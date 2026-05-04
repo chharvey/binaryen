@@ -5,4 +5,4 @@ node_modules/
 dist/
 
 # generating documentation
-docs/out/
+# docs/out/ # this is commented out on branch `gh-pages` so docs can be published

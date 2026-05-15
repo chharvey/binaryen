@@ -108,28 +108,51 @@ Objects:
 
 
 ## Module Manipulation
-- Properties of `Module` as a namespace:
-	- `new Module.Tag(ref: TagRef)`:                              an object containing information about a **Tag**
-	- `new Module.Global(ref: GlobalRef)`:                        an object containing information about a **Global**
-	- `new Module.Memory(mod: Module, name: string)`:             an object containing information about a **Memory**
-	- `new Module.Table(ref: TableRef)`:                          an object containing information about a **Table**
-	- `new Module.Function(ref: FunctionRef)`:                    an object containing information about a **Function**
-	- `new Module.DataSegment(mod: Module, ref: DataSegmentRef)`: an object containing information about a **Data Segment**
-	- `new Module.ElementSegment(ref: ElementSegmentRef)`:        an object containing information about an **Element Segment**
-	- `new Module.Import()`:                                      an object containing information about an **Import** (🌱 empty for now)
-	- `new Module.Export(ref: ExportRef)`:                        an object containing information about an **Export**
+Properties of `Module` as a namespace:
+- `new Module.Tag(ref: TagRef)`:                              an object containing information about a **Tag**
+- `new Module.Global(ref: GlobalRef)`:                        an object containing information about a **Global**
+- `new Module.Memory(mod: Module, name: string)`:             an object containing information about a **Memory**
+- `new Module.Table(ref: TableRef)`:                          an object containing information about a **Table**
+- `new Module.Function(ref: FunctionRef)`:                    an object containing information about a **Function**
+- `new Module.DataSegment(mod: Module, ref: DataSegmentRef)`: an object containing information about a **Data Segment**
+- `new Module.ElementSegment(ref: ElementSegmentRef)`:        an object containing information about an **Element Segment**
+- `new Module.Import()`:                                      an object containing information about an **Import** (🌱 empty for now)
+- `new Module.Export(ref: ExportRef)`:                        an object containing information about an **Export**
 
-- Properties of `Module` instances (see full list of methods in generated docs):
-	- `Module#wasm`:            [build WASM expressions](#expression-building)
-	- `Module#tags`:            **Tag** manipulation
-	- `Module#globals`:         **Global** manipulation
-	- `Module#memories`:        **Memory** manipulation
-	- `Module#tables`:          **Table** manipulation
-	- `Module#functions`:       **Function** manipulation
-	- `Module#dataSegments`:    **Data Segment** manipulation
-	- `Module#elementSegments`: **Element Segment** manipulation
-	- `Module#imports`:         **Import** manipulation
-	- `Module#exports`:         **Export** manipulation
+Properties of `Module` instances (see full list of methods in generated docs):
+- `Module#wasm`:            [build WASM expressions](#expression-building)
+- `Module#tags`:            **Tag** manipulation
+- `Module#globals`:         **Global** manipulation
+- `Module#memories`:        **Memory** manipulation
+- `Module#tables`:          **Table** manipulation
+- `Module#functions`:       **Function** manipulation
+- `Module#dataSegments`:    **Data Segment** manipulation
+- `Module#elementSegments`: **Element Segment** manipulation
+- `Module#imports`:         **Import** manipulation
+- `Module#exports`:         **Export** manipulation
+
+Module methods (see signatures and descriptions in generated docs):
+- Emission & Execution
+	- `.emitText()`
+	- `.emitStackIR()`
+	- `.emitAsmjs()`
+	- `.emitBinary()`
+	- `.interpret()`
+	- `.dispose()`
+- Validation & Optimization
+	- `.validate()`
+	- `.optimize()`
+	- `.optimizeFunction()`
+	- `.runPasses()`
+	- `.runPassesOnFunction()`
+- Debugging
+	- `.addDebugInfoFileName()`
+	- `.getDebugInfoFileName()`
+	- `.setDebugLocation()`
+	- `.setTypeName()`
+	- `.setFieldName()`
+	- `.addCustomSection()`
+	- `.updateMaps()`
 
 
 
@@ -145,9 +168,9 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.drop()`
 	- `.select()`
 - conditionals, blocks, loops, and breaking (“branching”)
-	- `.if()`
 	- `.block()`
 	- `.loop()`
+	- `.if()`
 	- `.br()`, `.br_if()`, `.br_table()`
 	- `.br_on_null()`, `.br_on_non_null()`, `.br_on_cast()`, `.br_on_cast_fail()`
 - function calls, returns, throws, and catching
@@ -169,6 +192,9 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.ref.func()`, `.ref.null()`, `.ref.is_null()`, `.ref.as_non_null()`, `.ref.eq()`, `.ref.test()`, `.ref.cast()`
 	- `.ref.i31()`, `i31.get_{s,u}()`
 	- ~~`.extern.convert_any()`, `.any.convert_extern()`~~; ⛔️ not yet supported
+- tuples 🌱 (Binaryen-specific)
+	- `.tuple.make()`
+	- `.tuple.extract()`
 - structs and arrays
 	- `.struct.new()`, `.struct.new_default()`
 	- `.struct.get()`, `.struct.get_{s,u}()`
@@ -181,6 +207,8 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.array.copy()`
 	- `.array.init_data()`, `.array.init_elem()`
 - integers
+	- `.{i32,i64}.load()`, `.{i32,i64}.load8_{s,u}()`, `.{i32,i64}.load16_{s,u}()`, `.i64.load32_{s,u}()`
+	- `.{i32,i64}.store()`, `.{i32,i64}.store8()`, `.{i32,i64}.store16()`, `.i64.store32()`
 	- `.{i32,i64}.const()`
 	- `.{i31,i32}.clz()`, `.{i32,i64}.ctz()`, `.{i32,i64}.popcnt()`
 	- `.{i32,i64}.extend8_s()`, `.{i32,i64}.extend16_s()`, `.i64.extend32_s()`
@@ -195,37 +223,101 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.i32.trunc_sat_f32_{s,u}()`, `.i32.trunc_sat_f64_{s,u}()`
 	- `.i64.trunc_sat_f32_{s,u}()`, `.i64.trunc_sat_f64_{s,u}()`
 	- `.i32.reinterpret_f32()`, `.i64.reinterpret_f64()`
+	- 🌱 WideInt proposal: `.add128()`, `.sub128()`, `.mul_wide_{s,u}()`
 - floats
+	- `.{f32,f64}.load()`, `.{f32,f64}.store()`
 	- `.{f32,f64}.const()`
 	- `.{f32,f64}.abs()`, `.{f32,f64}.neg()`, `.{f32,f64}.sqrt()`, `.{f32,f64}.ceil()`, `.{f32,f64}.floor()`, `.{f32,f64}.trunc()`, `.{f32,f64}.nearest()`
 	- `.{f32,f64}.add()`, `.{f32,f64}.sub()`, `.{f32,f64}.mul()`, `.{f32,f64}.div()`, `.{f32,f64}.min()`, `.{f32,f64}.max()`, `.{f32,f64}.copysign()`
 	- `.{f32,f64}.eq()`, `.{f32,f64}.lt()`, `.{f32,f64}.gt()`, `.{f32,f64}.le()`, `.{f32,f64}.ge()`
 	- `.{f32,f64}.convert_i32_s()`, `.{f32,f64}.convert_i32_u()`, `.{f32,f64}.convert_i64_s()`, `.{f32,f64}.convert_i64_u()`
 	- `.f32.demote_f64()`, `.f64.promote_f32()`
-- tuples 🌱 (Binaryen-specific)
-	- `.tuple.make()`
-	- `.tuple.extract()`
+- vectors
+	- `.v128.load()`
+	- `.v128.load{8x8,16x4,32x2}_{s,u}()`
+	- `.v128.load{8,16,32,64}_splat()`
+	- `.v128.load{32,64}_zero()`
+	- `.v128.load{8,16,32,64}_lane()`
+	- `.v128.store()`
+	- `.v128.store{8,16,32,64}_lane()`
+	- `.v128.const()`
+	- `.v128.not()`
+	- `.v128.and()`, `.v128.andnot()`, `.v128.or()`, `.v128.xor()`
+	- `.v128.bitselect()`
+	- `.v128.anytrue()`
+- SIMD ints
+	- `.{i8x16,i16x8,i32x4,i64x2}.abs()`, `.{i8x16,i16x8,i32x4,i64x2}.neg()`, `.i8x16.popcnt()`
+	>
+	- `.{i8x16,i16x8,i32x4,i64x2}.add()`
+	- `.{i8x16,i16x8,i32x4,i64x2}.sub()`
+	- `.{i8x16,i16x8}.add_sat_{s,u}()`
+	- `.{i8x16,i16x8}.sub_sat_{s,u}()`
+	- `.{i16x8,i32x4,i64x2}.mul()`
+	- `.{i8x16,i16x8}.avgr_u()`
+	- `.i16x8.q15mulr_sat_s()`
+	- `.i16x8.relaxed_q15mulr_s()`
+	- `.{i8x16,i16x8,i32x4}.min{s,u}()`
+	- `.{i8x16,i16x8,i32x4}.max{s,u}()`
+	>
+	- `.{i8x16,i16x8,i32x4,i64x2}.relaxed_laneselect()`
+	- `.{i8x16,i16x8,i32x4,i64x2}.all_true()`
+	- `.{i8x16,i16x8,i32x4,i64x2}.eq()`
+	- `.{i8x16,i16x8,i32x4,i64x2}.ne()`
+	- `.{i8x16,i16x8,i32x4}.lt_{s,u}()`, `.i64x2.lt_s()`
+	- `.{i8x16,i16x8,i32x4}.gt_{s,u}()`, `.i64x2.gt_s()`
+	- `.{i8x16,i16x8,i32x4}.le_{s,u}()`, `.i64x2.le_s()`
+	- `.{i8x16,i16x8,i32x4}.ge_{s,u}()`, `.i64x2.ge_s()`
+	>
+	- `.{i8x16,i16x8,i32x4,i64x2}.shl()`
+	- `.{i8x16,i16x8,i32x4,i64x2}.shr{s,u}()`
+	- `.{i8x16,i16x8,i32x4,i64x2}.bitmask()`
+	- `.i8x16.swizzle()`, `.i8x16.relaxed_swizzle()`
+	- `.i8x16.shuffle()`
+	>
+	- `.i16x8.extadd_pairwise_i8x16_{s,u}()`, `.i32x4.extadd_pairwise_i16x8_{s,u}()`
+	- `.i16x8.extmul_{low,high}_i8x16_{s,u}()`, `.i32x4.extmul_{low,high}_i16x8_{s,u}()`, `.i64x2.extmul_{low,high}_i32x4_{s,u}()`
+	- `.i32x4.dot_i16x8_s()`
+	- `.i16x8.relaxed_dot_i8x16_i7x16_s()`
+	- `.i32x4.relaxed_dot_i8x16_i7x16_add_s()`
+	- `.i8x16.narrow_i16x8_{s,u}()`, `.i16x8.narrow_i32x4_{s,u}()`
+	>
+	- `.i16x8.extend_{low,high}_i8x16_{s,u}()`, `.i32x4.extend_{low,high}_i16x8_{s,u}()`, `.i64x2.extend_{low,high}_i32x4_{s,u}()`
+	- `.i32x4.trunc_sat_f32x4_{s,u}()`, `.i32x4.trunc_sat_f64x2_{s,u}_zero()`
+	- `.i32x4.relaxed_trunc_f32x4_{s,u}()`, `.i32x4.relaxed_trunc_f64x2_{s,u}_zero()`
+- SIMD floats
+	- `.{f32x4,f64x2}.abs()`, `.{f32x4,f64x2}.neg()`, `.{f32x4,f64x2}.sqrt()`, `.{f32x4,f64x2}.ceil()`, `.{f32x4,f64x2}.floor()`, `.{f32x4,f64x2}.trunc()`, `.{f32x4,f64x2}.nearest()`
+	- `.{f32x4,f64x2}.add()`, `.{f32x4,f64x2}.sub()`, `.{f32x4,f64x2}.mul()`, `.{f32x4,f64x2}.div()`, `.{f32x4,f64x2}.min()`, `.{f32x4,f64x2}.max()`, `.{f32x4,f64x2}.pmin()`, `.{f32x4,f64x2}.pmax()`, `.{f32x4,f64x2}.relaxed_min()`, `.{f32x4,f64x2}.relaxed_max()`
+	- `.{f32x4,f64x2}.relaxed_madd()`, `.{f32x4,f64x2}.relaxed_nmadd()`
+	- `.{f32x4,f64x2}.eq()`, `.{f32x4,f64x2}.ne()`, `.{f32x4,f64x2}.lt()`, `.{f32x4,f64x2}.gt()`, `.{f32x4,f64x2}.le()`, `.{f32x4,f64x2}.ge()`
+	- `.f32x4.convert_i32x4_{s,u}()`, `.f64x2.convert_low_i32x4_{s,u}()`
+	- `.f32x4.demote_f64x2_zero()`, `.f64x2.promote_low_f32x4()`
+- SIMD vectors
+	- `.{i8x16,i16x8,i32x4,i64x2,f32x4,f64x2}.splat()`
+	- `.{i8x16,i16x8}.extract_lane_{s,u}()`, `.{i32x4,i64x2,f32x4,f64x2}.extract_lane()`
+	- `.{i8x16,i16x8,i32x4,i64x2,f32x4,f64x2}.replace_lane()`
 
 
 
 ## Expression Manipulation
-Expression info classes all live under the global `EXPR` namespace.
+Expression info classes all live under the global `expressions` namespace.
 They can be used to inspect and manipulate expressions.
 See generated docs for fields, methods, and descriptions of each.
 
-- `EXPR.Expression` (root class)
+- `expressions.Expression` (root class)
 - parametric instructions
-	- `EXPR.Drop`
-	- `EXPR.Select`
+	- `expressions.Drop`
+	- `expressions.Select`
 - control instructions
-	- `EXPR.Block`
-	- `EXPR.Loop`
-	- `EXPR.Break`
+	- `expressions.Block`
+	- `expressions.Loop`
+	- `expressions.Break`
 - variable instructions
-	- `EXPR.LocalGet`
-	- `EXPR.LocalSet`
+	- `expressions.LocalGet`
+	- `expressions.LocalSet`
+	- `expressions.GlobalGet`
+	- `expressions.GlobalSet`
 - numeric instructions
-	- `EXPR.Const`
+	- `expressions.Const`
 
 
 
@@ -246,11 +338,11 @@ Enum names have been singularized.
 - `ElementSegmentInfo` &rarr; `Module.ElementSegment`
 - `ExportInfo`         &rarr; `Module.Export`
 
-`ExpressionInfo` and related types are now classes in the `EXPR` namespace:
-- `ExpressionInfo` &rarr; `EXPR.Expression`
-- `BlockInfo`      &rarr; `EXPR.Block`
-- `LoopInfo`       &rarr; `EXPR.Loop`
-- `IfInfo`         &rarr; `EXPR.If`
+`ExpressionInfo` and related types are now classes in the `expressions` namespace:
+- `ExpressionInfo` &rarr; `expressions.Expression`
+- `BlockInfo`      &rarr; `expressions.Block`
+- `LoopInfo`       &rarr; `expressions.Loop`
+- `IfInfo`         &rarr; `expressions.If`
 - etc.
 
 ~~`MemorySegmentInfo`~~ ❌ has been removed.
@@ -293,17 +385,23 @@ Some of `Module`’s instance methods have been converted into getters/setters:
 - `Module#getFeatures()`        &rarr; `Module#features`
 - `Module#setFeatures()`        &rarr; `Module#features`
 
-`Module#copyExpression(expr)` has been moved to the global function `copyExpression(expr, mod)` where it lives alongside `getExpressionInfo` et al.
+Global `getSideEffects(expr, mod)` has been moved to `Module#getSideEffects()` where it lives alongside `Module#copyExpression()`.
 
-All “type” properties (`.i32`, `.i64`, etc) on `Module` previously served as namespaces containing functions for building expressions.
-(E.g., `Module#i32.add()` produced an `(i32.add)` WASM instruction.)
-These have all migrated to `Module#wasm`, an [Expression Builder](#expression-building).
-These properties also each contained its own `.pop()` method, which didn’t build a WASM expression,
+All expression creation methods (`.nop()`, `.drop()`, `.block()`, `.call()`, etc.) directly on `Module`
+were functions for building expressions, and have migrated to `Module#wasm`, an [Expression Builder](#expression-building).
+
+All “type” properties (`.i32`, `.i64`, etc) on `Module` previously served as namespaces containing similar functions.
+(E.g., `Module#i32.add()` produced an `(i32.add)` WASM instruction.) These also have all migrated to `Module#wasm`.
+
+These “type” properties also each contained its own `.pop()` method, which didn’t build a WASM expression,
 but was a pseudo-instruction enabling Binaryen to reason about multiple values on the stack.
 They have been combined into one method on Module, `Module#pop(t: Type)`, where `t` is one of the corresponding type namespaces.
 
 
 ### Expression Builder Methods
+These methods were previously directly on the `Module` class, and have been moved to `Module#wasm`.
+Some of them have also been renamed to align with the WASM spec.
+
 Note: To improve readability, assume all methods written in this section are bound to an Expression Builder (an object returned by `Module#wasm`).
 
 - `.break()`              &rarr; `.br()`
@@ -326,7 +424,7 @@ Many numeric methods have been renamed:
 - `.i32.trunc_s_sat.f64()` &rarr; `.i32.trunc_sat_f64_s()`
 - `.i32.trunc_u_sat.f32()` &rarr; `.i32.trunc_sat_f32_u()`
 - `.i32.trunc_u_sat.f64()` &rarr; `.i32.trunc_sat_f64_u()`
-- `.reinterpret()`         &rarr; `.reinterpret_f32()`
+- `.i32.reinterpret()`     &rarr; `.i32.reinterpret_f32()`
 >
 - `.i64.extend_s()`        &rarr; `.i64.extend_i32_s()`
 - `.i64.extend_u()`        &rarr; `.i64.extend_i32_u()`
@@ -338,7 +436,7 @@ Many numeric methods have been renamed:
 - `.i64.trunc_s_sat.f64()` &rarr; `.i64.trunc_sat_f64_s()`
 - `.i64.trunc_u_sat.f32()` &rarr; `.i64.trunc_sat_f32_u()`
 - `.i64.trunc_u_sat.f64()` &rarr; `.i64.trunc_sat_f64_u()`
-- `.reinterpret()`         &rarr; `.reinterpret_f64()`
+- `.i64.reinterpret()`     &rarr; `.i64.reinterpret_f64()`
 >
 - `.f32.convert_s.i32()` &rarr; `.f32.convert_i32_s()`
 - `.f32.convert_s.i64()` &rarr; `.f32.convert_i64_s()`

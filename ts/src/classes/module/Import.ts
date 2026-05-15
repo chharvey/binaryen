@@ -1,13 +1,14 @@
 import {
 	BinaryenObj,
 } from "../../-pre.ts";
+import {
+	PTR,
+	preserveStack,
+	strToStack,
+} from "../../-utils.ts";
 import type {
 	Type,
 } from "../../constants.ts";
-import {
-	preserveStack,
-	strToStack,
-} from "../../utils.ts";
 import type {
 	Module,
 } from "./Module.ts";
@@ -16,7 +17,6 @@ import type {
 
 /**
  * Information about an import in a WASM module.
- * @see {@link ModuleImports}
  */
 export class Import {
 	constructor() {}
@@ -25,7 +25,8 @@ export class Import {
 
 
 /**
- * Methods for manipulating {@link Import | imports} in a WASM module.
+ * Methods for manipulating imports in a WASM module.
+ * @inline
  */
 export class ModuleImports {
 	constructor(private readonly mod: Module) {}
@@ -56,14 +57,12 @@ export class ModuleImports {
 	}
 
 	#addComponent(binaryenFuncName: string, internalName: string, externalModuleName: string, externalBaseName: string, ...rest: any[]): void {
-		return preserveStack(() => {
-			BinaryenObj[binaryenFuncName](
-				this.mod.ptr,
-				strToStack(internalName),
-				strToStack(externalModuleName),
-				strToStack(externalBaseName),
-				...rest,
-			);
-		});
+		preserveStack(() => BinaryenObj[binaryenFuncName](
+			this.mod[PTR],
+			strToStack(internalName),
+			strToStack(externalModuleName),
+			strToStack(externalBaseName),
+			...rest,
+		));
 	}
 }

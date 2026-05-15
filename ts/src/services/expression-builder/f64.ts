@@ -4,59 +4,83 @@ import {
 import type {
 	Module,
 } from "../../classes/module/Module.ts";
+import {
+	type ExpressionRef,
+	Operation,
+	f64 as f64_t,
+} from "../../constants.ts";
+import {
+	binaryFn,
+	constant,
+	loadFn,
+	storeFn,
+	unaryFn,
+} from "./-utils.ts";
 
 
 
-/** Placeholder. */
-const STUB = (..._args: readonly number[]): number => 0;
-
-
-
-/** @see https://webassembly.github.io/spec/core/syntax/instructions.html#numeric-instructions */
-export function f64(_mod: Module) {
+/**
+ * @see https://webassembly.github.io/spec/core/syntax/instructions.html#memory-instructions
+ * @see https://webassembly.github.io/spec/core/syntax/instructions.html#numeric-instructions
+ */
+export function f64(mod: Module) {
 	return {
-		const: STUB,
+		load: loadFn(mod, f64_t, 8, true),
+		store: storeFn(mod, f64_t, 8),
 
-		abs: STUB,
-		neg: STUB,
-		sqrt: STUB,
-		ceil: STUB,
-		floor: STUB,
-		trunc: STUB,
-		nearest: STUB,
+		/** Return a static constant f64. */
+		const: (value: number): ExpressionRef => (
+			constant(mod, "_BinaryenLiteralFloat64", value)
+		),
 
-		add: STUB,
-		sub: STUB,
-		mul: STUB,
-		div: STUB,
-		min: STUB,
-		max: STUB,
-		copysign: STUB,
+		const_bits: (value: number | bigint): ExpressionRef => (
+			constant(mod, "_BinaryenLiteralFloat64Bits", BigInt(value))
+		),
 
-		eq: STUB,
-		ne: STUB,
-		lt: STUB,
-		gt: STUB,
-		le: STUB,
-		ge: STUB,
+		abs: unaryFn(mod, Operation.AbsFloat64),
+		neg: unaryFn(mod, Operation.NegFloat64),
+		sqrt: unaryFn(mod, Operation.SqrtFloat64),
+		ceil: unaryFn(mod, Operation.CeilFloat64),
+		floor: unaryFn(mod, Operation.FloorFloat64),
+		trunc: unaryFn(mod, Operation.TruncFloat64),
+		nearest: unaryFn(mod, Operation.NearestFloat64),
 
-		convert_i32_s: STUB,
-		convert_i32_u: STUB,
-		convert_i64_s: STUB,
-		convert_i64_u: STUB,
-		reinterpret_f64: STUB,
+		add: binaryFn(mod, Operation.AddFloat64),
+		sub: binaryFn(mod, Operation.SubFloat64),
+		mul: binaryFn(mod, Operation.MulFloat64),
+		div: binaryFn(mod, Operation.DivFloat64),
+		min: binaryFn(mod, Operation.MinFloat64),
+		max: binaryFn(mod, Operation.MaxFloat64),
+		copysign: binaryFn(mod, Operation.CopySignFloat64),
 
-		prmote_f32: STUB,
+		eq: binaryFn(mod, Operation.EqFloat64),
+		ne: binaryFn(mod, Operation.NeFloat64),
+		lt: binaryFn(mod, Operation.LtFloat64),
+		gt: binaryFn(mod, Operation.GtFloat64),
+		le: binaryFn(mod, Operation.LeFloat64),
+		ge: binaryFn(mod, Operation.GeFloat64),
+
+		convert_i32_s: unaryFn(mod, Operation.ConvertSInt32ToFloat64),
+		convert_i32_u: unaryFn(mod, Operation.ConvertUInt32ToFloat64),
+		convert_i64_s: unaryFn(mod, Operation.ConvertSInt64ToFloat64),
+		convert_i64_u: unaryFn(mod, Operation.ConvertUInt64ToFloat64),
+		reinterpret_f64: unaryFn(mod, Operation.ReinterpretInt64),
+
+		promote_f32: unaryFn(mod, Operation.PromoteFloat32),
 
 		/** @deprecated */
 		convert_s: {
-			/** @deprecated Use `.convert_i32_s()` instead. */ i32: STUB,
-			/** @deprecated Use `.convert_i64_s()` instead. */ i64: STUB,
+			// @ts-expect-error
+			/** @deprecated Use `.convert_i32_s()` instead. */ i32: (...args) => { consoleWarn("`.convert_s.i32()` is deprecated; use `.convert_i32_s()` instead."); return f64(mod).convert_i32_s(...args); },
+			// @ts-expect-error
+			/** @deprecated Use `.convert_i64_s()` instead. */ i64: (...args) => { consoleWarn("`.convert_s.i64()` is deprecated; use `.convert_i64_s()` instead."); return f64(mod).convert_i64_s(...args); },
 		},
 		/** @deprecated */
 		convert_u: {
-			/** @deprecated Use `.convert_i32_u()` instead. */ i32: STUB,
-			/** @deprecated Use `.convert_i64_u()` instead. */ i64: STUB,
+			// @ts-expect-error
+			/** @deprecated Use `.convert_i32_u()` instead. */ i32: (...args) => { consoleWarn("`.convert_u.i32()` is deprecated; use `.convert_i32_u()` instead."); return f64(mod).convert_i32_u(...args); },
+			// @ts-expect-error
+			/** @deprecated Use `.convert_i64_u()` instead. */ i64: (...args) => { consoleWarn("`.convert_u.i64()` is deprecated; use `.convert_i64_u()` instead."); return f64(mod).convert_i64_u(...args); },
 		},
 		// @ts-expect-error
 		/** @deprecated Use `.reinterpret_i64()` instead. */ reinterpret(...args) { consoleWarn("`.reinterpret()` is deprecated; use `.reinterpret_i64()` instead."); return this.reinterpret_i64(...args); },

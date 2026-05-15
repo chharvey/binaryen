@@ -1,56 +1,52 @@
+/* eslint-disable @stylistic/object-curly-newline */
+import {
+	BinaryenObj,
+} from "../../-pre.ts";
+import {
+	PTR,
+} from "../../-utils.ts";
 import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
 	array,
-} from "./array.ts";
+	struct,
+	tuple,
+} from "./aggregate.ts";
+import {f32} from "./f32.ts";
+import {f32x4} from "./f32x4.ts";
+import {f64} from "./f64.ts";
+import {f64x2} from "./f64x2.ts";
 import {
-	control,
-} from "./control.ts";
+	blocks,
+	breaks,
+	calls,
+	parametrics,
+	throws,
+} from "./generic.ts";
+import {i8x16} from "./i8x16.ts";
+import {i16x8} from "./i16x8.ts";
+import {i32} from "./i32.ts";
+import {i32x4} from "./i32x4.ts";
+import {i64} from "./i64.ts";
+import {i64x2} from "./i64x2.ts";
 import {
-	f32,
-} from "./f32.ts";
-import {
-	f64,
-} from "./f64.ts";
-import {
-	global,
-} from "./global.ts";
-import {
-	i31,
-} from "./i31.ts";
-import {
-	i32,
-} from "./i32.ts";
-import {
-	i64,
-} from "./i64.ts";
-import {
-	local,
-} from "./local.ts";
-import {
+	data,
 	memory,
 } from "./memory.ts";
 import {
-	parametric,
-} from "./parametric.ts";
-import {
+	i31,
 	ref,
-} from "./ref.ts";
-import {
-	struct,
-} from "./struct.ts";
+} from "./reference.ts";
 import {
 	table,
 } from "./table.ts";
+import {v128} from "./v128.ts";
 import {
-	tuple,
-} from "./tuple.ts";
-
-
-
-/** Placeholder. */
-const STUB = (..._args: readonly number[]): number => 0;
+	global,
+	local,
+} from "./variable.ts";
+/* eslint-enable @stylistic/object-curly-newline */
 
 
 
@@ -67,25 +63,36 @@ export function expressionBuilder(mod: Module) {
 	 * If any object literal has more than one property, move it out into a separate function.
 	 */
 	return {
-		...parametric(mod),
-		...control(mod),
+		...parametrics(mod),
+		...blocks(mod),
+		...breaks(mod),
+		...calls(mod),
+		...throws(mod),
 		local: local(mod),
 		global: global(mod),
 		table: table(mod),
-		elem: {drop: STUB},
+		// TODO: elem.drop
 		memory: memory(mod),
-		data: {drop: STUB},
+		data: data(mod),
 		ref: ref(mod),
+		i31: i31(mod),
+		// TODO: extern.convert_any
+		// TODO: any.convert_extern
+		tuple: tuple(mod),
 		struct: struct(mod),
 		array: array(mod),
-		i31: i31(mod),
-		// TODO: extern
-		// TODO: any
 		i32: i32(mod),
 		i64: i64(mod),
 		f32: f32(mod),
 		f64: f64(mod),
-		tuple: tuple(mod),
+		v128: v128(mod),
+		i8x16: i8x16(mod),
+		i16x8: i16x8(mod),
+		i32x4: i32x4(mod),
+		i64x2: i64x2(mod),
+		f32x4: f32x4(mod),
+		f64x2: f64x2(mod),
+		atomic: {fence: () => BinaryenObj["_BinaryenAtomicFence"](mod[PTR])},
 	} as const;
 }
 

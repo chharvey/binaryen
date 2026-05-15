@@ -6,31 +6,134 @@
 import {
 	_free,
 	_malloc,
+	HEAP8,
+	HEAPU32,
 	BinaryenObj,
 	getExceptionMessage,
 	stackAlloc,
 	stringToAscii,
 } from "./-pre.ts";
 import {
+	PTR,
+	i32sToStack,
+	preserveStack,
+} from "./-utils.ts";
+import {
 	type Feature,
 	Module,
 } from "./classes/module/Module.ts";
+import * as expressions from "./classes/expression/index.ts";
 import {
-	Expression,
-} from "./classes/expression/Expression.ts";
-import type {
 	ExpressionId,
-	ExpressionRef,
-	HeapType,
-	SideEffect,
-	Type,
+	type ExpressionRef,
+	type HeapType,
+	type Type,
 } from "./constants.ts";
-import {
-	HEAP8,
-	HEAPU32,
-	i32sToStack,
-	preserveStack,
-} from "./utils.ts";
+
+
+
+const EXPRESSION_TYPE_REGISTRY: ReadonlyMap<ExpressionId, new (expr: ExpressionRef) => expressions.Expression> = new Map<ExpressionId, new (expr: ExpressionRef) => expressions.Expression>([
+	// Parametric Instructions
+	[ExpressionId.Drop, expressions.Drop],
+	[ExpressionId.Select, expressions.Select],
+
+	// Control Instructions
+	[ExpressionId.Block, expressions.Block],
+	[ExpressionId.Loop, expressions.Loop],
+	[ExpressionId.If, expressions.If],
+	[ExpressionId.Break, expressions.Break],
+	[ExpressionId.Switch, expressions.Switch],
+	[ExpressionId.BrOn, expressions.BrOn],
+	[ExpressionId.Call, expressions.Call],
+	[ExpressionId.CallRef, expressions.CallRef],
+	[ExpressionId.CallIndirect, expressions.CallIndirect],
+	[ExpressionId.Return, expressions.Return],
+	[ExpressionId.Throw, expressions.Throw],
+	[ExpressionId.Rethrow, expressions.Rethrow],
+	[ExpressionId.Try, expressions.Try],
+
+	// Variable Instructions
+	[ExpressionId.LocalGet, expressions.LocalGet],
+	[ExpressionId.LocalSet, expressions.LocalSet],
+	[ExpressionId.GlobalGet, expressions.GlobalGet],
+	[ExpressionId.GlobalSet, expressions.GlobalSet],
+
+	// Table Instructions
+	[ExpressionId.TableGet, expressions.TableGet],
+	[ExpressionId.TableSet, expressions.TableSet],
+	[ExpressionId.TableSize, expressions.TableSize],
+	[ExpressionId.TableGrow, expressions.TableGrow],
+
+	// Memory Instructions
+	[ExpressionId.Load, expressions.Load],
+	[ExpressionId.Store, expressions.Store],
+	[ExpressionId.SIMDLoad, expressions.SIMDLoad],
+	[ExpressionId.SIMDLoadStoreLane, expressions.SIMDLoadStoreLane],
+	[ExpressionId.MemorySize, expressions.MemorySize],
+	[ExpressionId.MemoryGrow, expressions.MemoryGrow],
+	[ExpressionId.MemoryFill, expressions.MemoryFill],
+	[ExpressionId.MemoryCopy, expressions.MemoryCopy],
+	[ExpressionId.MemoryInit, expressions.MemoryInit],
+	[ExpressionId.DataDrop, expressions.DataDrop],
+
+	// Reference Instructions
+	[ExpressionId.RefFunc, expressions.RefFunc],
+	// TODO: [ExpressionId.RefNull, expressions.RefNull],
+	[ExpressionId.RefIsNull, expressions.RefIsNull],
+	[ExpressionId.RefAs, expressions.RefAs],
+	[ExpressionId.RefEq, expressions.RefEq],
+	[ExpressionId.RefTest, expressions.RefTest],
+	[ExpressionId.RefCast, expressions.RefCast],
+	[ExpressionId.RefI31, expressions.RefI31],
+	[ExpressionId.I31Get, expressions.I31Get],
+
+	// Aggregate Instructions
+	[ExpressionId.TupleMake, expressions.TupleMake],
+	[ExpressionId.TupleExtract, expressions.TupleExtract],
+	[ExpressionId.StructNew, expressions.StructNew],
+	[ExpressionId.StructGet, expressions.StructGet],
+	[ExpressionId.StructSet, expressions.StructSet],
+	[ExpressionId.ArrayNew, expressions.ArrayNew],
+	[ExpressionId.ArrayNewFixed, expressions.ArrayNewFixed],
+	[ExpressionId.ArrayNewData, expressions.ArrayNewData],
+	[ExpressionId.ArrayNewElem, expressions.ArrayNewElem],
+	[ExpressionId.ArrayGet, expressions.ArrayGet],
+	[ExpressionId.ArraySet, expressions.ArraySet],
+	[ExpressionId.ArrayLen, expressions.ArrayLen],
+	[ExpressionId.ArrayFill, expressions.ArrayFill],
+	[ExpressionId.ArrayCopy, expressions.ArrayCopy],
+	[ExpressionId.ArrayInitData, expressions.ArrayInitData],
+	[ExpressionId.ArrayInitElem, expressions.ArrayInitElem],
+
+	// Numeric & Vector Instructions
+	[ExpressionId.Const, expressions.Const],
+	[ExpressionId.Unary, expressions.Unary],
+	[ExpressionId.Binary, expressions.Binary],
+	[ExpressionId.WideIntAddSub, expressions.WideIntAddSub],
+	[ExpressionId.WideIntMul, expressions.WideIntMul],
+	[ExpressionId.SIMDTernary, expressions.SIMDTernary],
+	[ExpressionId.SIMDShift, expressions.SIMDShift],
+	[ExpressionId.SIMDShuffle, expressions.SIMDShuffle],
+	[ExpressionId.SIMDExtract, expressions.SIMDExtract],
+	[ExpressionId.SIMDReplace, expressions.SIMDReplace],
+
+	// Atomic Instructions
+	[ExpressionId.AtomicRMW, expressions.AtomicRMW],
+	[ExpressionId.AtomicCmpxchg, expressions.AtomicCmpxchg],
+	[ExpressionId.AtomicWait, expressions.AtomicWait],
+	[ExpressionId.AtomicNotify, expressions.AtomicNotify],
+	[ExpressionId.AtomicFence, expressions.AtomicFence],
+
+	// String Instructions
+	[ExpressionId.StringNew, expressions.StringNew],
+	[ExpressionId.StringConst, expressions.StringConst],
+	[ExpressionId.StringMeasure, expressions.StringMeasure],
+	[ExpressionId.StringEncode, expressions.StringEncode],
+	[ExpressionId.StringConcat, expressions.StringConcat],
+	[ExpressionId.StringEq, expressions.StringEq],
+	[ExpressionId.StringWTF16Get, expressions.StringWTF16Get],
+	[ExpressionId.StringSliceWTF, expressions.StringSliceWTF],
+]);
 
 
 
@@ -41,7 +144,7 @@ import {
 function wrapModule(ptr: number): Module {
 	const returned = new Module();
 	// @ts-expect-error -- warning: reassigning a readonly field
-	returned.ptr = ptr;
+	returned[PTR] = ptr;
 	return returned;
 }
 
@@ -62,7 +165,7 @@ function handleFatalError<T>(func: () => T): T {
 			const [_, message] = getExceptionMessage(e);
 			if (message.startsWith("Fatal: ")) {
 				// eslint-disable-next-line preserve-caught-error
-				throw new Error(message.substr(7).trim());
+				throw new Error(message.slice(7).trim());
 			}
 		} else {
 			const err = e as Error;
@@ -195,16 +298,8 @@ export function getExpressionType(expr: ExpressionRef): Type {
  * Additional properties depend on the expression’s ID
  * and are usually equivalent to the respective parameters when creating such an expression.
  */
-export function getExpressionInfo(expr: ExpressionRef): Expression {
-	return new Expression(getExpressionId(expr), expr);
-}
-
-/** Gets the side effects of the specified expression. */
-export function getSideEffects(expr: ExpressionRef, mod: Module): SideEffect {
-	return BinaryenObj["_BinaryenExpressionGetSideEffects"](expr, mod.ptr);
-}
-
-/** Creates a deep copy of an expression. */
-export function copyExpression(expr: ExpressionRef, mod: Module): ExpressionRef {
-	return BinaryenObj["_BinaryenExpressionCopy"](expr, mod.ptr);
+export function getExpressionInfo(expr: ExpressionRef): expressions.Expression {
+	const id = getExpressionId(expr);
+	const specificExpression = EXPRESSION_TYPE_REGISTRY.get(id);
+	return specificExpression ? new specificExpression(expr) : new expressions.Expression(id, expr);
 }

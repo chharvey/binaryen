@@ -1,18 +1,18 @@
 import {
 	BinaryenObj,
+	HEAPU32,
 	stackAlloc,
 } from "../-pre.ts";
+import {
+	i8sToStack,
+	i32sToStack,
+	preserveStack,
+} from "../-utils.ts";
 import type {
 	HeapType,
 	PackedType,
 	Type,
 } from "../constants.ts";
-import {
-	HEAPU32,
-	i8sToStack,
-	i32sToStack,
-	preserveStack,
-} from "../utils.ts";
 
 
 

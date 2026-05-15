@@ -2,14 +2,15 @@ import {
 	BinaryenObj,
 	UTF8ToString,
 } from "../../-pre.ts";
+import {
+	PTR,
+	preserveStack,
+	strToStack,
+} from "../../-utils.ts";
 import type {
 	ExportRef,
 	ExternalKind,
 } from "../../constants.ts";
-import {
-	preserveStack,
-	strToStack,
-} from "../../utils.ts";
 import type {
 	Module,
 } from "./Module.ts";
@@ -18,7 +19,6 @@ import type {
 
 /**
  * Information about an export in a WASM module.
- * @see {@link ModuleExports}
  */
 export class Export {
 	readonly kind: ExternalKind;
@@ -36,31 +36,30 @@ export class Export {
 
 
 /**
- * Methods for manipulating {@link Export | exports} in a WASM module.
+ * Methods for manipulating exports in a WASM module.
+ * @inline
  */
 export class ModuleExports {
 	constructor(private readonly mod: Module) {}
 
 	/** Gets an export by name. */
 	get(externalName: string): ExportRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetExport"](this.mod.ptr, strToStack(externalName)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetExport"](this.mod[PTR], strToStack(externalName)));
 	}
 
 	/** Gets an export by index. */
 	getByIndex(index: number): ExportRef {
-		return BinaryenObj["_BinaryenGetExportByIndex"](this.mod.ptr, index);
+		return BinaryenObj["_BinaryenGetExportByIndex"](this.mod[PTR], index);
 	}
 
 	/** Gets the number of exports witin the module. */
 	count(): number {
-		return BinaryenObj["_BinaryenGetNumExports"](this.mod.ptr);
+		return BinaryenObj["_BinaryenGetNumExports"](this.mod[PTR]);
 	}
 
 	/** Removes an export, by external name. */
 	remove(externalName: string): void {
-		return preserveStack(() => {
-			BinaryenObj["_BinaryenRemoveExport"](this.mod.ptr, strToStack(externalName));
-		});
+		preserveStack(() => BinaryenObj["_BinaryenRemoveExport"](this.mod[PTR], strToStack(externalName)));
 	}
 
 	/** Adds a tag export. */
@@ -89,6 +88,6 @@ export class ModuleExports {
 	}
 
 	#addComponent(binaryenFuncName: string, internalName: string, externalName: string): ExportRef {
-		return preserveStack(() => BinaryenObj[binaryenFuncName](this.mod.ptr, strToStack(internalName), strToStack(externalName)));
+		return preserveStack(() => BinaryenObj[binaryenFuncName](this.mod[PTR], strToStack(internalName), strToStack(externalName)));
 	}
 }

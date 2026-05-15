@@ -2,15 +2,16 @@ import {
 	BinaryenObj,
 	UTF8ToString,
 } from "../../-pre.ts";
+import {
+	PTR,
+	preserveStack,
+	strToStack,
+} from "../../-utils.ts";
 import type {
 	ExpressionRef,
 	GlobalRef,
 	Type,
 } from "../../constants.ts";
-import {
-	preserveStack,
-	strToStack,
-} from "../../utils.ts";
 import type {
 	Module,
 } from "./Module.ts";
@@ -19,7 +20,6 @@ import type {
 
 /**
  * Information about a global in a WASM module.
- * @see {@link ModuleGlobals}
  */
 export class Global {
 	readonly name: string;
@@ -43,35 +43,34 @@ export class Global {
 
 
 /**
- * Methods for manipulating {@link Global | globals} in a WASM module.
+ * Methods for manipulating globals in a WASM module.
+ * @inline
  */
 export class ModuleGlobals {
 	constructor(private readonly mod: Module) {}
 
 	/** Adds a global instance variable. */
 	add(name: string, type: Type, mutable: boolean, init: ExpressionRef): GlobalRef {
-		return preserveStack(() => BinaryenObj["_BinaryenAddGlobal"](this.mod.ptr, strToStack(name), type, mutable, init));
+		return preserveStack(() => BinaryenObj["_BinaryenAddGlobal"](this.mod[PTR], strToStack(name), type, mutable, init));
 	}
 
 	/** Gets a global by name. */
 	get(name: string): GlobalRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetGlobal"](this.mod.ptr, strToStack(name)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetGlobal"](this.mod[PTR], strToStack(name)));
 	}
 
 	/** Gets a global by index. */
 	getByIndex(index: number): GlobalRef {
-		return BinaryenObj["_BinaryenGetGlobalByIndex"](this.mod.ptr, index);
+		return BinaryenObj["_BinaryenGetGlobalByIndex"](this.mod[PTR], index);
 	}
 
 	/** Gets the number of globals within the module. */
 	count(): number {
-		return BinaryenObj["_BinaryenGetNumGlobals"](this.mod.ptr);
+		return BinaryenObj["_BinaryenGetNumGlobals"](this.mod[PTR]);
 	}
 
 	/** Removes a global by name. */
 	remove(name: string): void {
-		return preserveStack(() => {
-			BinaryenObj["_BinaryenRemoveGlobal"](this.mod.ptr, strToStack(name));
-		});
+		preserveStack(() => BinaryenObj["_BinaryenRemoveGlobal"](this.mod[PTR], strToStack(name)));
 	}
 }

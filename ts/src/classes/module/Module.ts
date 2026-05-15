@@ -1,15 +1,25 @@
 import {
-	_BinaryenSizeofAllocateAndWriteResult,
 	_free,
 	BinaryenObj,
+	HEAPU8,
+	HEAPU32,
 	UTF8ToString,
 	stackAlloc,
 } from "../../-pre.ts";
+import {
+	PTR,
+	i8sToStack,
+	i32sToStack,
+	preserveStack,
+	strToStack,
+} from "../../-utils.ts";
 import {
 	type DataSegmentRef,
 	type ExpressionRef,
 	type FunctionRef,
 	type HeapType,
+	type ModuleRef,
+	type SideEffect,
 	type TableRef,
 	type Type,
 	i32,
@@ -27,9 +37,7 @@ import {
 	stringref,
 } from "../../constants.ts";
 import {
-	copyExpression,
-} from "../../globals.ts";
-import {
+	consoleWarn,
 	replacedBy,
 } from "../../lib.ts";
 import {
@@ -37,39 +45,46 @@ import {
 	expressionBuilder,
 } from "../../services/expression-builder/expressionBuilder.ts";
 import {
-	HEAPU8,
-	HEAPU32,
-	i8sToStack,
-	i32sToStack,
-	preserveStack,
-	strToStack,
-} from "../../utils.ts";
-import * as DATA_SEGMENT from "./DataSegment.ts";
-import * as ELEMENT_SEGMENT from "./ElementSegment.ts";
-import * as EXPORT from "./Export.ts";
-import * as FUNCTION from "./Function.ts";
-import * as GLOBAL from "./Global.ts";
-import * as IMPORT from "./Import.ts";
-import * as MEMORY from "./Memory.ts";
-import * as TABLE from "./Table.ts";
-import * as TAG from "./Tag.ts";
+	DataSegment as DataSegment_,
+	ModuleDataSegments,
+} from "./DataSegment.ts";
+import {
+	ElementSegment as ElementSegment_,
+	ModuleElementSegments,
+} from "./ElementSegment.ts";
+import {
+	Export as Export_,
+	ModuleExports,
+} from "./Export.ts";
+import {
+	Function as Function_,
+	ModuleFunctions,
+} from "./Function.ts";
+import {
+	Global as Global_,
+	ModuleGlobals,
+} from "./Global.ts";
+import {
+	Import as Import_,
+	ModuleImports,
+} from "./Import.ts";
+import {
+	Memory as Memory_,
+	ModuleMemories,
+} from "./Memory.ts";
+import {
+	ModuleTables,
+	Table as Table_,
+} from "./Table.ts";
+import {
+	ModuleTags,
+	Tag as Tag_,
+} from "./Tag.ts";
 
 
 
 /** Probably used in `BinaryenObj["_BinaryenModulePrintAsmjs"]`. */
 declare let out: any;
-
-
-
-/**
- * The size of a single literal in memory as used in Const creation,
- * which is a little different: we don’t want users to need to make
- * their own Literals, as the C API handles them by value, which means
- * we would leak them. Instead, Const creation is fused together with
- * an intermediate stack allocation of this size to pass the value.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const SIZE_OF_LITERAL = BinaryenObj["_BinaryenSizeofLiteral"]();
 
 
 
@@ -96,8 +111,10 @@ export enum Feature {
 	FP16 = BinaryenObj["_BinaryenFeatureFP16"](),
 	BulkMemoryOpt = BinaryenObj["_BinaryenFeatureBulkMemoryOpt"](),
 	CallIndirectOverlong = BinaryenObj["_BinaryenFeatureCallIndirectOverlong"](),
+	// TODO: CustomDescriptors
 	RelaxedAtomics = BinaryenObj["_BinaryenFeatureRelaxedAtomics"](),
 	CustomPageSizes = BinaryenObj["_BinaryenFeatureCustomPageSizes"](),
+	// TODO: Multibyte
 	WideArithmetic = BinaryenObj["_BinaryenFeatureWideArithmetic"](),
 	All = BinaryenObj["_BinaryenFeatureAll"](),
 }
@@ -135,21 +152,28 @@ export enum Feature {
  * - has a property `.wasm`, a namespace for creating expressions in the module (`.wasm.nop()`, `.wasm.i32.add()`, etc.)
  */
 export class Module {
-	static readonly Tag = TAG.Tag;
-	static readonly Global = GLOBAL.Global;
-	static readonly Memory = MEMORY.Memory;
-	static readonly Table = TABLE.Table;
-	static readonly Function = FUNCTION.Function;
-	static readonly DataSegment = DATA_SEGMENT.DataSegment;
-	static readonly ElementSegment = ELEMENT_SEGMENT.ElementSegment;
-	static readonly Import = IMPORT.Import;
-	static readonly Export = EXPORT.Export;
+	/** @class */ static readonly Tag = Tag_;
+	/** @class */ static readonly Global = Global_;
+	/** @class */ static readonly Memory = Memory_;
+	/** @class */ static readonly Table = Table_;
+	/** @class */ static readonly Function = Function_;
+	/** @class */ static readonly DataSegment = DataSegment_;
+	/** @class */ static readonly ElementSegment = ElementSegment_;
+	/** @class */ static readonly Import = Import_;
+	/** @class */ static readonly Export = Export_;
 
-
-	readonly ptr: number = BinaryenObj["_BinaryenModuleCreate"]();
 
 	/**
-	 * This module’s {@link ExpressionBuilder | WASM expression builder}.
+	 * The underlying C-API pointer of the wrapped module.
+	 * @hidden
+	 */
+	readonly [PTR]: ModuleRef = BinaryenObj["_BinaryenModuleCreate"]();
+
+	// ## Expression Manipulation ## //
+	/**
+	 * This module’s WASM expression builder.
+	 *
+	 * See {@link ExpressionBuilder} for its type signature.
 	 *
 	 * N.B.: For convenience, developers may want to destructure the module to free `wasm`:
 	 * ```ts
@@ -162,10 +186,14 @@ export class Module {
 	 * const {i32, drop} = mod.wasm;
 	 * drop(i32.add(i32.const(3), i32.const(5)));
 	 * ```
+	 * @category Expression Manipulation
 	 */
 	readonly wasm: ExpressionBuilder = expressionBuilder(this);
 
-	/** Pseudo-instruction enabling Binaryen to reason about multiple values on the stack. */
+	/**
+	 * Pseudo-instruction enabling Binaryen to reason about multiple values on the stack.
+	 * @category Expression Manipulation
+	 */
 	pop(typ: Type): ExpressionRef {
 		if ([
 			i32,
@@ -182,116 +210,131 @@ export class Module {
 			externref,
 			stringref,
 		].includes(typ)) {
-			return BinaryenObj["_BinaryenPop"](this.ptr, typ);
+			return BinaryenObj["_BinaryenPop"](this[PTR], typ);
 		} else {
 			throw new Error(`Unexpected type ${ typ }.`);
 		}
 	}
 
+	/**
+	 * Gets the side effects of the specified expression.
+	 * @category Expression Manipulation
+	 */
+	getSideEffects(expr: ExpressionRef): SideEffect {
+		return BinaryenObj["_BinaryenExpressionGetSideEffects"](expr, this[PTR]);
+	}
+
+	/**
+	 * Creates a deep copy of an expression.
+	 * @category Expression Manipulation
+	 */
+	copyExpression(expr: ExpressionRef): ExpressionRef {
+		return BinaryenObj["_BinaryenExpressionCopy"](expr, this[PTR]);
+	}
+
 	// ## Module Component Operations ## //
 	// see https://webassembly.github.io/spec/core/syntax/modules.html
-	readonly tags = new TAG.ModuleTags(this);
-	readonly globals = new GLOBAL.ModuleGlobals(this);
-	readonly memories = new MEMORY.ModuleMemories(this);
-	readonly tables = new TABLE.ModuleTables(this);
-	readonly functions = new FUNCTION.ModuleFunctions(this);
-	readonly dataSegments = new DATA_SEGMENT.ModuleDataSegments(this);
-	readonly elementSegments = new ELEMENT_SEGMENT.ModuleElementSegments(this);
-	readonly imports = new IMPORT.ModuleImports(this);
-	readonly exports = new EXPORT.ModuleExports(this);
+	/** @category Module Component Operations */ readonly tags = new ModuleTags(this);
+	/** @category Module Component Operations */ readonly globals = new ModuleGlobals(this);
+	/** @category Module Component Operations */ readonly memories = new ModuleMemories(this);
+	/** @category Module Component Operations */ readonly tables = new ModuleTables(this);
+	/** @category Module Component Operations */ readonly functions = new ModuleFunctions(this);
+	/** @category Module Component Operations */ readonly dataSegments = new ModuleDataSegments(this);
+	/** @category Module Component Operations */ readonly elementSegments = new ModuleElementSegments(this);
+	/** @category Module Component Operations */ readonly imports = new ModuleImports(this);
+	/** @category Module Component Operations */ readonly exports = new ModuleExports(this);
 
 	/** @deprecated Use {@link Module#start | `this.start`} instead. */ @replacedBy("`this.start`") getStart() { return this.start; }
 	/** @deprecated Use {@link Module#start | `this.start`} instead. */ @replacedBy("`this.start`") setStart(start: FunctionRef) { this.start = start; }
 	/** @deprecated Use {@link Module#features | `this.features`} instead. */ @replacedBy("`this.features`") getFeatures() { return this.features; }
 	/** @deprecated Use {@link Module#features | `this.features`} instead. */ @replacedBy("`this.features`") setFeatures(features: Feature) { return this.features = features; }
 
-	/** The start function. */
-	get start(): FunctionRef {
-		return BinaryenObj["_BinaryenGetStart"](this.ptr);
-	}
-
-	set start(start: FunctionRef) {
-		BinaryenObj["_BinaryenSetStart"](this.ptr, start);
-	}
+	/**
+	 * The start function.
+	 * @category Module Component Operations
+	 */
+	get start(): FunctionRef { return BinaryenObj["_BinaryenGetStart"](this[PTR]); }
+	set start(start: FunctionRef) { BinaryenObj["_BinaryenSetStart"](this[PTR], start); }
 
 	/**
 	 * The WebAssembly features enabled for this module.
 	 * Features are a bitmask of `Feature` enum members.
+	 * @category Module Component Operations
 	 */
-	get features(): Feature {
-		return BinaryenObj["_BinaryenModuleGetFeatures"](this.ptr);
+	get features(): Feature { return BinaryenObj["_BinaryenModuleGetFeatures"](this[PTR]); }
+	set features(features: Feature) { BinaryenObj["_BinaryenModuleSetFeatures"](this[PTR], features); }
+
+	/** @deprecated Use {@link Module#tags | `this.tags.add`} instead. */ @replacedBy("`this.tags.add`") addTag(name: string, params: Type, results: Type) { return this.tags.add(name, params, results); }
+	/** @deprecated Use {@link Module#tags | `this.tags.get`} instead. */ @replacedBy("`this.tags.get`") getTag(name: string) { return this.tags.get(name); }
+	/** @deprecated Use {@link Module#tags | `this.tags.remove`} instead. */ @replacedBy("`this.tags.remove`") removeTag(name: string) { return this.tags.remove(name); }
+
+	/** @deprecated Use {@link Module#globals | `this.globals.add`} instead. */ @replacedBy("`this.globals.add`") addGlobal(name: string, type: Type, mutable: boolean, init: ExpressionRef) { return this.globals.add(name, type, mutable, init); }
+	/** @deprecated Use {@link Module#globals | `this.globals.get`} instead. */ @replacedBy("`this.globals.get`") getGlobal(name: string) { return this.globals.get(name); }
+	/** @deprecated Use {@link Module#globals | `this.globals.getByIndex`} instead. */ @replacedBy("`this.globals.getByIndex`") getGlobalByIndex(index: number) { return this.globals.getByIndex(index); }
+	/** @deprecated Use {@link Module#globals | `this.globals.count`} instead. */ @replacedBy("`this.globals.count`") getNumGlobals() { return this.globals.count(); }
+	/** @deprecated Use {@link Module#globals | `this.globals.remove`} instead. */ @replacedBy("`this.globals.remove`") removeGlobal(name: string) { return this.globals.remove(name); }
+
+	/** @deprecated Use {@link Module#memories | `this.memories.set`} instead. */ @replacedBy("`this.memories.set`") setMemory(initial: number, maximum: number, exportName: string, segments?: readonly any[], shared?: boolean, memory64?: boolean, internalName?: string) { return this.memories.set(initial, maximum, exportName, segments, shared, memory64, internalName); }
+	/** @deprecated Use {@link Module#memories | `this.memories.has`} instead. */ @replacedBy("`this.memories.has`") hasMemory() { return this.memories.has(); }
+
+	/** @deprecated Use {@link Module#tables | `this.tables.add`} instead. */ @replacedBy("`this.tables.add`") addTable(name: string, initial: number, maximum: number, type: Type = funcref, init?: ExpressionRef) { return this.tables.add(name, initial, maximum, type, init); }
+	/** @deprecated Use {@link Module#tables | `this.tables.get`} instead. */ @replacedBy("`this.tables.get`") getTable(name: string) { return this.tables.get(name); }
+	/** @deprecated Use {@link Module#tables | `this.tables.getByIndex`} instead. */ @replacedBy("`this.tables.getByIndex`") getTableByIndex(index: number) { return this.tables.getByIndex(index); }
+	/** @deprecated Use {@link Module#tables | `this.tables.getSegments`} instead. */ @replacedBy("`this.tables.getSegments`") getTableSegments(table: TableRef) { return this.tables.getSegments(table); }
+	/** @deprecated Use {@link Module#tables | `this.tables.count`} instead. */ @replacedBy("`this.tables.count`") getNumTables() { return this.tables.count(); }
+	/** @deprecated Use {@link Module#tables | `this.tables.remove`} instead. */ @replacedBy("`this.tables.remove`") removeTable(name: string) { return this.tables.remove(name); }
+
+	/** @deprecated Use {@link Module#functions | `this.functions.add`} instead. */ @replacedBy("`this.functions.add`") addFunction(name: string, params: Type, results: Type, varTypes: readonly Type[], body: ExpressionRef) { return this.functions.add(name, params, results, varTypes, body); }
+	/** @deprecated Use {@link Module#functions | `this.functions.get`} instead. */ @replacedBy("`this.functions.get`") getFunction(name: string) { return this.functions.get(name); }
+	/** @deprecated Use {@link Module#functions | `this.functions.getByIndex`} instead. */ @replacedBy("`this.functions.getByIndex`") getFunctionByIndex(index: number) { return this.functions.getByIndex(index); }
+	/** @deprecated Use {@link Module#functions | `this.functions.count`} instead. */ @replacedBy("`this.functions.count`") getNumFunctions() { return this.functions.count(); }
+	/** @deprecated Use {@link Module#functions | `this.functions.remove`} instead. */ @replacedBy("`this.functions.remove`") removeFunction(name: string) { return this.functions.remove(name); }
+
+	/** @deprecated Use {@link Module#dataSegments | `this.dataSegments.get`} instead. */ @replacedBy("`this.dataSegments.get`") getDataSegment(name: string) { return this.dataSegments.get(name); }
+	/** @deprecated Use {@link Module#dataSegments | `this.dataSegments.getByIndex`} instead. */ @replacedBy("`this.dataSegments.getByIndex`") getDataSegmentByIndex(index: number) { return this.dataSegments.getByIndex(index); }
+	/** @deprecated Use {@link Module#dataSegments | `this.dataSegments.count`} instead. */ @replacedBy("`this.dataSegments.count`") getNumDataSegments() { return this.dataSegments.count(); }
+
+	/** @deprecated Use {@link Module#elementSegments | `this.elementSegments.addActive`} instead. */ @replacedBy("`this.elementSegments.addActive`") addActiveElementSegment(table: string, name: string, funcNames: readonly string[], offset: ExpressionRef) { return this.elementSegments.addActive(table, name, funcNames, offset); }
+	/** @deprecated Use {@link Module#elementSegments | `this.elementSegments.addPassive`} instead. */ @replacedBy("`this.elementSegments.addPassive`") addPassiveElementSegment(name: string, funcNames: readonly string[]) { return this.elementSegments.addPassive(name, funcNames); }
+	/** @deprecated Use {@link Module#elementSegments | `this.elementSegments.get`} instead. */ @replacedBy("`this.elementSegments.get`") getElementSegment(name: string) { return this.elementSegments.get(name); }
+	/** @deprecated Use {@link Module#elementSegments | `this.elementSegments.getByIndex`} instead. */ @replacedBy("`this.elementSegments.getByIndex`") getElementSegmentByIndex(index: number) { return this.elementSegments.getByIndex(index); }
+	/** @deprecated Use {@link Module#elementSegments | `this.elementSegments.count`} instead. */ @replacedBy("`this.elementSegments.count`") getNumElementSegments() { return this.elementSegments.count(); }
+	/** @deprecated Use {@link Module#elementSegments | `this.elementSegments.remove`} instead. */ @replacedBy("`this.elementSegments.remove`") removeElementSegment(name: string) { return this.elementSegments.remove(name); }
+
+	/** @deprecated Use {@link Module#imports | `this.imports.addTag`} instead. */ @replacedBy("`this.imports.addTag`") addTagImport(internalName: string, externalModuleName: string, externalBaseName: string, params: Type, results: Type) { return this.imports.addTag(internalName, externalModuleName, externalBaseName, params, results); }
+	/** @deprecated Use {@link Module#imports | `this.imports.addGlobal`} instead. */ @replacedBy("`this.imports.addGlobal`") addGlobalImport(internalName: string, externalModuleName: string, externalBaseName: string, globalType: Type, mutable: boolean) { return this.imports.addGlobal(internalName, externalModuleName, externalBaseName, globalType, mutable); }
+	/** @deprecated Use {@link Module#imports | `this.imports.addMemory`} instead. */ @replacedBy("`this.imports.addMemory`") addMemoryImport(internalName: string, externalModuleName: string, externalBaseName: string, shared: boolean) { return this.imports.addMemory(internalName, externalModuleName, externalBaseName, shared); }
+	/** @deprecated Use {@link Module#imports | `this.imports.addTable`} instead. */ @replacedBy("`this.imports.addTable`") addTableImport(internalName: string, externalModuleName: string, externalBaseName: string) { return this.imports.addTable(internalName, externalModuleName, externalBaseName); }
+	/** @deprecated Use {@link Module#imports | `this.imports.addFunction`} instead. */ @replacedBy("`this.imports.addFunction`") addFunctionImport(internalName: string, externalModuleName: string, externalBaseName: string, params: Type, results: Type) { return this.imports.addFunction(internalName, externalModuleName, externalBaseName, params, results); }
+
+	/** @deprecated Use {@link Module#exports | `this.exports.get`} instead. */ @replacedBy("`this.exports.get`") getExport(externalName: string) { return this.exports.get(externalName); }
+	/** @deprecated Use {@link Module#exports | `this.exports.getByIndex`} instead. */ @replacedBy("`this.exports.getByIndex`") getExportByIndex(index: number) { return this.exports.getByIndex(index); }
+	/** @deprecated Use {@link Module#exports | `this.exports.count`} instead. */ @replacedBy("`this.exports.count`") getNumExports() { return this.exports.count(); }
+	/** @deprecated Use {@link Module#exports | `this.exports.remove`} instead. */ @replacedBy("`this.exports.remove`") removeExport(externalName: string) { return this.exports.remove(externalName); }
+	/** @deprecated Use {@link Module#exports | `this.exports.addTag`} instead. */ @replacedBy("`this.exports.addTag`") addTagExport(internalName: string, externalName: string) { return this.exports.addTag(internalName, externalName); }
+	/** @deprecated Use {@link Module#exports | `this.exports.addGlobal`} instead. */ @replacedBy("`this.exports.addGlobal`") addGlobalExport(internalName: string, externalName: string) { return this.exports.addGlobal(internalName, externalName); }
+	/** @deprecated Use {@link Module#exports | `this.exports.addMemory`} instead. */ @replacedBy("`this.exports.addMemory`") addMemoryExport(internalName: string, externalName: string) { return this.exports.addMemory(internalName, externalName); }
+	/** @deprecated Use {@link Module#exports | `this.exports.addTable`} instead. */ @replacedBy("`this.exports.addTable`") addTableExport(internalName: string, externalName: string) { return this.exports.addTable(internalName, externalName); }
+	/** @deprecated Use {@link Module#exports | `this.exports.addFunction`} instead. */ @replacedBy("`this.exports.addFunction`") addFunctionExport(internalName: string, externalName: string) { return this.exports.addFunction(internalName, externalName); }
+
+	/** @category Module Component Operations */
+	getMemoryInfo(name: string): Memory_ {
+		return new Memory_(this, name);
 	}
 
-	set features(features: Feature) {
-		BinaryenObj["_BinaryenModuleSetFeatures"](this.ptr, features);
-	}
-
-	/** @deprecated Use {@link ModuleTags#add | `this.tags.add`} instead. */ @replacedBy("`this.tags.add`") addTag(name: string, params: Type, results: Type) { return this.tags.add(name, params, results); }
-	/** @deprecated Use {@link ModuleTags#add | `this.tags.get`} instead. */ @replacedBy("`this.tags.get`") getTag(name: string) { return this.tags.get(name); }
-	/** @deprecated Use {@link ModuleTags#add | `this.tags.remove`} instead. */ @replacedBy("`this.tags.remove`") removeTag(name: string) { return this.tags.remove(name); }
-
-	/** @deprecated Use {@link ModuleGlobals#add | `this.globals.add`} instead. */ @replacedBy("`this.globals.add`") addGlobal(name: string, type: Type, mutable: boolean, init: ExpressionRef) { return this.globals.add(name, type, mutable, init); }
-	/** @deprecated Use {@link ModuleGlobals#get | `this.globals.get`} instead. */ @replacedBy("`this.globals.get`") getGlobal(name: string) { return this.globals.get(name); }
-	/** @deprecated Use {@link ModuleGlobals#getByIndex | `this.globals.getByIndex`} instead. */ @replacedBy("`this.globals.getByIndex`") getGlobalByIndex(index: number) { return this.globals.getByIndex(index); }
-	/** @deprecated Use {@link ModuleGlobals#count | `this.globals.count`} instead. */ @replacedBy("`this.globals.count`") getNumGlobals() { return this.globals.count(); }
-	/** @deprecated Use {@link ModuleGlobals#remove | `this.globals.remove`} instead. */ @replacedBy("`this.globals.remove`") removeGlobal(name: string) { return this.globals.remove(name); }
-
-	/** @deprecated Use {@link ModuleMemories#set | `this.memories.set`} instead. */ @replacedBy("`this.memories.set`") setMemory(initial: number, maximum: number, exportName: string, segments?: readonly any[], shared?: boolean, memory64?: boolean, internalName?: string) { return this.memories.set(initial, maximum, exportName, segments, shared, memory64, internalName); }
-	/** @deprecated Use {@link ModuleMemories#has | `this.memories.has`} instead. */ @replacedBy("`this.memories.has`") hasMemory() { return this.memories.has(); }
-
-	/** @deprecated Use {@link ModuleTables#add | `this.tables.add`} instead. */ @replacedBy("`this.tables.add`") addTable(name: string, initial: number, maximum: number, type: Type = funcref, init?: ExpressionRef) { return this.tables.add(name, initial, maximum, type, init); }
-	/** @deprecated Use {@link ModuleTables#get | `this.tables.get`} instead. */ @replacedBy("`this.tables.get`") getTable(name: string) { return this.tables.get(name); }
-	/** @deprecated Use {@link ModuleTables#getByIndex | `this.tables.getByIndex`} instead. */ @replacedBy("`this.tables.getByIndex`") getTableByIndex(index: number) { return this.tables.getByIndex(index); }
-	/** @deprecated Use {@link ModuleTables#getSegments | `this.tables.getSegments`} instead. */ @replacedBy("`this.tables.getSegments`") getTableSegments(table: TableRef) { return this.tables.getSegments(table); }
-	/** @deprecated Use {@link ModuleTables#count | `this.tables.count`} instead. */ @replacedBy("`this.tables.count`") getNumTables() { return this.tables.count(); }
-	/** @deprecated Use {@link ModuleTables#remove | `this.tables.remove`} instead. */ @replacedBy("`this.tables.remove`") removeTable(name: string) { return this.tables.remove(name); }
-
-	/** @deprecated Use {@link ModuleFunctions#add | `this.functions.add`} instead. */ @replacedBy("`this.functions.add`") addFunction(name: string, params: Type, results: Type, varTypes: readonly Type[], body: ExpressionRef) { return this.functions.add(name, params, results, varTypes, body); }
-	/** @deprecated Use {@link ModuleFunctions#get | `this.functions.get`} instead. */ @replacedBy("`this.functions.get`") getFunction(name: string) { return this.functions.get(name); }
-	/** @deprecated Use {@link ModuleFunctions#getByIndex | `this.functions.getByIndex`} instead. */ @replacedBy("`this.functions.getByIndex`") getFunctionByIndex(index: number) { return this.functions.getByIndex(index); }
-	/** @deprecated Use {@link ModuleFunctions#count | `this.functions.count`} instead. */ @replacedBy("`this.functions.count`") getNumFunctions() { return this.functions.count(); }
-	/** @deprecated Use {@link ModuleFunctions#remove | `this.functions.remove`} instead. */ @replacedBy("`this.functions.remove`") removeFunction(name: string) { return this.functions.remove(name); }
-
-	/** @deprecated Use {@link ModuleDataSegments#get | `this.dataSegments.get`} instead. */ @replacedBy("`this.dataSegments.get`") getDataSegment(name: string) { return this.dataSegments.get(name); }
-	/** @deprecated Use {@link ModuleDataSegments#getByIndex | `this.dataSegments.getByIndex`} instead. */ @replacedBy("`this.dataSegments.getByIndex`") getDataSegmentByIndex(index: number) { return this.dataSegments.getByIndex(index); }
-	/** @deprecated Use {@link ModuleDataSegments#count | `this.dataSegments.count`} instead. */ @replacedBy("`this.dataSegments.count`") getNumDataSegments() { return this.dataSegments.count(); }
-
-	/** @deprecated Use {@link ModuleElementSegments#addActive | `this.elementSegments.addActive`} instead. */ @replacedBy("`this.elementSegments.addActive`") addActiveElementSegment(table: string, name: string, funcNames: readonly string[], offset: ExpressionRef) { return this.elementSegments.addActive(table, name, funcNames, offset); }
-	/** @deprecated Use {@link ModuleElementSegments#addPassive | `this.elementSegments.addPassive`} instead. */ @replacedBy("`this.elementSegments.addPassive`") addPassiveElementSegment(name: string, funcNames: readonly string[]) { return this.elementSegments.addPassive(name, funcNames); }
-	/** @deprecated Use {@link ModuleElementSegments#get | `this.elementSegments.get`} instead. */ @replacedBy("`this.elementSegments.get`") getElementSegment(name: string) { return this.elementSegments.get(name); }
-	/** @deprecated Use {@link ModuleElementSegments#getByIndex | `this.elementSegments.getByIndex`} instead. */ @replacedBy("`this.elementSegments.getByIndex`") getElementSegmentByIndex(index: number) { return this.elementSegments.getByIndex(index); }
-	/** @deprecated Use {@link ModuleElementSegments#count | `this.elementSegments.count`} instead. */ @replacedBy("`this.elementSegments.count`") getNumElementSegments() { return this.elementSegments.count(); }
-	/** @deprecated Use {@link ModuleElementSegments#remove | `this.elementSegments.remove`} instead. */ @replacedBy("`this.elementSegments.remove`") removeElementSegment(name: string) { return this.elementSegments.remove(name); }
-
-	/** @deprecated Use {@link ModuleImports#addTag | `this.imports.addTag`} instead. */ @replacedBy("`this.imports.addTag`") addTagImport(internalName: string, externalModuleName: string, externalBaseName: string, params: Type, results: Type) { return this.imports.addTag(internalName, externalModuleName, externalBaseName, params, results); }
-	/** @deprecated Use {@link ModuleImports#addGlobal | `this.imports.addGlobal`} instead. */ @replacedBy("`this.imports.addGlobal`") addGlobalImport(internalName: string, externalModuleName: string, externalBaseName: string, globalType: Type, mutable: boolean) { return this.imports.addGlobal(internalName, externalModuleName, externalBaseName, globalType, mutable); }
-	/** @deprecated Use {@link ModuleImports#addMemory | `this.imports.addMemory`} instead. */ @replacedBy("`this.imports.addMemory`") addMemoryImport(internalName: string, externalModuleName: string, externalBaseName: string, shared: boolean) { return this.imports.addMemory(internalName, externalModuleName, externalBaseName, shared); }
-	/** @deprecated Use {@link ModuleImports#addTable | `this.imports.addTable`} instead. */ @replacedBy("`this.imports.addTable`") addTableImport(internalName: string, externalModuleName: string, externalBaseName: string) { return this.imports.addTable(internalName, externalModuleName, externalBaseName); }
-	/** @deprecated Use {@link ModuleImports#addFunction | `this.imports.addFunction`} instead. */ @replacedBy("`this.imports.addFunction`") addFunctionImport(internalName: string, externalModuleName: string, externalBaseName: string, params: Type, results: Type) { return this.imports.addFunction(internalName, externalModuleName, externalBaseName, params, results); }
-
-	/** @deprecated Use {@link ModuleExports#get | `this.exports.get`} instead. */ @replacedBy("`this.exports.get`") getExport(externalName: string) { return this.exports.get(externalName); }
-	/** @deprecated Use {@link ModuleExports#getByIndex | `this.exports.getByIndex`} instead. */ @replacedBy("`this.exports.getByIndex`") getExportByIndex(index: number) { return this.exports.getByIndex(index); }
-	/** @deprecated Use {@link ModuleExports#count | `this.exports.count`} instead. */ @replacedBy("`this.exports.count`") getNumExports() { return this.exports.count(); }
-	/** @deprecated Use {@link ModuleExports#remove | `this.exports.remove`} instead. */ @replacedBy("`this.exports.remove`") removeExport(externalName: string) { return this.exports.remove(externalName); }
-	/** @deprecated Use {@link ModuleExports#addTag | `this.exports.addTag`} instead. */ @replacedBy("`this.exports.addTag`") addTagExport(internalName: string, externalName: string) { return this.exports.addTag(internalName, externalName); }
-	/** @deprecated Use {@link ModuleExports#addGlobal | `this.exports.addGlobal`} instead. */ @replacedBy("`this.exports.addGlobal`") addGlobalExport(internalName: string, externalName: string) { return this.exports.addGlobal(internalName, externalName); }
-	/** @deprecated Use {@link ModuleExports#addMemory | `this.exports.addMemory`} instead. */ @replacedBy("`this.exports.addMemory`") addMemoryExport(internalName: string, externalName: string) { return this.exports.addMemory(internalName, externalName); }
-	/** @deprecated Use {@link ModuleExports#addTable | `this.exports.addTable`} instead. */ @replacedBy("`this.exports.addTable`") addTableExport(internalName: string, externalName: string) { return this.exports.addTable(internalName, externalName); }
-	/** @deprecated Use {@link ModuleExports#addFunction | `this.exports.addFunction`} instead. */ @replacedBy("`this.exports.addFunction`") addFunctionExport(internalName: string, externalName: string) { return this.exports.addFunction(internalName, externalName); }
-
-	getMemoryInfo(name: string): MEMORY.Memory {
-		return new MEMORY.Memory(this, name);
-	}
-
-	getDataSegmentInfo(segment: DataSegmentRef): DATA_SEGMENT.DataSegment {
-		return new DATA_SEGMENT.DataSegment(this, segment);
+	/** @category Module Component Operations */
+	getDataSegmentInfo(segment: DataSegmentRef): DataSegment_ {
+		return new DataSegment_(this, segment);
 	}
 
 	// ## Binaryen Operations ## //
 	// ### Emission & Execution ### //
-	/** Returns the module in Binaryen’s s-expression text format (not official stack-style text format). */
+	/**
+	 * Returns the module in Binaryen’s s-expression text format (not official stack-style text format).
+	 * @category Emission & Execution
+	 */
 	emitText(): string {
-		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteText"](this.ptr);
+		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteText"](this[PTR]);
 		const text = UTF8ToString(textPtr);
 		if (textPtr) {
 			_free(textPtr);
@@ -299,9 +342,12 @@ export class Module {
 		return text;
 	}
 
-	/** Returns the module in official stack-style text format. */
+	/**
+	 * Returns the module in official stack-style text format.
+	 * @category Emission & Execution
+	 */
 	emitStackIR(): string {
-		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteStackIR"](this.ptr);
+		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteStackIR"](this[PTR]);
 		const text = UTF8ToString(textPtr);
 		if (textPtr) {
 			_free(textPtr);
@@ -309,26 +355,35 @@ export class Module {
 		return text;
 	}
 
-	/** Returns the [asm.js](http://asmjs.org/) representation of the module. */
+	/**
+	 * Returns the [asm.js](http://asmjs.org/) representation of the module.
+	 * @category Emission & Execution
+	 */
 	emitAsmjs(): string {
 		let returned = "";
 		const saved = out;
 		out = (x: string) => {
 			returned += `${ x }\n`;
 		};
-		BinaryenObj["_BinaryenModulePrintAsmjs"](this.ptr);
+		BinaryenObj["_BinaryenModulePrintAsmjs"](this[PTR]);
 		out = saved;
 		return returned;
 	}
 
-	/** Returns the module in binary format. */
+	/**
+	 * Returns the module in binary format.
+	 * @category Emission & Execution
+	 */
 	emitBinary(): Uint8Array;
-	/** Returns the module in binary format with a given source map. */
+	/**
+	 * Returns the module in binary format with a given source map.
+	 * @category Emission & Execution
+	 */
 	emitBinary(sourceMapUrl: string): {binary: Uint8Array, sourceMap: string};
 	emitBinary(sourceMapUrl?: string): Uint8Array | {binary: Uint8Array, sourceMap: string} {
 		return preserveStack(() => {
-			const tempBuffer = stackAlloc(_BinaryenSizeofAllocateAndWriteResult());
-			BinaryenObj["_BinaryenModuleAllocateAndWrite"](tempBuffer, this.ptr, strToStack(sourceMapUrl));
+			const tempBuffer = stackAlloc(BinaryenObj["_BinaryenSizeofAllocateAndWriteResult"]());
+			BinaryenObj["_BinaryenModuleAllocateAndWrite"](tempBuffer, this[PTR], strToStack(sourceMapUrl));
 			const binaryPtr = HEAPU32[tempBuffer >>> 2];
 			const binaryBytes = HEAPU32[(tempBuffer >>> 2) + 1];
 			const sourceMapPtr = HEAPU32[(tempBuffer >>> 2) + 2];
@@ -347,64 +402,90 @@ export class Module {
 		});
 	}
 
-	/** Runs the module in the interpreter, calling the start function. */
+	/**
+	 * Runs the module in the interpreter, calling the start function.
+	 * @category Emission & Execution
+	 */
 	interpret(): void {
-		BinaryenObj["_BinaryenModuleInterpret"](this.ptr);
+		BinaryenObj["_BinaryenModuleInterpret"](this[PTR]);
 	}
 
-	/** Releases the resources held by the module once it isn't needed anymore. */
+	/**
+	 * Releases the resources held by the module once it isn’t needed anymore.
+	 * @category Emission & Execution
+	 */
 	dispose(): void {
-		BinaryenObj["_BinaryenModuleDispose"](this.ptr);
+		BinaryenObj["_BinaryenModuleDispose"](this[PTR]);
 	}
 
 	// ### Validation & Optimization ### //
-	/** Validates the module. Returns `true` if valid, otherwise prints validation errors and returns `false`. */
+	/**
+	 * Validates the module. Returns `true` if valid, otherwise prints validation errors and returns `false`.
+	 * @category Validation & Optimization
+	 */
 	validate(): number {
-		return BinaryenObj["_BinaryenModuleValidate"](this.ptr);
+		return BinaryenObj["_BinaryenModuleValidate"](this[PTR]);
 	}
 
-	/** Optimizes the module using the default optimization passes. */
+	/**
+	 * Optimizes the module using the default optimization passes.
+	 * @category Validation & Optimization
+	 */
 	optimize(): void {
-		BinaryenObj["_BinaryenModuleOptimize"](this.ptr);
+		BinaryenObj["_BinaryenModuleOptimize"](this[PTR]);
 	}
 
-	/** Optimizes a single function using the default optimization passes. */
+	/**
+	 * Optimizes a single function using the default optimization passes.
+	 * @category Validation & Optimization
+	 */
 	optimizeFunction(func: FunctionRef | string): void {
 		if (typeof func === "string") {
 			func = this.functions.get(func);
 		}
-		BinaryenObj["_BinaryenFunctionOptimize"](func, this.ptr);
+		BinaryenObj["_BinaryenFunctionOptimize"](func, this[PTR]);
 	}
 
-	/** Runs the specified passes on the module. */
+	/**
+	 * Runs the specified passes on the module.
+	 * @category Validation & Optimization
+	 */
 	runPasses(passes: readonly string[]): void {
-		return preserveStack(() => {
-			BinaryenObj["_BinaryenModuleRunPasses"](this.ptr, i32sToStack(passes.map(strToStack)), passes.length);
-		});
+		preserveStack(() => BinaryenObj["_BinaryenModuleRunPasses"](this[PTR], i32sToStack(passes.map(strToStack)), passes.length));
 	}
 
-	/** Runs the specified passes on a single function. */
+	/**
+	 * Runs the specified passes on a single function.
+	 * @category Validation & Optimization
+	 */
 	runPassesOnFunction(func: string | FunctionRef, passes: readonly string[]): void {
 		if (typeof func === "string") {
 			func = this.functions.get(func);
 		}
-		return preserveStack(() => {
-			BinaryenObj["_BinaryenFunctionRunPasses"](func, this.ptr, i32sToStack(passes.map(strToStack)), passes.length);
-		});
+		preserveStack(() => BinaryenObj["_BinaryenFunctionRunPasses"](func, this[PTR], i32sToStack(passes.map(strToStack)), passes.length));
 	}
 
 	// ### Debugging ### //
-	/** Adds a debug info file name to the module and returns its index. */
+	/**
+	 * Adds a debug info file name to the module and returns its index.
+	 * @category Debugging
+	 */
 	addDebugInfoFileName(filename: string): number {
-		return preserveStack(() => BinaryenObj["_BinaryenModuleAddDebugInfoFileName"](this.ptr, strToStack(filename)));
+		return preserveStack(() => BinaryenObj["_BinaryenModuleAddDebugInfoFileName"](this[PTR], strToStack(filename)));
 	}
 
-	/** Gets the name of the debug info file at the specified index. */
+	/**
+	 * Gets the name of the debug info file at the specified index.
+	 * @category Debugging
+	 */
 	getDebugInfoFileName(index: number): string {
-		return UTF8ToString(BinaryenObj["_BinaryenModuleGetDebugInfoFileName"](this.ptr, index));
+		return UTF8ToString(BinaryenObj["_BinaryenModuleGetDebugInfoFileName"](this[PTR], index));
 	}
 
-	/** Sets the debug location of the specified `ExpressionRef` within the specified `FunctionRef`. */
+	/**
+	 * Sets the debug location of the specified `ExpressionRef` within the specified `FunctionRef`.
+	 * @category Debugging
+	 */
 	setDebugLocation(func: FunctionRef, expr: ExpressionRef, fileIndex: number, lineNumber: number, columnNumber: number): void {
 		BinaryenObj["_BinaryenFunctionSetDebugLocation"](func, expr, fileIndex, lineNumber, columnNumber);
 	}
@@ -412,34 +493,25 @@ export class Module {
 	// ### Other ### //
 	/** [description] */
 	setTypeName(heapType: HeapType, name: string): void {
-		return preserveStack(() => {
-			BinaryenObj["_BinaryenModuleSetTypeName"](this.ptr, heapType, strToStack(name));
-		});
+		preserveStack(() => BinaryenObj["_BinaryenModuleSetTypeName"](this[PTR], heapType, strToStack(name)));
 	}
 
 	/** [description] */
 	setFieldName(heapType: HeapType, index: number, name: string): void {
-		return preserveStack(() => {
-			BinaryenObj["_BinaryenModuleSetFieldName"](this.ptr, heapType, index, strToStack(name));
-		});
+		preserveStack(() => BinaryenObj["_BinaryenModuleSetFieldName"](this[PTR], heapType, index, strToStack(name)));
 	}
 
 	/** Adds a custom section to the binary. */
 	addCustomSection(name: string, contents: Uint8Array): void {
-		return preserveStack(() => {
-			BinaryenObj["_BinaryenAddCustomSection"](this.ptr, strToStack(name), i8sToStack([...contents]), contents.length);
-		});
+		preserveStack(() => BinaryenObj["_BinaryenAddCustomSection"](this[PTR], strToStack(name), i8sToStack([...contents]), contents.length));
 	}
 
-	/** [description] */
+	/**
+	 * Updates the internal name mapping logic in a module.
+	 * This must be called after renaming module elements.
+	 */
 	updateMaps(): void {
-		BinaryenObj["_BinaryenModuleUpdateMaps"](this.ptr);
-	}
-
-	/** @deprecated Use {@link copyExpression | `copyExpression(expr, this)`} instead. */
-	@replacedBy("global `copyExpression(expr, this)`")
-	copyExpression(expr: ExpressionRef) {
-		return copyExpression(expr, this);
+		BinaryenObj["_BinaryenModuleUpdateMaps"](this[PTR]);
 	}
 }
 
@@ -451,15 +523,32 @@ export class Module {
  * Each class represents a component of a WASM module,
  * and its corresponding type is included for documentation.
  */
-// eslint-disable-next-line no-redeclare
 export namespace Module {
-	export type Tag = TAG.Tag;
-	export type Global = GLOBAL.Global;
-	export type Memory = MEMORY.Memory;
-	export type Table = TABLE.Table;
-	export type Function = FUNCTION.Function;
-	export type DataSegment = DATA_SEGMENT.DataSegment;
-	export type ElementSegment = ELEMENT_SEGMENT.ElementSegment;
-	export type Import = IMPORT.Import;
-	export type Export = EXPORT.Export;
+	export type Tag = Tag_;
+	export type Global = Global_;
+	export type Memory = Memory_;
+	export type Table = Table_;
+	export type Function = Function_;
+	export type DataSegment = DataSegment_;
+	export type ElementSegment = ElementSegment_;
+	export type Import = Import_;
+	export type Export = Export_;
 }
+
+
+
+/*
+ * The relocation of all `ExpressionBuilder` props from `Module` to `Module#wasm` is a breaking change,
+ * so we want to let users access it the old way but with deprecation warnings.
+ * This function delegates any accesses to those properties.
+ */
+Object.keys(new Module().wasm).forEach((key) => {
+	if (!Reflect.has(Module.prototype, key)) {
+		Reflect.defineProperty(Module.prototype, key, {
+			get() {
+				consoleWarn(`Module property \`.${ key }\` is deprecated; use \`.wasm.${ key }\` instead.`);
+				return (this as Module).wasm[key as keyof ExpressionBuilder];
+			},
+		});
+	}
+});

@@ -80,7 +80,7 @@ export class RefTest extends Expression {
 	get ref(): ExpressionRef { return BinaryenObj["_BinaryenRefTestGetRef"](this._ptr); }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenRefTestSetRef"](this._ptr, ref); }
 
-	get castType(): Type { return BinaryenObj["_BinaryenRefTestGetCastType"](this._ptr); }
+	get castType(): Type { return BinaryenObj["_BinaryenRefTestGetCastType"](this._ptr) as Type; }
 	set castType(castType: Type) { BinaryenObj["_BinaryenRefTestSetCastType"](this._ptr, castType); }
 }
 

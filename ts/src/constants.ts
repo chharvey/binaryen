@@ -6,12 +6,24 @@
 import {
 	BinaryenObj,
 } from "./-pre.ts";
+import type {
+	PTR,
+} from "./-utils.ts";
 
 
 
 // ## Static Types ## //
+/*
+ * Types are nominal. Even though they’re all defined as `number`, they shouldn’t be mixed.
+ * Nominal types are implemented as an intersection with an irreproducable object type,
+ * which has a secret key and a unique value.
+ * To assign numbers to a nominal type, casting is required (via `as` keyword):
+ * ```ts
+ * const t: Type = BinaryenObj["_BinaryenExpressionGetType"](expr) as Type;
+ * ```
+ */
 // ### Expressions ### //
-export type Type = number;
+export type Type = number & {readonly [PTR]: unique symbol};
 export type HeapType = number;
 export type PackedType = number;
 export type ExpressionRef = number;
@@ -44,49 +56,49 @@ export type ExportRef = number;
 
 // ### Binaryen-Only Types ### //
 /** Type with stack effect `[t*] -> [t*]`. */
-export const unreachable: Type = BinaryenObj["_BinaryenTypeUnreachable"]();
+export const unreachable: Type = BinaryenObj["_BinaryenTypeUnreachable"]() as Type;
 /** Type with stack effect `[t*] -> []`. Not to be confused with the WASM heap type `none`. */
-export const none: Type = BinaryenObj["_BinaryenTypeNone"]();
+export const none: Type = BinaryenObj["_BinaryenTypeNone"]() as Type;
 /** Used only for auto-detecting block types. */
-export const auto: Type = BinaryenObj["_BinaryenTypeAuto"]();
+export const auto: Type = BinaryenObj["_BinaryenTypeAuto"]() as Type;
 
 // ### Number & Vector Types ### //
 /** 32-bit integer. */
-export const i32: Type = BinaryenObj["_BinaryenTypeInt32"]();
+export const i32: Type = BinaryenObj["_BinaryenTypeInt32"]() as Type;
 /** 64-bit integer. */
-export const i64: Type = BinaryenObj["_BinaryenTypeInt64"]();
+export const i64: Type = BinaryenObj["_BinaryenTypeInt64"]() as Type;
 /** 64-bit float. */
-export const f32: Type = BinaryenObj["_BinaryenTypeFloat32"]();
+export const f32: Type = BinaryenObj["_BinaryenTypeFloat32"]() as Type;
 /** 64-bit float. */
-export const f64: Type = BinaryenObj["_BinaryenTypeFloat64"]();
+export const f64: Type = BinaryenObj["_BinaryenTypeFloat64"]() as Type;
 /** 128-bit vector (SIMD). */
-export const v128: Type = BinaryenObj["_BinaryenTypeVec128"]();
+export const v128: Type = BinaryenObj["_BinaryenTypeVec128"]() as Type;
 
 // ### Reference Types ### //
 /** `(ref null any)` */
-export const anyref: Type = BinaryenObj["_BinaryenTypeAnyref"]();
+export const anyref: Type = BinaryenObj["_BinaryenTypeAnyref"]() as Type;
 /** `(ref null eq)` */
-export const eqref: Type = BinaryenObj["_BinaryenTypeEqref"]();
+export const eqref: Type = BinaryenObj["_BinaryenTypeEqref"]() as Type;
 /** `(ref null i31)` */
-export const i31ref: Type = BinaryenObj["_BinaryenTypeI31ref"]();
+export const i31ref: Type = BinaryenObj["_BinaryenTypeI31ref"]() as Type;
 /** `(ref null struct)` */
-export const structref: Type = BinaryenObj["_BinaryenTypeStructref"]();
+export const structref: Type = BinaryenObj["_BinaryenTypeStructref"]() as Type;
 /** `(ref null array)` */
-export const arrayref: Type = BinaryenObj["_BinaryenTypeArrayref"]();
+export const arrayref: Type = BinaryenObj["_BinaryenTypeArrayref"]() as Type;
 /** `(ref null func)` */
-export const funcref: Type = BinaryenObj["_BinaryenTypeFuncref"]();
+export const funcref: Type = BinaryenObj["_BinaryenTypeFuncref"]() as Type;
 /** `(ref null exn)` */
-// export const exnref: Type = BinaryenObj["_BinaryenTypeExnref"](); // TODO: uncomment once supported in Binaryen
+// export const exnref: Type = BinaryenObj["_BinaryenTypeExnref"]() as Type; // TODO: uncomment once supported in Binaryen
 /** `(ref null extern)` */
-export const externref: Type = BinaryenObj["_BinaryenTypeExternref"]();
+export const externref: Type = BinaryenObj["_BinaryenTypeExternref"]() as Type;
 /** `(ref null none)` */
-export const nullref: Type = BinaryenObj["_BinaryenTypeNullref"]();
+export const nullref: Type = BinaryenObj["_BinaryenTypeNullref"]() as Type;
 /** `(ref null nofunc)` */
-export const nullfuncref: Type = BinaryenObj["_BinaryenTypeNullFuncref"]();
+export const nullfuncref: Type = BinaryenObj["_BinaryenTypeNullFuncref"]() as Type;
 /** `(ref null noexn)` */
-// export const nullexnref: Type = BinaryenObj["_BinaryenTypeNullExnref"](); // TODO: uncomment once supported in Binaryen
+// export const nullexnref: Type = BinaryenObj["_BinaryenTypeNullExnref"]() as Type; // TODO: uncomment once supported in Binaryen
 /** `(ref null noextern)` */
-export const nullexternref: Type = BinaryenObj["_BinaryenTypeNullExternref"]();
+export const nullexternref: Type = BinaryenObj["_BinaryenTypeNullExternref"]() as Type;
 
 // ### Packed Types ### //
 export const notPacked: PackedType = BinaryenObj["_BinaryenPackedTypeNotPacked"]();
@@ -96,7 +108,7 @@ export const i16: PackedType = BinaryenObj["_BinaryenPackedTypeInt16"]();
 // ### Proposed Types ### //
 // These types are not yet in the WASM spec. Move them to their respective sections once finalized.
 /** `(ref null string)` */
-export const stringref: Type = BinaryenObj["_BinaryenTypeStringref"]();
+export const stringref: Type = BinaryenObj["_BinaryenTypeStringref"]() as Type;
 
 
 

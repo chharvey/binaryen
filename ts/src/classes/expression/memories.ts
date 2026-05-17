@@ -68,7 +68,7 @@ export class Store extends Expression {
 	get value(): ExpressionRef { return BinaryenObj["_BinaryenStoreGetValue"](this._ptr); }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenStoreSetValue"](this._ptr, valueExpr); }
 
-	get valueType(): Type { return BinaryenObj["_BinaryenStoreGetValueType"](this._ptr); }
+	get valueType(): Type { return BinaryenObj["_BinaryenStoreGetValueType"](this._ptr) as Type; }
 	set valueType(valueType: Type) { BinaryenObj["_BinaryenStoreSetValueType"](this._ptr, valueType); }
 
 	get atomic(): boolean {return Boolean(BinaryenObj["_BinaryenStoreIsAtomic"](this._ptr));}

@@ -51,7 +51,7 @@ export class Table {
 	set max(max: number) { BinaryenObj["_BinaryenTableSetMax"](this.#ptr, max); }
 
 	/** The type of this table. */
-	get type(): Type { return BinaryenObj["_BinaryenTableGetType"](this.#ptr); }
+	get type(): Type { return BinaryenObj["_BinaryenTableGetType"](this.#ptr) as Type; }
 	set type(tableType: Type) { BinaryenObj["_BinaryenTableSetType"](this.#ptr, tableType); }
 
 	valueOf(): TableRef {

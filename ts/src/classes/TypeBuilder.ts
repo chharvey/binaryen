@@ -116,7 +116,7 @@ export class TypeBuilder {
 	 * @returns the tuple type
 	 */
 	getTempTupleType(types: readonly Type[]): Type {
-		return preserveStack(() => BinaryenObj["_TypeBuilderGetTempTupleType"](this.#ptr, i32sToStack(types), types.length));
+		return preserveStack(() => BinaryenObj["_TypeBuilderGetTempTupleType"](this.#ptr, i32sToStack(types), types.length) as Type);
 	}
 
 	/**
@@ -126,7 +126,7 @@ export class TypeBuilder {
 	 * @returns the reference type
 	 */
 	getTempRefType(heapType: HeapType, nullable: boolean): Type {
-		return BinaryenObj["_TypeBuilderGetTempRefType"](this.#ptr, heapType, nullable);
+		return BinaryenObj["_TypeBuilderGetTempRefType"](this.#ptr, heapType, nullable) as Type;
 	}
 
 	/**

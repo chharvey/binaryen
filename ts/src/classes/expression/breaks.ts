@@ -120,6 +120,6 @@ export class BrOn extends Expression {
 	get ref(): ExpressionRef { return BinaryenObj["_BinaryenBrOnGetRef"](this._ptr); }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenBrOnSetRef"](this._ptr, ref); }
 
-	get castType(): Type { return BinaryenObj["_BinaryenBrOnGetCastType"](this._ptr); }
+	get castType(): Type { return BinaryenObj["_BinaryenBrOnGetCastType"](this._ptr) as Type; }
 	set castType(castType: Type) { BinaryenObj["_BinaryenBrOnSetCastType"](this._ptr, castType); }
 }

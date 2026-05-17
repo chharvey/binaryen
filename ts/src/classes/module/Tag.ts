@@ -32,8 +32,8 @@ export class Tag {
 		this.name = UTF8ToString(BinaryenObj["_BinaryenTagGetName"](tag));
 		this.module = UTF8ToString(BinaryenObj["_BinaryenTagImportGetModule"](tag));
 		this.base = UTF8ToString(BinaryenObj["_BinaryenTagImportGetBase"](tag));
-		this.params = BinaryenObj["_BinaryenTagGetParams"](tag);
-		this.results = BinaryenObj["_BinaryenTagGetResults"](tag);
+		this.params = BinaryenObj["_BinaryenTagGetParams"](tag) as Type;
+		this.results = BinaryenObj["_BinaryenTagGetResults"](tag) as Type;
 	}
 }
 

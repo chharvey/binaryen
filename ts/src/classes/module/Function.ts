@@ -43,12 +43,12 @@ class BinaryenFunction {
 		this.module = UTF8ToString(BinaryenObj["_BinaryenFunctionImportGetModule"](this.#ptr));
 		this.base = UTF8ToString(BinaryenObj["_BinaryenFunctionImportGetBase"](this.#ptr));
 		this.name = UTF8ToString(BinaryenObj["_BinaryenFunctionGetName"](this.#ptr));
-		this.type = BinaryenObj["_BinaryenFunctionGetType"](this.#ptr);
-		this.params = BinaryenObj["_BinaryenFunctionGetParams"](this.#ptr);
-		this.results = BinaryenObj["_BinaryenFunctionGetResults"](this.#ptr);
+		this.type = BinaryenObj["_BinaryenFunctionGetType"](this.#ptr) as Type;
+		this.params = BinaryenObj["_BinaryenFunctionGetParams"](this.#ptr) as Type;
+		this.results = BinaryenObj["_BinaryenFunctionGetResults"](this.#ptr) as Type;
 		this.numVars = BinaryenObj["_BinaryenFunctionGetNumVars"](this.#ptr);
 		this.numLocals = BinaryenObj["_BinaryenFunctionGetNumLocals"](this.#ptr);
-		this.vars = getAllNested(func, BinaryenObj["_BinaryenFunctionGetNumVars"], BinaryenObj["_BinaryenFunctionGetVar"]);
+		this.vars = getAllNested(func, BinaryenObj["_BinaryenFunctionGetNumVars"], BinaryenObj["_BinaryenFunctionGetVar"]) as Type[];
 	}
 
 
@@ -66,7 +66,7 @@ class BinaryenFunction {
 	}
 
 	getVar(index: number): Type {
-		return BinaryenObj["_BinaryenFunctionGetVar"](this.#ptr, index);
+		return BinaryenObj["_BinaryenFunctionGetVar"](this.#ptr, index) as Type;
 	}
 
 	hasLocalName(index: number): boolean {

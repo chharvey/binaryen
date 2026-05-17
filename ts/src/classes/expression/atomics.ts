@@ -80,7 +80,7 @@ export class AtomicWait extends Expression {
 	get timeout(): ExpressionRef { return BinaryenObj["_BinaryenAtomicWaitGetTimeout"](this._ptr); }
 	set timeout(timeoutExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicWaitSetTimeout"](this._ptr, timeoutExpr); }
 
-	get expectedType(): Type { return BinaryenObj["_BinaryenAtomicWaitGetExpectedType"](this._ptr); }
+	get expectedType(): Type { return BinaryenObj["_BinaryenAtomicWaitGetExpectedType"](this._ptr) as Type; }
 	set expectedType(expectedType: Type) { BinaryenObj["_BinaryenAtomicWaitSetExpectedType"](this._ptr, expectedType); }
 }
 

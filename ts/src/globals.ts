@@ -238,7 +238,7 @@ export function exit(status: number): void {
  * @returns a tuple type containing the array’s components
  */
 export function createType(types: readonly Type[]): Type {
-	return preserveStack(() => BinaryenObj["_BinaryenTypeCreate"](i32sToStack(types), types.length));
+	return preserveStack(() => BinaryenObj["_BinaryenTypeCreate"](i32sToStack(types), types.length) as Type);
 }
 
 /**
@@ -266,7 +266,7 @@ export function expandType(typ: Type): Type[] {
  * @returns given `ht`: `(ref null? ht)`
  */
 export function getTypeFromHeapType(heapType: HeapType, nullable: boolean): Type {
-	return BinaryenObj["_BinaryenTypeFromHeapType"](heapType, nullable);
+	return BinaryenObj["_BinaryenTypeFromHeapType"](heapType, nullable) as Type;
 }
 
 /**
@@ -285,7 +285,7 @@ export function getExpressionId(expr: ExpressionRef): ExpressionId {
 
 /** Gets the type of the specified expression. */
 export function getExpressionType(expr: ExpressionRef): Type {
-	return BinaryenObj["_BinaryenExpressionGetType"](expr);
+	return BinaryenObj["_BinaryenExpressionGetType"](expr) as Type;
 }
 
 /**

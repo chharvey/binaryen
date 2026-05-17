@@ -60,7 +60,7 @@ export function struct(mod: Module) {
 		 * **Warning:** `.get()` no longer takes the boolean `isSigned` argument, and assumes an unpacked type.
 		 * For packed types, use `.get_s()` for signed and `.get_u()` for unsigned.
 		 */
-		get: function (index: number, ref: number, type: number, deprecated_isSigned?: boolean) {
+		get: function (index: number, ref: number, type: Type, deprecated_isSigned?: boolean) {
 			return deprecated_isSigned === undefined
 				? BinaryenObj["_BinaryenStructGet"](mod[PTR], index, ref, type)
 				: deprecated_isSigned
@@ -121,7 +121,7 @@ export function array(mod: Module) {
 		 * **Warning:** `.get()` no longer takes the boolean `isSigned` argument, and assumes an unpacked type.
 		 * For packed types, use `.get_s()` for signed and `.get_u()` for unsigned.
 		 */
-		get: function (ref: number, index: number, type: number, deprecated_isSigned?: boolean) {
+		get: function (ref: number, index: number, type: Type, deprecated_isSigned?: boolean) {
 			return deprecated_isSigned === undefined
 				? BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type)
 				: deprecated_isSigned

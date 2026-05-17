@@ -42,7 +42,7 @@ export type TableRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.Function}. */
 export type FunctionRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.DataSegment}. */
-export type DataSegmentRef = number;
+export type DataSegmentRef = number & {readonly [PTR]: unique symbol};
 /** Reference to an {@link Module.ElementSegment}. */
 export type ElementSegmentRef = number;
 // no `ImportRef`

@@ -58,12 +58,12 @@ export class ModuleDataSegments {
 
 	/** Gets a data segment by name. */
 	get(name: string): DataSegmentRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetDataSegment"](this.mod[PTR], strToStack(name)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetDataSegment"](this.mod[PTR], strToStack(name)) as DataSegmentRef);
 	}
 
 	/** Gets a data segment by index. */
 	getByIndex(index: number): DataSegmentRef {
-		return BinaryenObj["_BinaryenGetDataSegmentByIndex"](this.mod[PTR], index);
+		return BinaryenObj["_BinaryenGetDataSegmentByIndex"](this.mod[PTR], index) as DataSegmentRef;
 	}
 
 	/** Gets the number of data segments within the module. */

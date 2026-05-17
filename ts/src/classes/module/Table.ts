@@ -77,17 +77,17 @@ export class ModuleTables {
 
 	/** Adds a table. */
 	add(name: string, initial: number, maximum: number, type: Type = funcref, init?: ExpressionRef): TableRef {
-		return preserveStack(() => BinaryenObj["_BinaryenAddTable"](this.mod[PTR], strToStack(name), initial, maximum, type, init ?? 0));
+		return preserveStack(() => BinaryenObj["_BinaryenAddTable"](this.mod[PTR], strToStack(name), initial, maximum, type, init ?? 0) as TableRef);
 	}
 
 	/** Gets a table by name. */
 	get(name: string): TableRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetTable"](this.mod[PTR], strToStack(name)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetTable"](this.mod[PTR], strToStack(name)) as TableRef);
 	}
 
 	/** Gets a table by index. */
 	getByIndex(index: number): TableRef {
-		return BinaryenObj["_BinaryenGetTableByIndex"](this.mod[PTR], index);
+		return BinaryenObj["_BinaryenGetTableByIndex"](this.mod[PTR], index) as TableRef;
 	}
 
 	/** Gets the number of table segments within the module. */

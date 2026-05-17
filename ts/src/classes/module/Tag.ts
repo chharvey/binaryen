@@ -48,12 +48,12 @@ export class ModuleTags {
 
 	/** Adds a tag. */
 	add(name: string, params: Type, results: Type): TagRef {
-		return preserveStack(() => BinaryenObj["_BinaryenAddTag"](this.mod[PTR], strToStack(name), params, results));
+		return preserveStack(() => BinaryenObj["_BinaryenAddTag"](this.mod[PTR], strToStack(name), params, results) as TagRef);
 	}
 
 	/** Gets a tag by name. */
 	get(name: string): TagRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetTag"](this.mod[PTR], strToStack(name)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetTag"](this.mod[PTR], strToStack(name)) as TagRef);
 	}
 
 	/** Removes a tag by name. */

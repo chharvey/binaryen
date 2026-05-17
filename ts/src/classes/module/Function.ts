@@ -104,17 +104,17 @@ export class ModuleFunctions {
 			i32sToStack(varTypes),
 			varTypes.length,
 			body,
-		));
+		) as FunctionRef);
 	}
 
 	/** Gets a function by name. */
 	get(name: string): FunctionRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetFunction"](this.mod[PTR], strToStack(name)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetFunction"](this.mod[PTR], strToStack(name)) as FunctionRef);
 	}
 
 	/** Gets a function by index. */
 	getByIndex(index: number): FunctionRef {
-		return BinaryenObj["_BinaryenGetFunctionByIndex"](this.mod[PTR], index);
+		return BinaryenObj["_BinaryenGetFunctionByIndex"](this.mod[PTR], index) as FunctionRef;
 	}
 
 	/** Gets the number of functions within the module. */

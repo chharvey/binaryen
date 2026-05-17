@@ -270,7 +270,7 @@ export class Module {
 	 * The start function.
 	 * @category Module Component Operations
 	 */
-	get start(): FunctionRef { return BinaryenObj["_BinaryenGetStart"](this[PTR]); }
+	get start(): FunctionRef { return BinaryenObj["_BinaryenGetStart"](this[PTR]) as FunctionRef; }
 	set start(start: FunctionRef) { BinaryenObj["_BinaryenSetStart"](this[PTR], start); }
 
 	/**

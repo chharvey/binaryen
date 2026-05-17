@@ -40,7 +40,7 @@ export type MemoryRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.Table}. */
 export type TableRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.Function}. */
-export type FunctionRef = number;
+export type FunctionRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.DataSegment}. */
 export type DataSegmentRef = number;
 /** Reference to an {@link Module.ElementSegment}. */

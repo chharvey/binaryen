@@ -102,7 +102,7 @@ export class ModuleTables {
 				ret.push(segment);
 			}
 		}
-		return ret;
+		return ret as ElementSegmentRef[];
 	}
 
 	/** Gets the number of tables within the module. */

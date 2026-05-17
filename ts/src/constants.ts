@@ -44,7 +44,7 @@ export type FunctionRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.DataSegment}. */
 export type DataSegmentRef = number & {readonly [PTR]: unique symbol};
 /** Reference to an {@link Module.ElementSegment}. */
-export type ElementSegmentRef = number;
+export type ElementSegmentRef = number & {readonly [PTR]: unique symbol};
 // no `ImportRef`
 /** Reference to an {@link Module.Export}. */
 export type ExportRef = number;

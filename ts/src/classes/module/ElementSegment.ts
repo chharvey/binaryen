@@ -61,7 +61,7 @@ export class ModuleElementSegments {
 			i32sToStack(funcNames.map(strToStack)),
 			funcNames.length,
 			offset,
-		));
+		) as ElementSegmentRef);
 	}
 
 	/** Adds a passive element segment. */
@@ -71,17 +71,17 @@ export class ModuleElementSegments {
 			strToStack(name),
 			i32sToStack(funcNames.map(strToStack)),
 			funcNames.length,
-		));
+		) as ElementSegmentRef);
 	}
 
 	/** Gets an element segment by name. */
 	get(name: string): ElementSegmentRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetElementSegment"](this.mod[PTR], strToStack(name)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetElementSegment"](this.mod[PTR], strToStack(name)) as ElementSegmentRef);
 	}
 
 	/** Gets an element segment by index. */
 	getByIndex(index: number): ElementSegmentRef {
-		return BinaryenObj["_BinaryenGetElementSegmentByIndex"](this.mod[PTR], index);
+		return BinaryenObj["_BinaryenGetElementSegmentByIndex"](this.mod[PTR], index) as ElementSegmentRef;
 	}
 
 	/** Gets the number of element segments within the module. */

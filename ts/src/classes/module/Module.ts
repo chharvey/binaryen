@@ -184,7 +184,7 @@ export class Module {
 	 * The underlying C-API pointer of the wrapped module.
 	 * @hidden
 	 */
-	readonly [PTR]: ModuleRef = BinaryenObj["_BinaryenModuleCreate"]();
+	readonly [PTR]: ModuleRef = BinaryenObj["_BinaryenModuleCreate"]() as ModuleRef;
 
 	// ## Expression Manipulation ## //
 	/**

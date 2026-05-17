@@ -30,7 +30,7 @@ export type ExpressionRef = number & {readonly [PTR]: unique symbol};
 
 // ### Module Components ### //
 /** Reference to a {@link Module}. */
-export type ModuleRef = number;
+export type ModuleRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.Tag}. */
 export type TagRef = number;
 /** Reference to a {@link Module.Global}. */

@@ -36,8 +36,8 @@ export class Block extends Expression {
 		return BinaryenObj["_BinaryenBlockGetNumChildren"](this._ptr);
 	}
 
-	get children() {
-		return getAllNested(this._ptr, BinaryenObj["_BinaryenBlockGetNumChildren"], BinaryenObj["_BinaryenBlockGetChildAt"]);
+	get children(): ExpressionRef[] {
+		return getAllNested(this._ptr, BinaryenObj["_BinaryenBlockGetNumChildren"], BinaryenObj["_BinaryenBlockGetChildAt"]) as ExpressionRef[];
 	}
 
 	set children(children: readonly ExpressionRef[]) {
@@ -52,7 +52,7 @@ export class Block extends Expression {
 	}
 
 	getChildAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenBlockGetChildAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenBlockGetChildAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setChildAt(index: number, childExpr: ExpressionRef): void {
@@ -68,7 +68,7 @@ export class Block extends Expression {
 	}
 
 	removeChildAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenBlockRemoveChildAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenBlockRemoveChildAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -88,7 +88,7 @@ export class Loop extends Expression {
 		preserveStack(() => BinaryenObj["_BinaryenLoopSetName"](this._ptr, strToStack(name)));
 	}
 
-	get body(): ExpressionRef { return BinaryenObj["_BinaryenLoopGetBody"](this._ptr); }
+	get body(): ExpressionRef { return BinaryenObj["_BinaryenLoopGetBody"](this._ptr) as ExpressionRef; }
 	set body(bodyExpr: ExpressionRef) { BinaryenObj["_BinaryenLoopSetBody"](this._ptr, bodyExpr); }
 }
 
@@ -99,12 +99,12 @@ export class If extends Expression {
 		super(ExpressionId.If, expr);
 	}
 
-	get condition(): ExpressionRef { return BinaryenObj["_BinaryenIfGetCondition"](this._ptr); }
+	get condition(): ExpressionRef { return BinaryenObj["_BinaryenIfGetCondition"](this._ptr) as ExpressionRef; }
 	set condition(condExpr: ExpressionRef) { BinaryenObj["_BinaryenIfSetCondition"](condExpr); }
 
-	get ifTrue(): ExpressionRef { return BinaryenObj["_BinaryenIfGetIfTrue"](this._ptr); }
+	get ifTrue(): ExpressionRef { return BinaryenObj["_BinaryenIfGetIfTrue"](this._ptr) as ExpressionRef; }
 	set ifTrue(ifTrueExpr: ExpressionRef) { BinaryenObj["_BinaryenIfSetIfTrue"](this._ptr, ifTrueExpr); }
 
-	get ifFalse(): ExpressionRef { return BinaryenObj["_BinaryenIfGetIfFalse"](this._ptr); }
+	get ifFalse(): ExpressionRef { return BinaryenObj["_BinaryenIfGetIfFalse"](this._ptr) as ExpressionRef; }
 	set ifFalse(ifFalseExpr: ExpressionRef) { BinaryenObj["_BinaryenIfSetIfFalse"](this._ptr, ifFalseExpr); }
 }

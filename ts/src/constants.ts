@@ -26,7 +26,7 @@ import type {
 export type Type = number & {readonly [PTR]: unique symbol};
 export type HeapType = number & {readonly [PTR]: unique symbol};
 export type PackedType = number & {readonly [PTR]: unique symbol};
-export type ExpressionRef = number;
+export type ExpressionRef = number & {readonly [PTR]: unique symbol};
 
 // ### Module Components ### //
 /** Reference to a {@link Module}. */

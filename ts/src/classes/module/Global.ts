@@ -36,7 +36,7 @@ export class Global {
 		this.base = UTF8ToString(BinaryenObj["_BinaryenGlobalImportGetBase"](global));
 		this.type = BinaryenObj["_BinaryenGlobalGetType"](global) as Type;
 		this.mutable = Boolean(BinaryenObj["_BinaryenGlobalIsMutable"](global));
-		this.init = BinaryenObj["_BinaryenGlobalGetInitExpr"](global);
+		this.init = BinaryenObj["_BinaryenGlobalGetInitExpr"](global) as ExpressionRef;
 	}
 }
 

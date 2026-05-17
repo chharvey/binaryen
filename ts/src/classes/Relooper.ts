@@ -83,6 +83,6 @@ export class Relooper {
 	 * This returns an expression — normal WebAssembly code — that you can use normally anywhere.
 	 */
 	renderAndDispose(entry: RelooperBlockRef, labelHelper: number): ExpressionRef {
-		return BinaryenObj["_RelooperRenderAndDispose"](this.#ptr, entry, labelHelper);
+		return BinaryenObj["_RelooperRenderAndDispose"](this.#ptr, entry, labelHelper) as ExpressionRef;
 	}
 }

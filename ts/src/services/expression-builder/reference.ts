@@ -27,37 +27,37 @@ export function ref(mod: Module) {
 
 		/** Produces a null reference. */
 		null: (typ: Type): ExpressionRef => (
-			BinaryenObj["_BinaryenRefNull"](mod[PTR], typ)
+			BinaryenObj["_BinaryenRefNull"](mod[PTR], typ) as ExpressionRef
 		),
 
 		/** Checks for null. */
 		is_null: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefIsNull"](mod[PTR], value)
+			BinaryenObj["_BinaryenRefIsNull"](mod[PTR], value) as ExpressionRef
 		),
 
 		/** Converts a nullible reference to a non-null one, or traps. */
 		as_non_null: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefAs"](mod[PTR], Operation.RefAsNonNull, value)
+			BinaryenObj["_BinaryenRefAs"](mod[PTR], Operation.RefAsNonNull, value) as ExpressionRef
 		),
 
 		/** Compares two references. */
 		eq: (left: ExpressionRef, right: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefEq"](mod[PTR], left, right)
+			BinaryenObj["_BinaryenRefEq"](mod[PTR], left, right) as ExpressionRef
 		),
 
 		/** Tests the dynamic type of a reference, and returns boolean. */
 		test: (value: ExpressionRef, castType: Type): ExpressionRef => (
-			BinaryenObj["_BinaryenRefTest"](mod[PTR], value, castType)
+			BinaryenObj["_BinaryenRefTest"](mod[PTR], value, castType) as ExpressionRef
 		),
 
 		/** Tests the dynamic type of a reference, and performs a downcast or traps. */
 		cast: (value: ExpressionRef, castType: Type): ExpressionRef => (
-			BinaryenObj["_BinaryenRefCast"](mod[PTR], value, castType)
+			BinaryenObj["_BinaryenRefCast"](mod[PTR], value, castType) as ExpressionRef
 		),
 
 		/** Converts type i32 to an unboxed scalar. */
 		i31: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefI31"](mod[PTR], value)
+			BinaryenObj["_BinaryenRefI31"](mod[PTR], value) as ExpressionRef
 		),
 	} as const;
 }
@@ -69,12 +69,12 @@ export function i31(mod: Module) {
 	return {
 		/** Converts an unboxed scalar to type i32, signed. */
 		get_s: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, true)
+			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, true) as ExpressionRef
 		),
 
 		/** Converts an unboxed scalar to type i32, unsigned. */
 		get_u: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, false)
+			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, false) as ExpressionRef
 		),
 	} as const;
 }

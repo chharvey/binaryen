@@ -35,7 +35,7 @@ export class LocalSet extends Expression {
 	get index(): number { return BinaryenObj["_BinaryenLocalSetGetIndex"](this._ptr); }
 	set index(index: number) { BinaryenObj["_BinaryenLocalSetSetIndex"](this._ptr, index); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenLocalSetGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenLocalSetGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenLocalSetSetValue"](this._ptr, valueExpr); }
 
 	get isTee(): boolean {
@@ -64,6 +64,6 @@ export class GlobalSet extends Expression {
 	get name(): string { return UTF8ToString(BinaryenObj["_BinaryenGlobalSetGetName"](this._ptr)); }
 	set name(name: string) { preserveStack(() => BinaryenObj["_BinaryenGlobalSetSetName"](this._ptr, strToStack(name))); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenGlobalSetGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenGlobalSetGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenGlobalSetSetValue"](this._ptr, valueExpr); }
 }

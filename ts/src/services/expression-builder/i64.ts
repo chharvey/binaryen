@@ -86,19 +86,19 @@ export function i64(mod: Module) {
 		rem_u: binaryFn(mod, Operation.RemUInt64),
 
 		add128: (leftLow: ExpressionRef, leftHigh: ExpressionRef, rightLow: ExpressionRef, rightHigh: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenWideIntAddSub"](mod[PTR], Operation.AddInt128, leftLow, leftHigh, rightLow, rightHigh)
+			BinaryenObj["_BinaryenWideIntAddSub"](mod[PTR], Operation.AddInt128, leftLow, leftHigh, rightLow, rightHigh) as ExpressionRef
 		),
 
 		sub128: (leftLow: ExpressionRef, leftHigh: ExpressionRef, rightLow: ExpressionRef, rightHigh: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenWideIntAddSub"](mod[PTR], Operation.SubInt128, leftLow, leftHigh, rightLow, rightHigh)
+			BinaryenObj["_BinaryenWideIntAddSub"](mod[PTR], Operation.SubInt128, leftLow, leftHigh, rightLow, rightHigh) as ExpressionRef
 		),
 
 		mul_wide_s: (left: ExpressionRef, right: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenWideIntMul"](mod[PTR], Operation.MulWideSInt64, left, right)
+			BinaryenObj["_BinaryenWideIntMul"](mod[PTR], Operation.MulWideSInt64, left, right) as ExpressionRef
 		),
 
 		mul_wide_u: (left: ExpressionRef, right: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenWideIntMul"](mod[PTR], Operation.MulWideUInt64, left, right)
+			BinaryenObj["_BinaryenWideIntMul"](mod[PTR], Operation.MulWideUInt64, left, right) as ExpressionRef
 		),
 
 		and: binaryFn(mod, Operation.AndInt64),

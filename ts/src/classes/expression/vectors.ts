@@ -25,13 +25,13 @@ export class SIMDTernary extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenSIMDTernaryGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenSIMDTernarySetOp"](this._ptr, op); }
 
-	get a(): ExpressionRef { return BinaryenObj["_BinaryenSIMDTernaryGetA"](this._ptr); }
+	get a(): ExpressionRef { return BinaryenObj["_BinaryenSIMDTernaryGetA"](this._ptr) as ExpressionRef; }
 	set a(aExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDTernarySetA"](this._ptr, aExpr); }
 
-	get b(): ExpressionRef { return BinaryenObj["_BinaryenSIMDTernaryGetB"](this._ptr); }
+	get b(): ExpressionRef { return BinaryenObj["_BinaryenSIMDTernaryGetB"](this._ptr) as ExpressionRef; }
 	set b(bExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDTernarySetB"](this._ptr, bExpr); }
 
-	get c(): ExpressionRef { return BinaryenObj["_BinaryenSIMDTernaryGetC"](this._ptr); }
+	get c(): ExpressionRef { return BinaryenObj["_BinaryenSIMDTernaryGetC"](this._ptr) as ExpressionRef; }
 	set c(cExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDTernarySetC"](this._ptr, cExpr); }
 }
 
@@ -45,10 +45,10 @@ export class SIMDShift extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenSIMDShiftGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenSIMDShiftSetOp"](this._ptr, op); }
 
-	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShiftGetVec"](this._ptr); }
+	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShiftGetVec"](this._ptr) as ExpressionRef; }
 	set vec(vecExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDShiftSetVec"](this._ptr, vecExpr); }
 
-	get shift(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShiftGetShift"](this._ptr); }
+	get shift(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShiftGetShift"](this._ptr) as ExpressionRef; }
 	set shift(shiftExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDShiftSetShift"](this._ptr, shiftExpr); }
 }
 
@@ -59,10 +59,10 @@ export class SIMDShuffle extends Expression {
 		super(ExpressionId.SIMDShuffle, expr);
 	}
 
-	get left(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShuffleGetLeft"](this._ptr); }
+	get left(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShuffleGetLeft"](this._ptr) as ExpressionRef; }
 	set left(leftExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDShuffleSetLeft"](this._ptr, leftExpr); }
 
-	get right(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShuffleGetRight"](this._ptr); }
+	get right(): ExpressionRef { return BinaryenObj["_BinaryenSIMDShuffleGetRight"](this._ptr) as ExpressionRef; }
 	set right(rightExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDShuffleSetRight"](this._ptr, rightExpr); }
 
 	get mask(): number[] {
@@ -98,7 +98,7 @@ export class SIMDExtract extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenSIMDExtractGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenSIMDExtractSetOp"](this._ptr, op); }
 
-	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDExtractGetVec"](this._ptr); }
+	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDExtractGetVec"](this._ptr) as ExpressionRef; }
 	set vec(vecExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDExtractSetVec"](this._ptr, vecExpr); }
 
 	get index(): number { return BinaryenObj["_BinaryenSIMDExtractGetIndex"](this._ptr); }
@@ -115,12 +115,12 @@ export class SIMDReplace extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenSIMDReplaceGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenSIMDReplaceSetOp"](this._ptr, op); }
 
-	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDReplaceGetVec"](this._ptr); }
+	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDReplaceGetVec"](this._ptr) as ExpressionRef; }
 	set vec(vecExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDReplaceSetVec"](this._ptr, vecExpr); }
 
 	get index(): number { return BinaryenObj["_BinaryenSIMDReplaceGetIndex"](this._ptr); }
 	set index(index: number) { BinaryenObj["_BinaryenSIMDReplaceSetIndex"](this._ptr, index); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenSIMDReplaceGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenSIMDReplaceGetValue"](this._ptr) as ExpressionRef; }
 	set value(value: ExpressionRef) { BinaryenObj["_BinaryenSIMDReplaceSetValue"](this._ptr, value); }
 }

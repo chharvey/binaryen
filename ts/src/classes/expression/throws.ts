@@ -33,7 +33,7 @@ export class Throw extends Expression {
 			this._ptr,
 			BinaryenObj["_BinaryenThrowGetNumOperands"],
 			BinaryenObj["_BinaryenThrowGetOperandAt"],
-		);
+		) as ExpressionRef[];
 	}
 
 	set operands(operands: readonly ExpressionRef[]) {
@@ -49,7 +49,7 @@ export class Throw extends Expression {
 
 
 	getOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenThrowGetOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenThrowGetOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setOperandAt(index: number, operandExpr: ExpressionRef): void {
@@ -65,7 +65,7 @@ export class Throw extends Expression {
 	}
 
 	removeOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenThrowRemoveOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenThrowRemoveOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -93,7 +93,7 @@ export class Try extends Expression {
 		super(ExpressionId.Try, expr);
 	}
 
-	get body(): ExpressionRef { return BinaryenObj["_BinaryenTryGetBody"](this._ptr); }
+	get body(): ExpressionRef { return BinaryenObj["_BinaryenTryGetBody"](this._ptr) as ExpressionRef; }
 	set body(bodyExpr: ExpressionRef) { BinaryenObj["_BinaryenTrySetBody"](this._ptr, bodyExpr); }
 
 	get numCatchTags(): number { return BinaryenObj["_BinaryenTryGetNumCatchTags"](this._ptr); }
@@ -135,7 +135,7 @@ export class Try extends Expression {
 			this._ptr,
 			BinaryenObj["_BinaryenTryGetNumCatchBodies"],
 			BinaryenObj["_BinaryenTryGetCatchBodyAt"],
-		);
+		) as ExpressionRef[];
 	}
 
 	set catchBodies(catchBodies: readonly ExpressionRef[]) {
@@ -179,7 +179,7 @@ export class Try extends Expression {
 	}
 
 	getCatchBodyAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenTryGetCatchBodyAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenTryGetCatchBodyAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setCatchBodyAt(index: number, catchExpr: ExpressionRef): void {
@@ -195,7 +195,7 @@ export class Try extends Expression {
 	}
 
 	removeCatchBodyAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenTryRemoveCatchBodyAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenTryRemoveCatchBodyAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	hasCatchAll(): boolean {

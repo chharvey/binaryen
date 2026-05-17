@@ -38,7 +38,7 @@ export class RefIsNull extends Expression {
 		super(ExpressionId.RefIsNull, expr);
 	}
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenRefIsNullGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenRefIsNullGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenRefIsNullSetValue"](this._ptr, valueExpr); }
 }
 
@@ -52,7 +52,7 @@ export class RefAs extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenRefAsGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenRefAsSetOp"](this._ptr, op); }
 
-	get value(): ExpressionRef {return BinaryenObj["_BinaryenRefAsGetValue"](this._ptr);}
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenRefAsGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenRefAsSetValue"](this._ptr, valueExpr); }
 }
 
@@ -63,10 +63,10 @@ export class RefEq extends Expression {
 		super(ExpressionId.RefEq, expr);
 	}
 
-	get left(): ExpressionRef { return BinaryenObj["_BinaryenRefEqGetLeft"](this._ptr); }
+	get left(): ExpressionRef { return BinaryenObj["_BinaryenRefEqGetLeft"](this._ptr) as ExpressionRef; }
 	set left(leftExpr: ExpressionRef) { BinaryenObj["_BinaryenRefEqSetLeft"](this._ptr, leftExpr); }
 
-	get right(): ExpressionRef { return BinaryenObj["_BinaryenRefEqGetRight"](this._ptr); }
+	get right(): ExpressionRef { return BinaryenObj["_BinaryenRefEqGetRight"](this._ptr) as ExpressionRef; }
 	set right(rightExpr: ExpressionRef) { BinaryenObj["_BinaryenRefEqSetRight"](this._ptr, rightExpr); }
 }
 
@@ -77,7 +77,7 @@ export class RefTest extends Expression {
 		super(ExpressionId.RefTest, expr);
 	}
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenRefTestGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenRefTestGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenRefTestSetRef"](this._ptr, ref); }
 
 	get castType(): Type { return BinaryenObj["_BinaryenRefTestGetCastType"](this._ptr) as Type; }
@@ -91,7 +91,7 @@ export class RefCast extends Expression {
 		super(ExpressionId.RefCast, expr);
 	}
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenRefCastGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenRefCastGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenRefCastSetRef"](this._ptr, ref); }
 }
 
@@ -102,7 +102,7 @@ export class RefI31 extends Expression {
 		super(ExpressionId.RefI31, expr);
 	}
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenRefI31GetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenRefI31GetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenRefI31SetValue"](this._ptr, valueExpr); }
 }
 
@@ -113,7 +113,7 @@ export class I31Get extends Expression {
 		super(ExpressionId.I31Get, expr);
 	}
 
-	get i31(): ExpressionRef { return BinaryenObj["_BinaryenI31GetGetI31"](this._ptr); }
+	get i31(): ExpressionRef { return BinaryenObj["_BinaryenI31GetGetI31"](this._ptr) as ExpressionRef; }
 	set i31(i31Expr: ExpressionRef) { BinaryenObj["_BinaryenI31GetSetI31"](this._ptr, i31Expr); }
 
 	get signed(): boolean { return Boolean(BinaryenObj["_BinaryenI31GetIsSigned"](this._ptr)); }

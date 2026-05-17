@@ -53,7 +53,7 @@ class BinaryenFunction {
 
 
 	get body(): ExpressionRef {
-		return BinaryenObj["_BinaryenFunctionGetBody"](this.#ptr);
+		return BinaryenObj["_BinaryenFunctionGetBody"](this.#ptr) as ExpressionRef;
 	}
 
 	set body(bodyExpr: ExpressionRef) {

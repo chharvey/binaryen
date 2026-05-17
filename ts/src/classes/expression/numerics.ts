@@ -84,7 +84,7 @@ export class Unary extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenUnaryGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenUnarySetOp"](this._ptr, op); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenUnaryGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenUnaryGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenUnarySetValue"](this._ptr, valueExpr); }
 }
 
@@ -98,10 +98,10 @@ export class Binary extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenBinaryGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenBinarySetOp"](this._ptr, op); }
 
-	get left(): ExpressionRef { return BinaryenObj["_BinaryenBinaryGetLeft"](this._ptr); }
+	get left(): ExpressionRef { return BinaryenObj["_BinaryenBinaryGetLeft"](this._ptr) as ExpressionRef; }
 	set left(leftExpr: ExpressionRef) { BinaryenObj["_BinaryenBinarySetLeft"](this._ptr, leftExpr); }
 
-	get right(): ExpressionRef { return BinaryenObj["_BinaryenBinaryGetRight"](this._ptr); }
+	get right(): ExpressionRef { return BinaryenObj["_BinaryenBinaryGetRight"](this._ptr) as ExpressionRef; }
 	set right(rightExpr: ExpressionRef) { BinaryenObj["_BinaryenBinarySetRight"](this._ptr, rightExpr); }
 }
 
@@ -115,16 +115,16 @@ export class WideIntAddSub extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenWideIntAddSubGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenWideIntAddSubSetOp"](this._ptr, op); }
 
-	get leftLow(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetLeftLow"](this._ptr); }
+	get leftLow(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetLeftLow"](this._ptr) as ExpressionRef; }
 	set leftLow(leftExpr: ExpressionRef) { BinaryenObj["_BinaryenWideIntAddSubSetLeftLow"](this._ptr, leftExpr); }
 
-	get leftHigh(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetLeftHigh"](this._ptr); }
+	get leftHigh(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetLeftHigh"](this._ptr) as ExpressionRef; }
 	set leftHigh(leftExpr: ExpressionRef) { BinaryenObj["_BinaryenWideIntAddSubSetLeftHigh"](this._ptr, leftExpr); }
 
-	get rightLow(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetRightLow"](this._ptr); }
+	get rightLow(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetRightLow"](this._ptr) as ExpressionRef; }
 	set rightLow(rightExpr: ExpressionRef) { BinaryenObj["_BinaryenWideIntAddSubSetRightLow"](this._ptr, rightExpr); }
 
-	get rightHigh(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetRightHigh"](this._ptr); }
+	get rightHigh(): ExpressionRef { return BinaryenObj["_BinaryenWideIntAddSubGetRightHigh"](this._ptr) as ExpressionRef; }
 	set rightHigh(rightExpr: ExpressionRef) { BinaryenObj["_BinaryenWideIntAddSubSetRightHigh"](this._ptr, rightExpr); }
 }
 
@@ -138,9 +138,9 @@ export class WideIntMul extends Expression {
 	get op(): Operation { return BinaryenObj["_BinaryenWideIntMulGetOp"](this._ptr); }
 	set op(op: Operation) { BinaryenObj["_BinaryenWideIntMulSetOp"](this._ptr, op); }
 
-	get left(): ExpressionRef { return BinaryenObj["_BinaryenWideIntMulGetLeft"](this._ptr); }
+	get left(): ExpressionRef { return BinaryenObj["_BinaryenWideIntMulGetLeft"](this._ptr) as ExpressionRef; }
 	set left(leftExpr: ExpressionRef) { BinaryenObj["_BinaryenWideIntMulSetLeft"](this._ptr, leftExpr); }
 
-	get right(): ExpressionRef { return BinaryenObj["_BinaryenWideIntMulGetRight"](this._ptr); }
+	get right(): ExpressionRef { return BinaryenObj["_BinaryenWideIntMulGetRight"](this._ptr) as ExpressionRef; }
 	set right(rightExpr: ExpressionRef) { BinaryenObj["_BinaryenWideIntMulSetRight"](this._ptr, rightExpr); }
 }

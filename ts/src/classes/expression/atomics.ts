@@ -31,10 +31,10 @@ export class AtomicRMW extends Expression {
 	get offset(): number { return BinaryenObj["_BinaryenAtomicRMWGetOffset"](this._ptr); }
 	set offset(offset: number) { BinaryenObj["_BinaryenAtomicRMWSetOffset"](this._ptr, offset); }
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicRMWGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicRMWGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicRMWSetPtr"](this._ptr, ptrExpr); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenAtomicRMWGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenAtomicRMWGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicRMWSetValue"](this._ptr, valueExpr); }
 }
 
@@ -54,13 +54,13 @@ export class AtomicCmpxchg extends Expression {
 	get offset(): number { return BinaryenObj["_BinaryenAtomicCmpxchgGetOffset"](this._ptr); }
 	set offset(offset: number) { BinaryenObj["_BinaryenAtomicCmpxchgSetOffset"](this._ptr, offset); }
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicCmpxchgGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicCmpxchgGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicCmpxchgSetPtr"](this._ptr, ptrExpr); }
 
-	get expected(): ExpressionRef { return BinaryenObj["_BinaryenAtomicCmpxchgGetExpected"](this._ptr); }
+	get expected(): ExpressionRef { return BinaryenObj["_BinaryenAtomicCmpxchgGetExpected"](this._ptr) as ExpressionRef; }
 	set expected(expectedExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicCmpxchgSetExpected"](this._ptr, expectedExpr); }
 
-	get replacement(): ExpressionRef { return BinaryenObj["_BinaryenAtomicCmpxchgGetReplacement"](this._ptr); }
+	get replacement(): ExpressionRef { return BinaryenObj["_BinaryenAtomicCmpxchgGetReplacement"](this._ptr) as ExpressionRef; }
 	set replacement(replacementExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicCmpxchgSetReplacement"](this._ptr, replacementExpr); }
 }
 
@@ -71,13 +71,13 @@ export class AtomicWait extends Expression {
 		super(ExpressionId.AtomicWait, expr);
 	}
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicWaitGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicWaitGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicWaitSetPtr"](this._ptr, ptrExpr); }
 
-	get expected(): ExpressionRef { return BinaryenObj["_BinaryenAtomicWaitGetExpected"](this._ptr); }
+	get expected(): ExpressionRef { return BinaryenObj["_BinaryenAtomicWaitGetExpected"](this._ptr) as ExpressionRef; }
 	set expected(expectedExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicWaitSetExpected"](this._ptr, expectedExpr); }
 
-	get timeout(): ExpressionRef { return BinaryenObj["_BinaryenAtomicWaitGetTimeout"](this._ptr); }
+	get timeout(): ExpressionRef { return BinaryenObj["_BinaryenAtomicWaitGetTimeout"](this._ptr) as ExpressionRef; }
 	set timeout(timeoutExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicWaitSetTimeout"](this._ptr, timeoutExpr); }
 
 	get expectedType(): Type { return BinaryenObj["_BinaryenAtomicWaitGetExpectedType"](this._ptr) as Type; }
@@ -91,10 +91,10 @@ export class AtomicNotify extends Expression {
 		super(ExpressionId.AtomicNotify, expr);
 	}
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicNotifyGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenAtomicNotifyGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicNotifySetPtr"](this._ptr, ptrExpr); }
 
-	get notifyCount(): ExpressionRef { return BinaryenObj["_BinaryenAtomicNotifyGetNotifyCount"](this._ptr); }
+	get notifyCount(): ExpressionRef { return BinaryenObj["_BinaryenAtomicNotifyGetNotifyCount"](this._ptr) as ExpressionRef; }
 	set notifyCount(notifyCountExpr: ExpressionRef) { BinaryenObj["_BinaryenAtomicNotifySetNotifyCount"](this._ptr, notifyCountExpr); }
 }
 

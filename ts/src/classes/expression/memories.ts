@@ -36,7 +36,7 @@ export class Load extends Expression {
 	get align(): number { return BinaryenObj["_BinaryenLoadGetAlign"](this._ptr); }
 	set align(align: number) { BinaryenObj["_BinaryenLoadSetAlign"](this._ptr, align); }
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenLoadGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenLoadGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenLoadSetPtr"](this._ptr, ptrExpr); }
 
 	get atomic(): boolean { return Boolean(BinaryenObj["_BinaryenLoadIsAtomic"](this._ptr)); }
@@ -62,10 +62,10 @@ export class Store extends Expression {
 	get align(): number { return BinaryenObj["_BinaryenStoreGetAlign"](this._ptr); }
 	set align(align: number) { BinaryenObj["_BinaryenStoreSetAlign"](this._ptr, align); }
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenLoadGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenLoadGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenLoadSetPtr"](this._ptr, ptrExpr); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenStoreGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenStoreGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenStoreSetValue"](this._ptr, valueExpr); }
 
 	get valueType(): Type { return BinaryenObj["_BinaryenStoreGetValueType"](this._ptr) as Type; }
@@ -94,7 +94,7 @@ export class SIMDLoad extends Expression {
 	get align(): number { return BinaryenObj["_BinaryenSIMDLoadGetAlign"](this._ptr); }
 	set align(align: number) { BinaryenObj["_BinaryenSIMDLoadSetAlign"](this._ptr, align); }
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDLoadSetPtr"](this._ptr, ptrExpr); }
 }
 
@@ -114,13 +114,13 @@ export class SIMDLoadStoreLane extends Expression {
 	get align(): number { return BinaryenObj["_BinaryenSIMDLoadStoreLaneGetAlign"](this._ptr); }
 	set align(align: number) { BinaryenObj["_BinaryenSIMDLoadStoreLaneSetAlign"](this._ptr, align); }
 
-	get index(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadStoreLaneGetIndex"](this._ptr); }
+	get index(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadStoreLaneGetIndex"](this._ptr) as ExpressionRef; }
 	set index(index: ExpressionRef) { BinaryenObj["_BinaryenSIMDLoadStoreLaneSetIndex"](this._ptr, index); }
 
-	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadStoreLaneGetPtr"](this._ptr); }
+	get ptr(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadStoreLaneGetPtr"](this._ptr) as ExpressionRef; }
 	set ptr(ptrExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDLoadStoreLaneSetPtr"](this._ptr, ptrExpr); }
 
-	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadStoreLaneGetVec"](this._ptr); }
+	get vec(): ExpressionRef { return BinaryenObj["_BinaryenSIMDLoadStoreLaneGetVec"](this._ptr) as ExpressionRef; }
 	set vec(vecExpr: ExpressionRef) { BinaryenObj["_BinaryenSIMDLoadStoreLaneSetVec"](this._ptr, vecExpr); }
 
 	get store(): boolean {return Boolean(BinaryenObj["_BinaryenSIMDLoadStoreLaneIsStore"](this._ptr));}
@@ -141,7 +141,7 @@ export class MemoryGrow extends Expression {
 		super(ExpressionId.MemoryGrow, expr);
 	}
 
-	get delta(): ExpressionRef { return BinaryenObj["_BinaryenMemoryGrowGetDelta"](this._ptr); }
+	get delta(): ExpressionRef { return BinaryenObj["_BinaryenMemoryGrowGetDelta"](this._ptr) as ExpressionRef; }
 	set delta(deltaExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryGrowSetDelta"](this._ptr, deltaExpr); }
 }
 
@@ -152,13 +152,13 @@ export class MemoryFill extends Expression {
 		super(ExpressionId.MemoryFill, expr);
 	}
 
-	get dest(): ExpressionRef { return BinaryenObj["_BinaryenMemoryFillGetDest"](this._ptr); }
+	get dest(): ExpressionRef { return BinaryenObj["_BinaryenMemoryFillGetDest"](this._ptr) as ExpressionRef; }
 	set dest(destExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryFillSetDest"](this._ptr, destExpr); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenMemoryFillGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenMemoryFillGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryFillSetValue"](this._ptr, valueExpr); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenMemoryFillGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenMemoryFillGetSize"](this._ptr) as ExpressionRef; }
 	set size(sizeExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryFillSetSize"](this._ptr, sizeExpr); }
 }
 
@@ -169,13 +169,13 @@ export class MemoryCopy extends Expression {
 		super(ExpressionId.MemoryCopy, expr);
 	}
 
-	get dest(): ExpressionRef { return BinaryenObj["_BinaryenMemoryCopyGetDest"](this._ptr); }
+	get dest(): ExpressionRef { return BinaryenObj["_BinaryenMemoryCopyGetDest"](this._ptr) as ExpressionRef; }
 	set dest(destExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryCopySetDest"](this._ptr, destExpr); }
 
-	get source(): ExpressionRef { return BinaryenObj["_BinaryenMemoryCopyGetSource"](this._ptr); }
+	get source(): ExpressionRef { return BinaryenObj["_BinaryenMemoryCopyGetSource"](this._ptr) as ExpressionRef; }
 	set source(sourceExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryCopySetSource"](this._ptr, sourceExpr); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenMemoryCopyGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenMemoryCopyGetSize"](this._ptr) as ExpressionRef; }
 	set size(sizeExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryCopySetSize"](this._ptr, sizeExpr); }
 }
 
@@ -189,13 +189,13 @@ export class MemoryInit extends Expression {
 	get segment(): string { return UTF8ToString(BinaryenObj["_BinaryenMemoryInitGetSegment"](this._ptr)); }
 	set segment(segment: string) { preserveStack(() => BinaryenObj["_BinaryenMemoryCopySetDest"](this._ptr, strToStack(segment))); }
 
-	get dest(): ExpressionRef { return BinaryenObj["_BinaryenMemoryInitGetDest"](this._ptr); }
+	get dest(): ExpressionRef { return BinaryenObj["_BinaryenMemoryInitGetDest"](this._ptr) as ExpressionRef; }
 	set dest(destExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryInitSetDest"](this._ptr, destExpr); }
 
-	get offset(): ExpressionRef { return BinaryenObj["_BinaryenMemoryInitGetOffset"](this._ptr); }
+	get offset(): ExpressionRef { return BinaryenObj["_BinaryenMemoryInitGetOffset"](this._ptr) as ExpressionRef; }
 	set offset(offsetExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryInitSetOffset"](this._ptr, offsetExpr); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenMemoryInitGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenMemoryInitGetSize"](this._ptr) as ExpressionRef; }
 	set size(sizeExpr: ExpressionRef) { BinaryenObj["_BinaryenMemoryInitGetSize"](this._ptr, sizeExpr); }
 }
 

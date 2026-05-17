@@ -37,7 +37,7 @@ export class Call extends Expression {
 			this._ptr,
 			BinaryenObj["_BinaryenCallGetNumOperands"],
 			BinaryenObj["_BinaryenCallGetOperandAt"],
-		);
+		) as ExpressionRef[];
 	}
 
 	set operands(operands: readonly ExpressionRef[]) {
@@ -52,7 +52,7 @@ export class Call extends Expression {
 	}
 
 	getOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenCallGetOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenCallGetOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setOperandAt(index: number, operandExpr: ExpressionRef): void {
@@ -68,7 +68,7 @@ export class Call extends Expression {
 	}
 
 	removeOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenCallRemoveOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenCallRemoveOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -79,7 +79,7 @@ export class CallRef extends Expression {
 		super(ExpressionId.CallRef, expr);
 	}
 
-	get target(): ExpressionRef { return BinaryenObj["_BinaryenCallRefGetTarget"](this._ptr); }
+	get target(): ExpressionRef { return BinaryenObj["_BinaryenCallRefGetTarget"](this._ptr) as ExpressionRef; }
 	set target(targetExpr: ExpressionRef) { BinaryenObj["_BinaryenCallRefSetTarget"](this._ptr, targetExpr); }
 
 	get return(): boolean { return Boolean(BinaryenObj["_BinaryenCallRefIsReturn"](this._ptr)); }
@@ -88,7 +88,7 @@ export class CallRef extends Expression {
 	get numOperands(): number { return BinaryenObj["_BinaryenCallRefGetNumOperands"](this._ptr); }
 
 	getOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenCallRefGetOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenCallRefGetOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setOperandAt(index: number, operandExpr: ExpressionRef): void {
@@ -100,7 +100,7 @@ export class CallRef extends Expression {
 	}
 
 	removeOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenCallRefRemoveOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenCallRefRemoveOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -111,7 +111,7 @@ export class CallIndirect extends Expression {
 		super(ExpressionId.CallIndirect, expr);
 	}
 
-	get target(): ExpressionRef { return BinaryenObj["_BinaryenCallIndirectGetTarget"](this._ptr); }
+	get target(): ExpressionRef { return BinaryenObj["_BinaryenCallIndirectGetTarget"](this._ptr) as ExpressionRef; }
 	set target(targetExpr: ExpressionRef) { BinaryenObj["_BinaryenCallIndirectSetTarget"](this._ptr, targetExpr); }
 
 	get return(): boolean { return Boolean(BinaryenObj["_BinaryenCallIndirectIsReturn"](this._ptr)); }
@@ -133,7 +133,7 @@ export class CallIndirect extends Expression {
 			this._ptr,
 			BinaryenObj["_BinaryenCallIndirectGetNumOperands"],
 			BinaryenObj["_BinaryenCallIndirectGetOperandAt"],
-		);
+		) as ExpressionRef[];
 	}
 
 	set operands(operands: readonly ExpressionRef[]) {
@@ -148,7 +148,7 @@ export class CallIndirect extends Expression {
 	}
 
 	getOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenCallIndirectGetOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenCallIndirectGetOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setOperandAt(index: number, operandExpr: ExpressionRef): void {
@@ -164,7 +164,7 @@ export class CallIndirect extends Expression {
 	}
 
 	removeOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenCallIndirectRemoveOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenCallIndirectRemoveOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -175,6 +175,6 @@ export class Return extends Expression {
 		super(ExpressionId.Return, expr);
 	}
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenReturnGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenReturnGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenReturnSetValue"](this._ptr, valueExpr); }
 }

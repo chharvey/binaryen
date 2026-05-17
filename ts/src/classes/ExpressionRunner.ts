@@ -45,6 +45,6 @@ export class ExpressionRunner {
 	}
 
 	runAndDispose(expr: ExpressionRef): ExpressionRef {
-		return BinaryenObj["_ExpressionRunnerRunAndDispose"](this.#ptr, expr);
+		return BinaryenObj["_ExpressionRunnerRunAndDispose"](this.#ptr, expr) as ExpressionRef;
 	}
 }

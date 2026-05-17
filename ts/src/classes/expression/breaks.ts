@@ -33,10 +33,10 @@ export class Break extends Expression {
 		preserveStack(() => BinaryenObj["_BinaryenBreakSetName"](this._ptr, strToStack(name)));
 	}
 
-	get condition(): ExpressionRef { return BinaryenObj["_BinaryenBreakGetCondition"](this._ptr); }
+	get condition(): ExpressionRef { return BinaryenObj["_BinaryenBreakGetCondition"](this._ptr) as ExpressionRef; }
 	set condition(condExpr: ExpressionRef) {BinaryenObj["_BinaryenBreakSetCondition"](this._ptr, condExpr);}
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenBreakGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenBreakGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenBreakSetValue"](this._ptr, valueExpr); }
 }
 
@@ -47,10 +47,10 @@ export class Switch extends Expression {
 		super(ExpressionId.Switch, expr);
 	}
 
-	get condition(): ExpressionRef { return BinaryenObj["_BinaryenSwitchGetCondition"](this._ptr); }
+	get condition(): ExpressionRef { return BinaryenObj["_BinaryenSwitchGetCondition"](this._ptr) as ExpressionRef; }
 	set condition(condExpr: ExpressionRef) { BinaryenObj["_BinaryenSwitchSetCondition"](condExpr); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenSwitchGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenSwitchGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenSwitchSetValue"](valueExpr); }
 
 	get numNames(): number { return BinaryenObj["_BinaryenSwitchGetNumNames"](this._ptr); }
@@ -117,7 +117,7 @@ export class BrOn extends Expression {
 	get name(): string { return UTF8ToString(BinaryenObj["_BinaryenBrOnGetName"](this._ptr)); }
 	set name(name: string) { preserveStack(() => BinaryenObj["_BinaryenBrOnSetName"](this._ptr, strToStack(name))); }
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenBrOnGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenBrOnGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenBrOnSetRef"](this._ptr, ref); }
 
 	get castType(): Type { return BinaryenObj["_BinaryenBrOnGetCastType"](this._ptr) as Type; }

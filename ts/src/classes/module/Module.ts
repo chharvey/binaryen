@@ -227,7 +227,7 @@ export class Module {
 			externref,
 			stringref,
 		].includes(typ)) {
-			return BinaryenObj["_BinaryenPop"](this[PTR], typ);
+			return BinaryenObj["_BinaryenPop"](this[PTR], typ) as ExpressionRef;
 		} else {
 			throw new Error(`Unexpected type ${ typ }.`);
 		}
@@ -246,7 +246,7 @@ export class Module {
 	 * @category Expression Manipulation
 	 */
 	copyExpression(expr: ExpressionRef): ExpressionRef {
-		return BinaryenObj["_BinaryenExpressionCopy"](expr, this[PTR]);
+		return BinaryenObj["_BinaryenExpressionCopy"](expr, this[PTR]) as ExpressionRef;
 	}
 
 	// ## Module Component Operations ## //

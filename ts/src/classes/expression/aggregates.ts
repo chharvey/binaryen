@@ -32,7 +32,7 @@ export class TupleMake extends Expression {
 			this._ptr,
 			BinaryenObj["_BinaryenTupleMakeGetNumOperands"],
 			BinaryenObj["_BinaryenTupleMakeGetOperandAt"],
-		);
+		) as ExpressionRef[];
 	}
 
 	set operands(operands: readonly ExpressionRef[]) {
@@ -47,7 +47,7 @@ export class TupleMake extends Expression {
 	}
 
 	getOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenTupleMakeGetOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenTupleMakeGetOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setOperandAt(index: number, operandExpr: ExpressionRef): void {
@@ -63,7 +63,7 @@ export class TupleMake extends Expression {
 	}
 
 	removeOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenTupleMakeRemoveOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenTupleMakeRemoveOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -74,7 +74,7 @@ export class TupleExtract extends Expression {
 		super(ExpressionId.TupleExtract, expr);
 	}
 
-	get tuple(): ExpressionRef { return BinaryenObj["_BinaryenTupleExtractGetTuple"](this._ptr); }
+	get tuple(): ExpressionRef { return BinaryenObj["_BinaryenTupleExtractGetTuple"](this._ptr) as ExpressionRef; }
 	set tuple(tupleExpr: ExpressionRef) { BinaryenObj["_BinaryenTupleExtractSetTuple"](this._ptr, tupleExpr); }
 
 	get index(): number { return BinaryenObj["_BinaryenTupleExtractGetIndex"](this._ptr); }
@@ -97,7 +97,7 @@ export class StructNew extends Expression {
 			this._ptr,
 			BinaryenObj["_BinaryenStructNewGetNumOperands"],
 			BinaryenObj["_BinaryenStructNewGetOperandAt"],
-		);
+		) as ExpressionRef[];
 	}
 
 	set operands(operands: readonly ExpressionRef[]) {
@@ -112,7 +112,7 @@ export class StructNew extends Expression {
 	}
 
 	getOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenStructNewGetOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenStructNewGetOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setOperandAt(index: number, operandExpr: ExpressionRef): void {
@@ -128,7 +128,7 @@ export class StructNew extends Expression {
 	}
 
 	removeOperandAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenStructNewRemoveOperandAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenStructNewRemoveOperandAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -142,7 +142,7 @@ export class StructGet extends Expression {
 	get index(): number { return BinaryenObj["_BinaryenStructGetGetIndex"](this._ptr); }
 	set index(index: number) { BinaryenObj["_BinaryenStructGetSetIndex"](this._ptr, index); }
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenStructGetGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenStructGetGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenStructGetSetRef"](this._ptr, ref); }
 
 	get signed(): boolean { return Boolean(BinaryenObj["_BinaryenStructGetIsSigned"](this._ptr)); }
@@ -159,10 +159,10 @@ export class StructSet extends Expression {
 	get index(): number { return BinaryenObj["_BinaryenStructSetGetIndex"](this._ptr); }
 	set index(index: number) { BinaryenObj["_BinaryenStructSetSetIndex"](this._ptr, index); }
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenStructSetGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenStructSetGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenStructSetSetRef"](this._ptr, ref); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenStructSetGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenStructSetGetValue"](this._ptr) as ExpressionRef; }
 	set value(value: ExpressionRef) { BinaryenObj["_BinaryenStructSetSetValue"](this._ptr, value); }
 }
 
@@ -173,10 +173,10 @@ export class ArrayNew extends Expression {
 		super(ExpressionId.ArrayNew, expr);
 	}
 
-	get init(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewGetInit"](this._ptr); }
+	get init(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewGetInit"](this._ptr) as ExpressionRef; }
 	set init(init: ExpressionRef) { BinaryenObj["_BinaryenArrayNewSetInit"](this._ptr, init); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewGetSize"](this._ptr) as ExpressionRef; }
 	set size(size: ExpressionRef) { BinaryenObj["_BinaryenArrayNewSetSize"](this._ptr, size); }
 }
 
@@ -196,7 +196,7 @@ export class ArrayNewFixed extends Expression {
 			this._ptr,
 			BinaryenObj["_BinaryenArrayNewFixedGetNumValues"],
 			BinaryenObj["_BinaryenArrayNewFixedGetValueAt"],
-		);
+		) as ExpressionRef[];
 	}
 
 	set values(operands: readonly ExpressionRef[]) {
@@ -211,7 +211,7 @@ export class ArrayNewFixed extends Expression {
 	}
 
 	getValueAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenArrayNewFixedGetValueAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenArrayNewFixedGetValueAt"](this._ptr, index) as ExpressionRef;
 	}
 
 	setValueAt(index: number, valueExpr: ExpressionRef): void {
@@ -227,7 +227,7 @@ export class ArrayNewFixed extends Expression {
 	}
 
 	removeValueAt(index: number): ExpressionRef {
-		return BinaryenObj["_BinaryenArrayNewFixedRemoveValueAt"](this._ptr, index);
+		return BinaryenObj["_BinaryenArrayNewFixedRemoveValueAt"](this._ptr, index) as ExpressionRef;
 	}
 }
 
@@ -241,10 +241,10 @@ export class ArrayNewData extends Expression {
 	get segment(): string { return UTF8ToString(BinaryenObj["_BinaryenArrayNewDataGetSegment"](this._ptr)); }
 	set segment(segment: string) { preserveStack(() => BinaryenObj["_BinaryenArrayNewDataSetSegment"](this._ptr, strToStack(segment))); }
 
-	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewDataGetOffset"](this._ptr); }
+	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewDataGetOffset"](this._ptr) as ExpressionRef; }
 	set offset(offset: ExpressionRef) { BinaryenObj["_BinaryenArrayNewDataSetOffset"](this._ptr, offset); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewDataGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewDataGetSize"](this._ptr) as ExpressionRef; }
 	set size(size: ExpressionRef) { BinaryenObj["_BinaryenArrayNewDataSetSize"](this._ptr, size); }
 }
 
@@ -258,10 +258,10 @@ export class ArrayNewElem extends Expression {
 	get segment(): string { return UTF8ToString(BinaryenObj["_BinaryenArrayNewElemGetSegment"](this._ptr)); }
 	set segment(segment: string) { preserveStack(() => BinaryenObj["_BinaryenArrayNewElemSetSegment"](this._ptr, strToStack(segment))); }
 
-	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewElemGetOffset"](this._ptr); }
+	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewElemGetOffset"](this._ptr) as ExpressionRef; }
 	set offset(offset: ExpressionRef) { BinaryenObj["_BinaryenArrayNewElemSetOffset"](this._ptr, offset); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewElemGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayNewElemGetSize"](this._ptr) as ExpressionRef; }
 	set size(size: ExpressionRef) { BinaryenObj["_BinaryenArrayNewElemSetSize"](this._ptr, size); }
 }
 
@@ -272,10 +272,10 @@ export class ArrayGet extends Expression {
 		super(ExpressionId.ArrayGet, expr);
 	}
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayGetGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayGetGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenArrayGetSetRef"](this._ptr, ref); }
 
-	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayGetGetIndex"](this._ptr); }
+	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayGetGetIndex"](this._ptr) as ExpressionRef; }
 	set index(index: ExpressionRef) { BinaryenObj["_BinaryenArrayGetSetIndex"](this._ptr, index); }
 
 	get signed(): boolean { return Boolean(BinaryenObj["_BinaryenArrayGetIsSigned"](this._ptr)); }
@@ -289,13 +289,13 @@ export class ArraySet extends Expression {
 		super(ExpressionId.ArraySet, expr);
 	}
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArraySetGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArraySetGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenArraySetSetRef"](this._ptr, ref); }
 
-	get index(): ExpressionRef { return BinaryenObj["_BinaryenArraySetGetIndex"](this._ptr); }
+	get index(): ExpressionRef { return BinaryenObj["_BinaryenArraySetGetIndex"](this._ptr) as ExpressionRef; }
 	set index(index: ExpressionRef) { BinaryenObj["_BinaryenArraySetSetIndex"](this._ptr, index); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenArraySetGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenArraySetGetValue"](this._ptr) as ExpressionRef; }
 	set value(value: ExpressionRef) { BinaryenObj["_BinaryenArraySetSetValue"](this._ptr, value); }
 }
 
@@ -306,7 +306,7 @@ export class ArrayLen extends Expression {
 		super(ExpressionId.ArrayLen, expr);
 	}
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayLenGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayLenGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenArrayLenSetRef"](this._ptr, ref); }
 }
 
@@ -317,16 +317,16 @@ export class ArrayFill extends Expression {
 		super(ExpressionId.ArrayFill, expr);
 	}
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenArrayFillSetRef"](this._ptr, ref); }
 
-	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetIndex"](this._ptr); }
+	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetIndex"](this._ptr) as ExpressionRef; }
 	set index(index: ExpressionRef) { BinaryenObj["_BinaryenArrayFillSetIndex"](this._ptr, index); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetValue"](this._ptr) as ExpressionRef; }
 	set value(value: ExpressionRef) { BinaryenObj["_BinaryenArrayFillSetValue"](this._ptr, value); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayFillGetSize"](this._ptr) as ExpressionRef; }
 	set size(size: ExpressionRef) { BinaryenObj["_BinaryenArrayFillSetSize"](this._ptr, size); }
 }
 
@@ -337,19 +337,19 @@ export class ArrayCopy extends Expression {
 		super(ExpressionId.ArrayCopy, expr);
 	}
 
-	get destRef(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetDestRef"](this._ptr); }
+	get destRef(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetDestRef"](this._ptr) as ExpressionRef; }
 	set destRef(ref: ExpressionRef) { BinaryenObj["_BinaryenArrayCopySetDestRef"](this._ptr, ref); }
 
-	get destIndex(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetDestIndex"](this._ptr); }
+	get destIndex(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetDestIndex"](this._ptr) as ExpressionRef; }
 	set destIndex(index: ExpressionRef) { BinaryenObj["_BinaryenArrayCopySetDestIndex"](this._ptr, index); }
 
-	get srcRef(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetSrcRef"](this._ptr); }
+	get srcRef(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetSrcRef"](this._ptr) as ExpressionRef; }
 	set srcRef(ref: ExpressionRef) { BinaryenObj["_BinaryenArrayCopySetSrcRef"](this._ptr, ref); }
 
-	get srcIndex(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetSrcIndex"](this._ptr); }
+	get srcIndex(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetSrcIndex"](this._ptr) as ExpressionRef; }
 	set srcIndex(index: ExpressionRef) { BinaryenObj["_BinaryenArrayCopySetSrcIndex"](this._ptr, index); }
 
-	get length(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetLength"](this._ptr); }
+	get length(): ExpressionRef { return BinaryenObj["_BinaryenArrayCopyGetLength"](this._ptr) as ExpressionRef; }
 	set length(length: ExpressionRef) { BinaryenObj["_BinaryenArrayCopySetLength"](this._ptr, length); }
 }
 
@@ -363,16 +363,16 @@ export class ArrayInitData extends Expression {
 	get segment(): string { return UTF8ToString(BinaryenObj["_BinaryenArrayInitDataGetSegment"](this._ptr)); }
 	set segment(segment: string) { preserveStack(() => BinaryenObj["_BinaryenArrayInitDataSetSegment"](this._ptr, strToStack(segment))); }
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenArrayInitDataSetRef"](this._ptr, ref); }
 
-	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetIndex"](this._ptr); }
+	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetIndex"](this._ptr) as ExpressionRef; }
 	set index(index: ExpressionRef) { BinaryenObj["_BinaryenArrayInitDataSetIndex"](this._ptr, index); }
 
-	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetOffset"](this._ptr); }
+	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetOffset"](this._ptr) as ExpressionRef; }
 	set offset(offset: ExpressionRef) { BinaryenObj["_BinaryenArrayInitDataSetOffset"](this._ptr, offset); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitDataGetSize"](this._ptr) as ExpressionRef; }
 	set size(size: ExpressionRef) { BinaryenObj["_BinaryenArrayInitDataSetSize"](this._ptr, size); }
 }
 
@@ -386,15 +386,15 @@ export class ArrayInitElem extends Expression {
 	get segment(): string { return UTF8ToString(BinaryenObj["_BinaryenArrayInitElemGetSegment"](this._ptr)); }
 	set segment(segment: string) { preserveStack(() => BinaryenObj["_BinaryenArrayInitElemSetSegment"](this._ptr, strToStack(segment))); }
 
-	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetRef"](this._ptr); }
+	get ref(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetRef"](this._ptr) as ExpressionRef; }
 	set ref(ref: ExpressionRef) { BinaryenObj["_BinaryenArrayInitElemSetRef"](this._ptr, ref); }
 
-	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetIndex"](this._ptr); }
+	get index(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetIndex"](this._ptr) as ExpressionRef; }
 	set index(index: ExpressionRef) { BinaryenObj["_BinaryenArrayInitElemSetIndex"](this._ptr, index); }
 
-	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetOffset"](this._ptr); }
+	get offset(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetOffset"](this._ptr) as ExpressionRef; }
 	set offset(offset: ExpressionRef) { BinaryenObj["_BinaryenArrayInitElemSetOffset"](this._ptr, offset); }
 
-	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetSize"](this._ptr); }
+	get size(): ExpressionRef { return BinaryenObj["_BinaryenArrayInitElemGetSize"](this._ptr) as ExpressionRef; }
 	set size(size: ExpressionRef) { BinaryenObj["_BinaryenArrayInitElemSetSize"](this._ptr, size); }
 }

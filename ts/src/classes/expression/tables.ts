@@ -41,7 +41,7 @@ export class TableSet extends Expression {
 	get index(): number { return BinaryenObj["_BinaryenTableSetGetIndex"](this._ptr); }
 	set index(index: number) { BinaryenObj["_BinaryenTableSetSetIndex"](this._ptr, index); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenTableSetGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenTableSetGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenTableSetSetValue"](this._ptr, valueExpr); }
 }
 
@@ -66,9 +66,9 @@ export class TableGrow extends Expression {
 	get table(): string { return UTF8ToString(BinaryenObj["_BinaryenTableGrowGetTable"](this._ptr)); }
 	set table(name: string) { preserveStack(() => BinaryenObj["_BinaryenTableGrowSetTable"](this._ptr, strToStack(name))); }
 
-	get value(): ExpressionRef { return BinaryenObj["_BinaryenTableGrowGetValue"](this._ptr); }
+	get value(): ExpressionRef { return BinaryenObj["_BinaryenTableGrowGetValue"](this._ptr) as ExpressionRef; }
 	set value(valueExpr: ExpressionRef) { BinaryenObj["_BinaryenTableGrowSetValue"](this._ptr, valueExpr); }
 
-	get delta(): ExpressionRef { return BinaryenObj["_BinaryenTableGrowGetDelta"](this._ptr); }
+	get delta(): ExpressionRef { return BinaryenObj["_BinaryenTableGrowGetDelta"](this._ptr) as ExpressionRef; }
 	set delta(deltaExpr: ExpressionRef) { BinaryenObj["_BinaryenTableGrowSetDelta"](this._ptr, deltaExpr); }
 }

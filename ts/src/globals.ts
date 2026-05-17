@@ -275,7 +275,7 @@ export function getTypeFromHeapType(heapType: HeapType, nullable: boolean): Type
  * @returns given `(ref null? ht)`: `ht`
  */
 export function getHeapType(typ: Type): HeapType {
-	return BinaryenObj["_BinaryenTypeGetHeapType"](typ);
+	return BinaryenObj["_BinaryenTypeGetHeapType"](typ) as HeapType;
 }
 
 /** A misnomer — returns not a unique “ID”, but the “kind” of the expression. */

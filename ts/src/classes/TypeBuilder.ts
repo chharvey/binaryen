@@ -97,7 +97,7 @@ export class TypeBuilder {
 	 * @param elementPackedType packed type of elements
 	 * @param elementMutable are array entries mutable?
 	 */
-	setArrayType(index: number, elementType: Type, elementPackedType: Type, elementMutable: boolean): void {
+	setArrayType(index: number, elementType: Type, elementPackedType: PackedType, elementMutable: boolean): void {
 		BinaryenObj["_TypeBuilderSetArrayType"](this.#ptr, index, elementType, elementPackedType, elementMutable);
 	}
 
@@ -107,7 +107,7 @@ export class TypeBuilder {
 	 * @returns the heap type at the given index
 	 */
 	getTempHeapType(index: number): HeapType {
-		return BinaryenObj["_TypeBuilderGetTempHeapType"](this.#ptr, index);
+		return BinaryenObj["_TypeBuilderGetTempHeapType"](this.#ptr, index) as HeapType;
 	}
 
 	/**

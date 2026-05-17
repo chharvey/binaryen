@@ -24,8 +24,8 @@ import type {
  */
 // ### Expressions ### //
 export type Type = number & {readonly [PTR]: unique symbol};
-export type HeapType = number;
-export type PackedType = number;
+export type HeapType = number & {readonly [PTR]: unique symbol};
+export type PackedType = number & {readonly [PTR]: unique symbol};
 export type ExpressionRef = number;
 
 // ### Module Components ### //
@@ -101,9 +101,9 @@ export const nullfuncref: Type = BinaryenObj["_BinaryenTypeNullFuncref"]() as Ty
 export const nullexternref: Type = BinaryenObj["_BinaryenTypeNullExternref"]() as Type;
 
 // ### Packed Types ### //
-export const notPacked: PackedType = BinaryenObj["_BinaryenPackedTypeNotPacked"]();
-export const i8: PackedType = BinaryenObj["_BinaryenPackedTypeInt8"]();
-export const i16: PackedType = BinaryenObj["_BinaryenPackedTypeInt16"]();
+export const notPacked: PackedType = BinaryenObj["_BinaryenPackedTypeNotPacked"]() as PackedType;
+export const i8: PackedType = BinaryenObj["_BinaryenPackedTypeInt8"]() as PackedType;
+export const i16: PackedType = BinaryenObj["_BinaryenPackedTypeInt16"]() as PackedType;
 
 // ### Proposed Types ### //
 // These types are not yet in the WASM spec. Move them to their respective sections once finalized.

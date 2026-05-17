@@ -35,7 +35,7 @@ If you rely on Binaryen.TS and spot an issue, please consider sending a PR our w
 <ul>
 <li><code>TagRef</code></li>
 <li><code>GlobalRef</code></li>
-<li><s><code>MemoryRef</code></s> ⛔️</li>
+<li><code>MemoryRef</code></li>
 <li><code>TableRef</code></li>
 <li><code>FunctionRef</code></li>
 <li><code>DataSegmentRef</code></li>
@@ -90,9 +90,19 @@ If you rely on Binaryen.TS and spot an issue, please consider sending a PR our w
 </li>
 <li><code>SideEffect</code>: an enumeration of values returend by <code>getSideEffects()</code></li>
 <li><code>ExternalKind</code>: an enumeration of kinds of exports; serves as type of the <code>Module.Export#kind</code> field</li>
+<li><code>Operation</code>: used in <a href="#expression-manipulation">manipulating expressions</a></li>
 <li><code>MemoryOrder</code>: an enumeration of values used in atomic expression methods</li>
+<li><code>Feature</code>: WASM Module features</li>
+<li><code>ExpressionRunnerFlag</code>: flags for the <code>ExpressionRunner</code> class</li>
 </ul>
 <h3 id="global-bindings" class="tsd-anchor-link">Global Bindings<a href="#global-bindings" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Classes (see generated docs for descriptions):</p>
+<ul>
+<li><code>Module</code></li>
+<li><code>TypeBuilder</code></li>
+<li><code>ExpressionRunner</code></li>
+<li><code>Relooper</code></li>
+</ul>
 <p>Functions (see generated docs for descriptions):</p>
 <ul>
 <li><code>emitText(expr: ExpressionRef): string</code></li>
@@ -107,8 +117,6 @@ If you rely on Binaryen.TS and spot an issue, please consider sending a PR our w
 <li><code>getExpressionId(expr: ExpressionRef): ExpressionId</code></li>
 <li><code>getExpressionType(expr: ExpressionRef): Type</code></li>
 <li><code>getExpressionInfo(expr: ExpressionRef): Expression</code></li>
-<li><code>getSideEffects(expr: ExpressionRef, mod: Module): SideEffect</code></li>
-<li><code>copyExpression(expr: ExpressionRef, mod: Module): ExpressionRef</code></li>
 </ul>
 <p>Objects:</p>
 <ul>
@@ -129,7 +137,12 @@ If you rely on Binaryen.TS and spot an issue, please consider sending a PR our w
 </ul>
 <p>Properties of <code>Module</code> instances (see full list of methods in generated docs):</p>
 <ul>
-<li><code>Module#wasm</code>:            <a href="#expression-building">build WASM expressions</a></li>
+<li><code>Module#wasm</code>:     <a href="#expression-building">build WASM expressions</a></li>
+<li><code>Module#start</code>:    get/set the start function</li>
+<li><code>Module#features</code>: get/set WASM features (a bitmask)</li>
+</ul>
+<blockquote></blockquote>
+<ul>
 <li><code>Module#tags</code>:            <strong>Tag</strong> manipulation</li>
 <li><code>Module#globals</code>:         <strong>Global</strong> manipulation</li>
 <li><code>Module#memories</code>:        <strong>Memory</strong> manipulation</li>
@@ -142,6 +155,13 @@ If you rely on Binaryen.TS and spot an issue, please consider sending a PR our w
 </ul>
 <p>Module methods (see signatures and descriptions in generated docs):</p>
 <ul>
+<li>Expression Manipulation
+<ul>
+<li><code>.pop()</code></li>
+<li><code>.getSideEffects()</code></li>
+<li><code>.copyExpression()</code></li>
+</ul>
+</li>
 <li>Emission &amp; Execution
 <ul>
 <li><code>.emitText()</code></li>

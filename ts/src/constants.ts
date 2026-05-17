@@ -34,7 +34,7 @@ export type ModuleRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.Tag}. */
 export type TagRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.Global}. */
-export type GlobalRef = number;
+export type GlobalRef = number & {readonly [PTR]: unique symbol};
 /** Reference to a {@link Module.Memory}. */
 export type MemoryRef = number;
 /** Reference to a {@link Module.Table}. */

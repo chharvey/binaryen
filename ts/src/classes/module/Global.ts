@@ -51,17 +51,17 @@ export class ModuleGlobals {
 
 	/** Adds a global instance variable. */
 	add(name: string, type: Type, mutable: boolean, init: ExpressionRef): GlobalRef {
-		return preserveStack(() => BinaryenObj["_BinaryenAddGlobal"](this.mod[PTR], strToStack(name), type, mutable, init));
+		return preserveStack(() => BinaryenObj["_BinaryenAddGlobal"](this.mod[PTR], strToStack(name), type, mutable, init) as GlobalRef);
 	}
 
 	/** Gets a global by name. */
 	get(name: string): GlobalRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetGlobal"](this.mod[PTR], strToStack(name)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetGlobal"](this.mod[PTR], strToStack(name)) as GlobalRef);
 	}
 
 	/** Gets a global by index. */
 	getByIndex(index: number): GlobalRef {
-		return BinaryenObj["_BinaryenGetGlobalByIndex"](this.mod[PTR], index);
+		return BinaryenObj["_BinaryenGetGlobalByIndex"](this.mod[PTR], index) as GlobalRef;
 	}
 
 	/** Gets the number of globals within the module. */

@@ -44,12 +44,12 @@ export class ModuleExports {
 
 	/** Gets an export by name. */
 	get(externalName: string): ExportRef {
-		return preserveStack(() => BinaryenObj["_BinaryenGetExport"](this.mod[PTR], strToStack(externalName)));
+		return preserveStack(() => BinaryenObj["_BinaryenGetExport"](this.mod[PTR], strToStack(externalName)) as ExportRef);
 	}
 
 	/** Gets an export by index. */
 	getByIndex(index: number): ExportRef {
-		return BinaryenObj["_BinaryenGetExportByIndex"](this.mod[PTR], index);
+		return BinaryenObj["_BinaryenGetExportByIndex"](this.mod[PTR], index) as ExportRef;
 	}
 
 	/** Gets the number of exports witin the module. */
@@ -88,6 +88,6 @@ export class ModuleExports {
 	}
 
 	#addComponent(binaryenFuncName: string, internalName: string, externalName: string): ExportRef {
-		return preserveStack(() => BinaryenObj[binaryenFuncName](this.mod[PTR], strToStack(internalName), strToStack(externalName)));
+		return preserveStack(() => BinaryenObj[binaryenFuncName](this.mod[PTR], strToStack(internalName), strToStack(externalName)) as ExportRef);
 	}
 }

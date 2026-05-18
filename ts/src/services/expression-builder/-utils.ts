@@ -30,7 +30,7 @@ const SIZE_OF_LITERAL = BinaryenObj["_BinaryenSizeofLiteral"]();
 
 
 
-export function constant(
+export function constant<T extends ExpressionRef>(
 	mod: Module,
 	binFuncName: (
 		| "_BinaryenLiteralInt32"
@@ -40,16 +40,16 @@ export function constant(
 		| "_BinaryenLiteralFloat32Bits"
 	),
 	value: number,
-): ExpressionRef;
-export function constant(
+): T;
+export function constant<T extends ExpressionRef>(
 	mod: Module,
 	binFuncName: (
 		| "_BinaryenLiteralInt64"
 		| "_BinaryenLiteralFloat64Bits"
 	),
 	value: bigint,
-): ExpressionRef;
-export function constant(mod: Module, binFuncName: string, value: number | bigint): ExpressionRef {
+): T;
+export function constant<T extends ExpressionRef>(mod: Module, binFuncName: string, value: number | bigint): T {
 	return preserveStack(() => {
 		// Weird C stuff happening here…
 		// `tempLiteral` is a pointer whose reference gets mutated by the call to `binFuncName`.
@@ -57,7 +57,7 @@ export function constant(mod: Module, binFuncName: string, value: number | bigin
 		// (e.g `BinaryenLiteralInt32`) to a function with 2 params.
 		const tempLiteral = stackAlloc(SIZE_OF_LITERAL);
 		BinaryenObj[binFuncName](tempLiteral, value);
-		return BinaryenObj["_BinaryenConst"](mod[PTR], tempLiteral) as ExpressionRef;
+		return BinaryenObj["_BinaryenConst"](mod[PTR], tempLiteral) as T;
 	});
 }
 

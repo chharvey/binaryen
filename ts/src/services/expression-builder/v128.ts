@@ -56,7 +56,7 @@ export function v128(mod: Module) {
 		store64_lane: simdLoadStoreLaneFn(mod, Operation.Store64LaneVec128),
 
 		/** Return a static constant v128. */
-		const: (i8s: readonly number[]): ExpressionRef => (
+		const: (i8s: readonly number[]): v128_t => (
 			constant(mod, "_BinaryenLiteralVec128", i8sToStack(i8s))
 		),
 

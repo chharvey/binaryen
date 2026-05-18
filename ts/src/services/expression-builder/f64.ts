@@ -5,7 +5,6 @@ import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
-	type ExpressionRef,
 	Operation,
 	f64 as f64_t,
 } from "../../constants.ts";
@@ -29,11 +28,11 @@ export function f64(mod: Module) {
 		store: storeFn(mod, f64_t, 8),
 
 		/** Return a static constant f64. */
-		const: (value: number): ExpressionRef => (
+		const: (value: number): f64_t => (
 			constant(mod, "_BinaryenLiteralFloat64", value)
 		),
 
-		const_bits: (value: number | bigint): ExpressionRef => (
+		const_bits: (value: number | bigint): f64_t => (
 			constant(mod, "_BinaryenLiteralFloat64Bits", BigInt(value))
 		),
 

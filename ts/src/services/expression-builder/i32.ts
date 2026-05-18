@@ -5,7 +5,6 @@ import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
-	type ExpressionRef,
 	Operation,
 	i32 as i32_t,
 } from "../../constants.ts";
@@ -57,7 +56,7 @@ export function i32(mod: Module) {
 		store16: storeFn(mod, i32_t, 2),
 
 		/** Return a static constant i32. */
-		const: (value: number): ExpressionRef => (
+		const: (value: number): i32_t => (
 			constant(mod, "_BinaryenLiteralInt32", value)
 		),
 

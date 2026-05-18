@@ -66,7 +66,7 @@ export function i64(mod: Module) {
 		store32: storeFn(mod, i64_t, 4),
 
 		/** Return a static constant i64. */
-		const: (value: number | bigint): ExpressionRef => (
+		const: (value: number | bigint): i64_t => (
 			constant(mod, "_BinaryenLiteralInt64", BigInt(value))
 		),
 

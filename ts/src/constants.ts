@@ -6,9 +6,6 @@
 import {
 	BinaryenObj,
 } from "./-pre.ts";
-import type {
-	PTR,
-} from "./-utils.ts";
 
 
 
@@ -17,37 +14,40 @@ import type {
  * Types are nominal. Even though they’re all defined as `number`, they shouldn’t be mixed.
  * Nominal types are implemented as an intersection with an irreproducable object type,
  * which has a secret key and a unique value.
+ * (Both happen to be type `unique symbol`, but that’s a happy coincidence.)
  * To assign numbers to a nominal type, casting is required (via `as` keyword):
  * ```ts
  * const t: Type = BinaryenObj["_BinaryenExpressionGetType"](expr) as Type;
  * ```
  */
+/** “Secret” symbol key for nominal typing. Not a real value. */
+declare const __type: unique symbol;
 // ### Expressions ### //
-export type Type = number & {readonly [PTR]: unique symbol};
-export type HeapType = number & {readonly [PTR]: unique symbol};
-export type PackedType = number & {readonly [PTR]: unique symbol};
-export type ExpressionRef = number & {readonly [PTR]: unique symbol};
+export type Type = number & {readonly [__type]: unique symbol};
+export type HeapType = number & {readonly [__type]: unique symbol};
+export type PackedType = number & {readonly [__type]: unique symbol};
+export type ExpressionRef = number & {readonly [__type]: unique symbol};
 
 // ### Module Components ### //
 /** Reference to a {@link Module}. */
-export type ModuleRef = number & {readonly [PTR]: unique symbol};
+export type ModuleRef = number & {readonly [__type]: unique symbol};
 /** Reference to a {@link Module.Tag}. */
-export type TagRef = number & {readonly [PTR]: unique symbol};
+export type TagRef = number & {readonly [__type]: unique symbol};
 /** Reference to a {@link Module.Global}. */
-export type GlobalRef = number & {readonly [PTR]: unique symbol};
+export type GlobalRef = number & {readonly [__type]: unique symbol};
 /** Reference to a {@link Module.Memory}. */
-export type MemoryRef = number & {readonly [PTR]: unique symbol};
+export type MemoryRef = number & {readonly [__type]: unique symbol};
 /** Reference to a {@link Module.Table}. */
-export type TableRef = number & {readonly [PTR]: unique symbol};
+export type TableRef = number & {readonly [__type]: unique symbol};
 /** Reference to a {@link Module.Function}. */
-export type FunctionRef = number & {readonly [PTR]: unique symbol};
+export type FunctionRef = number & {readonly [__type]: unique symbol};
 /** Reference to a {@link Module.DataSegment}. */
-export type DataSegmentRef = number & {readonly [PTR]: unique symbol};
+export type DataSegmentRef = number & {readonly [__type]: unique symbol};
 /** Reference to an {@link Module.ElementSegment}. */
-export type ElementSegmentRef = number & {readonly [PTR]: unique symbol};
+export type ElementSegmentRef = number & {readonly [__type]: unique symbol};
 // no `ImportRef`
 /** Reference to an {@link Module.Export}. */
-export type ExportRef = number & {readonly [PTR]: unique symbol};
+export type ExportRef = number & {readonly [__type]: unique symbol};
 
 
 

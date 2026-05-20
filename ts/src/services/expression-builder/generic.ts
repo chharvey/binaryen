@@ -14,6 +14,7 @@ import {
 	type ExpressionRef,
 	Operation,
 	type Type,
+	type i32,
 	none,
 	unreachable,
 } from "../../constants.ts";
@@ -27,23 +28,23 @@ import {
 export function parametrics(mod: Module) {
 	return {
 		/** Creates a no-operation `(nop)` instruction. */
-		nop: (): ExpressionRef => (
-			BinaryenObj["_BinaryenNop"](mod[PTR]) as ExpressionRef
+		nop: (): none => (
+			BinaryenObj["_BinaryenNop"](mod[PTR]) as none
 		),
 
 		/** Creates an unreachable instruction that will always trap. */
-		unreachable: (): ExpressionRef => (
-			BinaryenObj["_BinaryenUnreachable"](mod[PTR]) as ExpressionRef
+		unreachable: (): unreachable => (
+			BinaryenObj["_BinaryenUnreachable"](mod[PTR]) as unreachable
 		),
 
 		/** Creates a `(drop)` of a value. */
-		drop: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenDrop"](mod[PTR], value) as ExpressionRef
+		drop: (value: ExpressionRef): none => (
+			BinaryenObj["_BinaryenDrop"](mod[PTR], value) as none
 		),
 
 		/** Creates a `(select)` of one of two values. */
-		select: (ifTrue: ExpressionRef, ifFalse: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenSelect"](mod[PTR], ifTrue, ifFalse) as ExpressionRef
+		select: <T extends ExpressionRef>(condition: i32, ifTrue: T, ifFalse: T): T => (
+			BinaryenObj["_BinaryenSelect"](mod[PTR], condition, ifTrue, ifFalse) as T
 		),
 	} as const;
 }

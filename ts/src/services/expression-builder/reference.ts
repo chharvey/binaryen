@@ -13,6 +13,8 @@ import {
 	type ExpressionRef,
 	Operation,
 	type Type,
+	type eqref,
+	type i32,
 } from "../../constants.ts";
 
 
@@ -21,43 +23,43 @@ import {
 export function ref(mod: Module) {
 	return {
 		/** Produces a reference to a given function. */
-		func: (name: string, type: Type) => (
-			preserveStack(() => BinaryenObj["_BinaryenRefFunc"](mod[PTR], strToStack(name), type))
+		func: <T extends ExpressionRef>(name: string, type: Type): T => (
+			preserveStack(() => BinaryenObj["_BinaryenRefFunc"](mod[PTR], strToStack(name), type) as T)
 		),
 
 		/** Produces a null reference. */
-		null: (typ: Type): ExpressionRef => (
-			BinaryenObj["_BinaryenRefNull"](mod[PTR], typ) as ExpressionRef
+		null: <T extends ExpressionRef>(typ: Type): T => (
+			BinaryenObj["_BinaryenRefNull"](mod[PTR], typ) as T
 		),
 
 		/** Checks for null. */
-		is_null: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefIsNull"](mod[PTR], value) as ExpressionRef
+		is_null: (value: ExpressionRef): i32 => (
+			BinaryenObj["_BinaryenRefIsNull"](mod[PTR], value) as i32
 		),
 
 		/** Converts a nullible reference to a non-null one, or traps. */
-		as_non_null: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefAs"](mod[PTR], Operation.RefAsNonNull, value) as ExpressionRef
+		as_non_null: <T extends ExpressionRef>(value: ExpressionRef): T => (
+			BinaryenObj["_BinaryenRefAs"](mod[PTR], Operation.RefAsNonNull, value) as T
 		),
 
 		/** Compares two references. */
-		eq: (left: ExpressionRef, right: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefEq"](mod[PTR], left, right) as ExpressionRef
+		eq: (left: eqref, right: eqref): i32 => (
+			BinaryenObj["_BinaryenRefEq"](mod[PTR], left, right) as i32
 		),
 
 		/** Tests the dynamic type of a reference, and returns boolean. */
-		test: (value: ExpressionRef, castType: Type): ExpressionRef => (
-			BinaryenObj["_BinaryenRefTest"](mod[PTR], value, castType) as ExpressionRef
+		test: (value: ExpressionRef, castType: Type): i32 => (
+			BinaryenObj["_BinaryenRefTest"](mod[PTR], value, castType) as i32
 		),
 
 		/** Tests the dynamic type of a reference, and performs a downcast or traps. */
-		cast: (value: ExpressionRef, castType: Type): ExpressionRef => (
-			BinaryenObj["_BinaryenRefCast"](mod[PTR], value, castType) as ExpressionRef
+		cast: <T extends ExpressionRef>(value: ExpressionRef, castType: Type): T => (
+			BinaryenObj["_BinaryenRefCast"](mod[PTR], value, castType) as T
 		),
 
 		/** Converts type i32 to an unboxed scalar. */
-		i31: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenRefI31"](mod[PTR], value) as ExpressionRef
+		i31: <T extends ExpressionRef>(value: i32): T => (
+			BinaryenObj["_BinaryenRefI31"](mod[PTR], value) as T
 		),
 	} as const;
 }
@@ -68,13 +70,13 @@ export function ref(mod: Module) {
 export function i31(mod: Module) {
 	return {
 		/** Converts an unboxed scalar to type i32, signed. */
-		get_s: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, true) as ExpressionRef
+		get_s: (value: ExpressionRef): i32 => (
+			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, true) as i32
 		),
 
 		/** Converts an unboxed scalar to type i32, unsigned. */
-		get_u: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, false) as ExpressionRef
+		get_u: (value: ExpressionRef): i32 => (
+			BinaryenObj["_BinaryenI31Get"](mod[PTR], value, false) as i32
 		),
 	} as const;
 }

@@ -55,24 +55,28 @@ export function parametrics(mod: Module) {
 export function blocks(mod: Module) {
 	return {
 		/** Creates a `(block)`. */
-		block: (name: string | null, children: readonly ExpressionRef[], resultType: Type = none): ExpressionRef => (
+		block: <T extends ExpressionRef>(name: string | null, children: readonly ExpressionRef[], resultType: Type = none): T => (
 			preserveStack(() => BinaryenObj["_BinaryenBlock"](
 				mod[PTR],
 				name ? strToStack(name) : 0,
 				i32sToStack(children),
 				children.length,
 				resultType,
-			) as ExpressionRef)
+			) as T)
 		),
 
 		/** Creates a `(loop)`. */
-		loop: (name: string, body: ExpressionRef): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenLoop"](mod[PTR], strToStack(name), body) as ExpressionRef)
+		loop: <T extends ExpressionRef>(name: string, body: T): T => (
+			preserveStack(() => BinaryenObj["_BinaryenLoop"](mod[PTR], strToStack(name), body) as T)
 		),
 
 		/** Creates an ‘if’ or ‘if/else’ combination. */
-		if: (condition: ExpressionRef, ifTrue: ExpressionRef, ifFalse: ExpressionRef = expressionBuilder(mod).nop()): ExpressionRef => (
-			BinaryenObj["_BinaryenIf"](mod[PTR], condition, ifTrue, ifFalse) as ExpressionRef
+		if: ((condition: i32, ifTrue: ExpressionRef, ifFalse: ExpressionRef = expressionBuilder(mod).nop()) => (
+			BinaryenObj["_BinaryenIf"](mod[PTR], condition, ifTrue, ifFalse)
+		)) as (
+			// next best thing to method overloads: intersection of function types
+			((condition: i32, ifTrue: none) => none) &
+			(<T extends ExpressionRef>(condition: i32, ifTrue: T, ifFalse: T) => T)
 		),
 	} as const;
 }
@@ -81,23 +85,23 @@ export function blocks(mod: Module) {
 
 /** @see https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions */
 export function breaks(mod: Module) {
-	function brOn(op: Operation, label: string, value: ExpressionRef, castType: Type): ExpressionRef {
-		return preserveStack(() => BinaryenObj["_BinaryenBrOn"](mod[PTR], op, strToStack(label), value, castType) as ExpressionRef);
+	function brOn(op: Operation, label: string, value: ExpressionRef, castType: Type): none {
+		return preserveStack(() => BinaryenObj["_BinaryenBrOn"](mod[PTR], op, strToStack(label), value, castType) as none);
 	}
 
 	return {
 		/** Creates an unconditional branch `(br)` to a label. */
-		br: (label: string, condition?: ExpressionRef, value?: ExpressionRef): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenBreak"](mod[PTR], strToStack(label), condition!, value!) as ExpressionRef)
+		br: (label: string, condition?: i32, value?: ExpressionRef): none => (
+			preserveStack(() => BinaryenObj["_BinaryenBreak"](mod[PTR], strToStack(label), condition!, value!) as none)
 		),
 
 		/** Creates a conditional branch `(br_if)` to a label. */
-		br_if: (label: string, condition: ExpressionRef, value?: ExpressionRef): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenBreak"](mod[PTR], strToStack(label), condition, value!) as ExpressionRef)
+		br_if: (label: string, condition: i32, value?: ExpressionRef): none => (
+			preserveStack(() => BinaryenObj["_BinaryenBreak"](mod[PTR], strToStack(label), condition, value!) as none)
 		),
 
 		/** Creates a switch. */
-		br_table: (labels: readonly string[], defaultLabel: string, condition: ExpressionRef, value?: ExpressionRef): ExpressionRef => (
+		br_table: (labels: readonly string[], defaultLabel: string, condition: i32, value?: ExpressionRef): none => (
 			preserveStack(() => BinaryenObj["_BinaryenSwitch"](
 				mod[PTR],
 				i32sToStack(labels.map(strToStack)),
@@ -105,26 +109,26 @@ export function breaks(mod: Module) {
 				strToStack(defaultLabel),
 				condition,
 				value!,
-			) as ExpressionRef)
+			) as none)
 		),
 
 		/** Branches if the reference operand is null. */
-		br_on_null: (label: string, value: ExpressionRef): ExpressionRef => (
+		br_on_null: (label: string, value: ExpressionRef): none => (
 			brOn(Operation.BrOnNull, label, value, unreachable)
 		),
 
 		/** Branches if the reference operand is not null. */
-		br_on_non_null: (label: string, value: ExpressionRef): ExpressionRef => (
+		br_on_non_null: (label: string, value: ExpressionRef): none => (
 			brOn(Operation.BrOnNonNull, label, value, unreachable)
 		),
 
 		/** Branches if the reference operand is successfully downcast to the given type. */
-		br_on_cast: (label: string, value: ExpressionRef, castType: Type): ExpressionRef => (
+		br_on_cast: (label: string, value: ExpressionRef, castType: Type): none => (
 			brOn(Operation.BrOnCast, label, value, castType)
 		),
 
 		/** Branches if the reference operand fails to downcast to the given type. */
-		br_on_cast_fail: (label: string, value: ExpressionRef, castType: Type): ExpressionRef => (
+		br_on_cast_fail: (label: string, value: ExpressionRef, castType: Type): none => (
 			brOn(Operation.BrOnCastFail, label, value, castType)
 		),
 
@@ -144,38 +148,38 @@ export function calls(mod: Module) {
 		 * Creates a call to a function.
 		 * Note that we must specify the return type here as we may not have created the function being called yet.
 		 */
-		call: (name: string, operands: readonly ExpressionRef[], resultsType: Type): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenCall"](mod[PTR], strToStack(name), i32sToStack(operands), operands.length, resultsType) as ExpressionRef)
+		call: <T extends ExpressionRef>(name: string, operands: readonly ExpressionRef[], resultsType: Type): T => (
+			preserveStack(() => BinaryenObj["_BinaryenCall"](mod[PTR], strToStack(name), i32sToStack(operands), operands.length, resultsType) as T)
 		),
 
 		/** Similar to `call`, but takes a function reference operand instead of a name as the called value. */
-		call_ref: (target: ExpressionRef, operands: readonly ExpressionRef[], resultsType: Type): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenCallRef"](mod[PTR], target, i32sToStack(operands), operands.length, resultsType) as ExpressionRef)
+		call_ref: <T extends ExpressionRef>(target: ExpressionRef, operands: readonly ExpressionRef[], resultsType: Type): T => (
+			preserveStack(() => BinaryenObj["_BinaryenCallRef"](mod[PTR], target, i32sToStack(operands), operands.length, resultsType) as T)
 		),
 
 		/** Similar to `call_ref`, but indexes into a table to find the function to call. */
-		call_indirect: (table: string, target: ExpressionRef, operands: readonly ExpressionRef[], paramsType: Type, resultsType: Type): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenCallIndirect"](mod[PTR], strToStack(table), target, i32sToStack(operands), operands.length, paramsType, resultsType) as ExpressionRef)
+		call_indirect: <T extends ExpressionRef>(table: string, target: ExpressionRef, operands: readonly ExpressionRef[], paramsType: Type, resultsType: Type): T => (
+			preserveStack(() => BinaryenObj["_BinaryenCallIndirect"](mod[PTR], strToStack(table), target, i32sToStack(operands), operands.length, paramsType, resultsType) as T)
 		),
 
 		/** Unconditional branch to the body of the current function. */
-		return: (value: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenReturn"](mod[PTR], value) as ExpressionRef
+		return: (value: ExpressionRef): none => (
+			BinaryenObj["_BinaryenReturn"](mod[PTR], value) as none
 		),
 
 		/** Tail-call variant of `call`. */
-		return_call: (name: string, operands: readonly ExpressionRef[], resultsType: Type): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenReturnCall"](mod[PTR], strToStack(name), i32sToStack(operands), operands.length, resultsType) as ExpressionRef)
+		return_call: (name: string, operands: readonly ExpressionRef[], resultsType: Type): none => (
+			preserveStack(() => BinaryenObj["_BinaryenReturnCall"](mod[PTR], strToStack(name), i32sToStack(operands), operands.length, resultsType) as none)
 		),
 
 		/** Tail-call variant of `call_ref`. */
-		return_call_ref: (target: ExpressionRef, operands: readonly ExpressionRef[], resultsType: Type): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenReturnCallRef"](mod[PTR], target, i32sToStack(operands), operands.length, resultsType) as ExpressionRef)
+		return_call_ref: (target: ExpressionRef, operands: readonly ExpressionRef[], resultsType: Type): none => (
+			preserveStack(() => BinaryenObj["_BinaryenReturnCallRef"](mod[PTR], target, i32sToStack(operands), operands.length, resultsType) as none)
 		),
 
 		/** Tail-call variant of `call_indirect`. */
-		return_call_indirect: (table: string, target: ExpressionRef, operands: readonly ExpressionRef[], paramsType: Type, resultsType: Type): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenReturnCallIndirect"](mod[PTR], strToStack(table), target, i32sToStack(operands), operands.length, paramsType, resultsType) as ExpressionRef)
+		return_call_indirect: (table: string, target: ExpressionRef, operands: readonly ExpressionRef[], paramsType: Type, resultsType: Type): none => (
+			preserveStack(() => BinaryenObj["_BinaryenReturnCallIndirect"](mod[PTR], strToStack(table), target, i32sToStack(operands), operands.length, paramsType, resultsType) as none)
 		),
 
 		// @ts-expect-error
@@ -193,13 +197,13 @@ export function calls(mod: Module) {
 export function throws(mod: Module) {
 	return {
 		/** Raise an exception. */
-		throw: (tag: string, operands: readonly ExpressionRef[]): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenThrow"](mod[PTR], strToStack(tag), i32sToStack(operands), operands.length) as ExpressionRef)
+		throw: (tag: string, operands: readonly ExpressionRef[]): none => (
+			preserveStack(() => BinaryenObj["_BinaryenThrow"](mod[PTR], strToStack(tag), i32sToStack(operands), operands.length) as none)
 		),
 
 		/** Reraise an exception. */
-		throw_ref: (target: string): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenRethrow"](mod[PTR], strToStack(target)) as ExpressionRef)
+		throw_ref: (target: string): none => (
+			preserveStack(() => BinaryenObj["_BinaryenRethrow"](mod[PTR], strToStack(target)) as none)
 		),
 
 		/** Installs an exception handler that handles exceptions as specified by its catch clauses. */
@@ -209,7 +213,7 @@ export function throws(mod: Module) {
 			catchTags: readonly string[],
 			catchBodies: readonly ExpressionRef[],
 			delegateTarget: string,
-		): ExpressionRef => preserveStack(() => BinaryenObj["_BinaryenTry"](
+		): none => preserveStack(() => BinaryenObj["_BinaryenTry"](
 			mod[PTR],
 			strToStack(name),
 			body,
@@ -218,7 +222,7 @@ export function throws(mod: Module) {
 			i32sToStack(catchBodies),
 			catchBodies.length,
 			strToStack(delegateTarget),
-		) as ExpressionRef),
+		) as none),
 
 		// TODO: catch
 		// TODO: catch_ref

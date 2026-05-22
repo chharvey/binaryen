@@ -14,6 +14,7 @@ import {
 	type Type,
 	i32,
 	i64,
+	type none,
 } from "../../constants.ts";
 
 
@@ -47,31 +48,31 @@ function atomic(mod: Module) {
 export function memory(mod: Module) {
 	return {
 		/** Returns the current size of a memory. */
-		size: (name: string, memory64: boolean = false): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenMemorySize"](mod[PTR], strToStack(name), memory64) as ExpressionRef)
+		size: <T extends ExpressionRef>(name: string, memory64: boolean = false): T => (
+			preserveStack(() => BinaryenObj["_BinaryenMemorySize"](mod[PTR], strToStack(name), memory64) as T)
 		),
 
 		/** Grows memory by a given delta and returns the previous size, or -1 if not enough space can be allocated. */
-		grow: (delta: ExpressionRef, name: string, memory64: boolean = false): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenMemoryGrow"](mod[PTR], delta, strToStack(name), memory64) as ExpressionRef)
+		grow: <T extends ExpressionRef>(delta: T, name: string, memory64: boolean = false): T => (
+			preserveStack(() => BinaryenObj["_BinaryenMemoryGrow"](mod[PTR], delta, strToStack(name), memory64) as T)
 		),
 
 		/** Sets all values in a region of memory to a given byte. */
-		fill: (dest: ExpressionRef, value: ExpressionRef, size: ExpressionRef, name: string): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenMemoryFill"](mod[PTR], dest, value, size, strToStack(name)) as ExpressionRef)
+		fill: <T extends ExpressionRef>(dest: T, value: i32, size: T, name: string): none => (
+			preserveStack(() => BinaryenObj["_BinaryenMemoryFill"](mod[PTR], dest, value, size, strToStack(name)) as none)
 		),
 
 		/**
 		 * Copies data from a source memory region to a possibly overlapping destination region in another or the same memory.
 		 * The first index denotes the destination.
 		 */
-		copy: (dest: ExpressionRef, source: ExpressionRef, size: ExpressionRef, destMemory: string, sourceMemory: string): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenMemoryCopy"](mod[PTR], dest, source, size, strToStack(destMemory), strToStack(sourceMemory)) as ExpressionRef)
+		copy: (dest: ExpressionRef, source: ExpressionRef, size: ExpressionRef, destMemory: string, sourceMemory: string): none => (
+			preserveStack(() => BinaryenObj["_BinaryenMemoryCopy"](mod[PTR], dest, source, size, strToStack(destMemory), strToStack(sourceMemory)) as none)
 		),
 
 		/** Copies data from a passive data segment into a memory. */
-		init: (segment: string, dest: ExpressionRef, offset: ExpressionRef, size: ExpressionRef, name: string): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenMemoryInit"](mod[PTR], strToStack(segment), dest, offset, size, strToStack(name)) as ExpressionRef)
+		init: (segment: string, dest: ExpressionRef, offset: i32, size: i32, name: string): none => (
+			preserveStack(() => BinaryenObj["_BinaryenMemoryInit"](mod[PTR], strToStack(segment), dest, offset, size, strToStack(name)) as none)
 		),
 
 		/** @experimental */
@@ -85,8 +86,8 @@ export function memory(mod: Module) {
 export function data(mod: Module) {
 	return {
 		/** Prevents further use of a passive data segment. */
-		drop: (segment: string): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenDataDrop"](mod[PTR], strToStack(segment)) as ExpressionRef)
+		drop: (segment: string): none => (
+			preserveStack(() => BinaryenObj["_BinaryenDataDrop"](mod[PTR], strToStack(segment)) as none)
 		),
 	} as const;
 }

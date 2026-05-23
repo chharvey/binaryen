@@ -6,7 +6,10 @@ import type {
 } from "../../classes/module/Module.ts";
 import {
 	Operation,
+	type f32,
+	type f64,
 	i32 as i32_t,
+	type i64,
 } from "../../constants.ts";
 import {
 	atomicLoadFn,
@@ -60,11 +63,11 @@ export function i32(mod: Module) {
 			constant(mod, "_BinaryenLiteralInt32", value)
 		),
 
-		clz: unaryFn(mod, Operation.ClzInt32),
-		ctz: unaryFn(mod, Operation.CtzInt32),
-		popcnt: unaryFn(mod, Operation.PopcntInt32),
-		extend8_s: unaryFn(mod, Operation.ExtendS8Int32),
-		extend16_s: unaryFn(mod, Operation.ExtendS16Int32),
+		clz: unaryFn<i32_t>(mod, Operation.ClzInt32),
+		ctz: unaryFn<i32_t>(mod, Operation.CtzInt32),
+		popcnt: unaryFn<i32_t>(mod, Operation.PopcntInt32),
+		extend8_s: unaryFn<i32_t>(mod, Operation.ExtendS8Int32),
+		extend16_s: unaryFn<i32_t>(mod, Operation.ExtendS16Int32),
 
 		add: binaryFn(mod, Operation.AddInt32),
 		sub: binaryFn(mod, Operation.SubInt32),
@@ -83,7 +86,7 @@ export function i32(mod: Module) {
 		rotl: binaryFn(mod, Operation.RotLInt32),
 		rotr: binaryFn(mod, Operation.RotRInt32),
 
-		eqz: unaryFn(mod, Operation.EqZInt32),
+		eqz: unaryFn<i32_t, i32_t>(mod, Operation.EqZInt32),
 
 		eq: binaryFn(mod, Operation.EqInt32),
 		ne: binaryFn(mod, Operation.NeInt32),
@@ -96,17 +99,17 @@ export function i32(mod: Module) {
 		ge_s: binaryFn(mod, Operation.GeSInt32),
 		ge_u: binaryFn(mod, Operation.GeUInt32),
 
-		wrap_i64: unaryFn(mod, Operation.WrapInt64),
+		wrap_i64: unaryFn<i64, i32_t>(mod, Operation.WrapInt64),
 
-		trunc_f32_s: unaryFn(mod, Operation.TruncSFloat32ToInt32),
-		trunc_f32_u: unaryFn(mod, Operation.TruncUFloat32ToInt32),
-		trunc_f64_s: unaryFn(mod, Operation.TruncSFloat64ToInt32),
-		trunc_f64_u: unaryFn(mod, Operation.TruncUFloat64ToInt32),
-		trunc_sat_f32_s: unaryFn(mod, Operation.TruncSatSFloat32ToInt32),
-		trunc_sat_f32_u: unaryFn(mod, Operation.TruncSatUFloat32ToInt32),
-		trunc_sat_f64_s: unaryFn(mod, Operation.TruncSatSFloat64ToInt32),
-		trunc_sat_f64_u: unaryFn(mod, Operation.TruncSatUFloat64ToInt32),
-		reinterpret_f32: unaryFn(mod, Operation.ReinterpretFloat32),
+		trunc_f32_s: unaryFn<f32, i32_t>(mod, Operation.TruncSFloat32ToInt32),
+		trunc_f32_u: unaryFn<f32, i32_t>(mod, Operation.TruncUFloat32ToInt32),
+		trunc_f64_s: unaryFn<f64, i32_t>(mod, Operation.TruncSFloat64ToInt32),
+		trunc_f64_u: unaryFn<f64, i32_t>(mod, Operation.TruncUFloat64ToInt32),
+		trunc_sat_f32_s: unaryFn<f32, i32_t>(mod, Operation.TruncSatSFloat32ToInt32),
+		trunc_sat_f32_u: unaryFn<f32, i32_t>(mod, Operation.TruncSatUFloat32ToInt32),
+		trunc_sat_f64_s: unaryFn<f64, i32_t>(mod, Operation.TruncSatSFloat64ToInt32),
+		trunc_sat_f64_u: unaryFn<f64, i32_t>(mod, Operation.TruncSatUFloat64ToInt32),
+		reinterpret_f32: unaryFn<f32, i32_t>(mod, Operation.ReinterpretFloat32),
 
 		/** @experimental */
 		atomic: atomic(mod),

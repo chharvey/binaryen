@@ -6,7 +6,10 @@ import type {
 } from "../../classes/module/Module.ts";
 import {
 	Operation,
+	type f32,
 	f64 as f64_t,
+	type i32,
+	type i64,
 } from "../../constants.ts";
 import {
 	binaryFn,
@@ -36,13 +39,13 @@ export function f64(mod: Module) {
 			constant(mod, "_BinaryenLiteralFloat64Bits", BigInt(value))
 		),
 
-		abs: unaryFn(mod, Operation.AbsFloat64),
-		neg: unaryFn(mod, Operation.NegFloat64),
-		sqrt: unaryFn(mod, Operation.SqrtFloat64),
-		ceil: unaryFn(mod, Operation.CeilFloat64),
-		floor: unaryFn(mod, Operation.FloorFloat64),
-		trunc: unaryFn(mod, Operation.TruncFloat64),
-		nearest: unaryFn(mod, Operation.NearestFloat64),
+		abs: unaryFn<f64_t>(mod, Operation.AbsFloat64),
+		neg: unaryFn<f64_t>(mod, Operation.NegFloat64),
+		sqrt: unaryFn<f64_t>(mod, Operation.SqrtFloat64),
+		ceil: unaryFn<f64_t>(mod, Operation.CeilFloat64),
+		floor: unaryFn<f64_t>(mod, Operation.FloorFloat64),
+		trunc: unaryFn<f64_t>(mod, Operation.TruncFloat64),
+		nearest: unaryFn<f64_t>(mod, Operation.NearestFloat64),
 
 		add: binaryFn(mod, Operation.AddFloat64),
 		sub: binaryFn(mod, Operation.SubFloat64),
@@ -59,13 +62,13 @@ export function f64(mod: Module) {
 		le: binaryFn(mod, Operation.LeFloat64),
 		ge: binaryFn(mod, Operation.GeFloat64),
 
-		convert_i32_s: unaryFn(mod, Operation.ConvertSInt32ToFloat64),
-		convert_i32_u: unaryFn(mod, Operation.ConvertUInt32ToFloat64),
-		convert_i64_s: unaryFn(mod, Operation.ConvertSInt64ToFloat64),
-		convert_i64_u: unaryFn(mod, Operation.ConvertUInt64ToFloat64),
-		reinterpret_f64: unaryFn(mod, Operation.ReinterpretInt64),
+		convert_i32_s: unaryFn<i32, f64_t>(mod, Operation.ConvertSInt32ToFloat64),
+		convert_i32_u: unaryFn<i32, f64_t>(mod, Operation.ConvertUInt32ToFloat64),
+		convert_i64_s: unaryFn<i64, f64_t>(mod, Operation.ConvertSInt64ToFloat64),
+		convert_i64_u: unaryFn<i64, f64_t>(mod, Operation.ConvertUInt64ToFloat64),
+		reinterpret_i64: unaryFn<i64, f64_t>(mod, Operation.ReinterpretInt64),
 
-		promote_f32: unaryFn(mod, Operation.PromoteFloat32),
+		promote_f32: unaryFn<f32, f64_t>(mod, Operation.PromoteFloat32),
 
 		/** @deprecated */
 		convert_s: {

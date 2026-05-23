@@ -3,6 +3,8 @@ import type {
 } from "../../classes/module/Module.ts";
 import {
 	Operation,
+	type f32,
+	type v128,
 } from "../../constants.ts";
 import {
 	binaryFn,
@@ -16,13 +18,13 @@ import {
 /** @see https://webassembly.github.io/spec/core/syntax/instructions.html#vector-instructions */
 export function f32x4(mod: Module) {
 	return {
-		abs: unaryFn(mod, Operation.AbsVecF32x4),
-		neg: unaryFn(mod, Operation.NegVecF32x4),
-		sqrt: unaryFn(mod, Operation.SqrtVecF32x4),
-		ceil: unaryFn(mod, Operation.CeilVecF32x4),
-		floor: unaryFn(mod, Operation.FloorVecF32x4),
-		trunc: unaryFn(mod, Operation.TruncVecF32x4),
-		nearest: unaryFn(mod, Operation.NearestVecF32x4),
+		abs: unaryFn<v128>(mod, Operation.AbsVecF32x4),
+		neg: unaryFn<v128>(mod, Operation.NegVecF32x4),
+		sqrt: unaryFn<v128>(mod, Operation.SqrtVecF32x4),
+		ceil: unaryFn<v128>(mod, Operation.CeilVecF32x4),
+		floor: unaryFn<v128>(mod, Operation.FloorVecF32x4),
+		trunc: unaryFn<v128>(mod, Operation.TruncVecF32x4),
+		nearest: unaryFn<v128>(mod, Operation.NearestVecF32x4),
 
 		add: binaryFn(mod, Operation.AddVecF32x4),
 		sub: binaryFn(mod, Operation.SubVecF32x4),
@@ -45,12 +47,12 @@ export function f32x4(mod: Module) {
 		le: binaryFn(mod, Operation.LeVecF32x4),
 		ge: binaryFn(mod, Operation.GeVecF32x4),
 
-		convert_i32x4_s: unaryFn(mod, Operation.ConvertSVecI32x4ToVecF32x4),
-		convert_i32x4_u: unaryFn(mod, Operation.ConvertUVecI32x4ToVecF32x4),
+		convert_i32x4_s: unaryFn<v128>(mod, Operation.ConvertSVecI32x4ToVecF32x4),
+		convert_i32x4_u: unaryFn<v128>(mod, Operation.ConvertUVecI32x4ToVecF32x4),
 
-		demote_f64x2_zero: unaryFn(mod, Operation.DemoteZeroVecF64x2ToVecF32x4),
+		demote_f64x2_zero: unaryFn<v128>(mod, Operation.DemoteZeroVecF64x2ToVecF32x4),
 
-		splat: unaryFn(mod, Operation.SplatVecF32x4),
+		splat: unaryFn<f32, v128>(mod, Operation.SplatVecF32x4),
 		extract_lane: simdExtractFn(mod, Operation.ExtractLaneVecF32x4),
 		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecF32x4),
 	} as const;

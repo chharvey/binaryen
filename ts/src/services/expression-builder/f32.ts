@@ -7,6 +7,9 @@ import type {
 import {
 	Operation,
 	f32 as f32_t,
+	type f64,
+	type i32,
+	type i64,
 } from "../../constants.ts";
 import {
 	binaryFn,
@@ -36,13 +39,13 @@ export function f32(mod: Module) {
 			constant(mod, "_BinaryenLiteralFloat32Bits", value)
 		),
 
-		abs: unaryFn(mod, Operation.AbsFloat32),
-		neg: unaryFn(mod, Operation.NegFloat32),
-		sqrt: unaryFn(mod, Operation.SqrtFloat32),
-		ceil: unaryFn(mod, Operation.CeilFloat32),
-		floor: unaryFn(mod, Operation.FloorFloat32),
-		trunc: unaryFn(mod, Operation.TruncFloat32),
-		nearest: unaryFn(mod, Operation.NearestFloat32),
+		abs: unaryFn<f32_t>(mod, Operation.AbsFloat32),
+		neg: unaryFn<f32_t>(mod, Operation.NegFloat32),
+		sqrt: unaryFn<f32_t>(mod, Operation.SqrtFloat32),
+		ceil: unaryFn<f32_t>(mod, Operation.CeilFloat32),
+		floor: unaryFn<f32_t>(mod, Operation.FloorFloat32),
+		trunc: unaryFn<f32_t>(mod, Operation.TruncFloat32),
+		nearest: unaryFn<f32_t>(mod, Operation.NearestFloat32),
 
 		add: binaryFn(mod, Operation.AddFloat32),
 		sub: binaryFn(mod, Operation.SubFloat32),
@@ -59,13 +62,13 @@ export function f32(mod: Module) {
 		le: binaryFn(mod, Operation.LeFloat32),
 		ge: binaryFn(mod, Operation.GeFloat32),
 
-		convert_i32_s: unaryFn(mod, Operation.ConvertSInt32ToFloat32),
-		convert_i32_u: unaryFn(mod, Operation.ConvertUInt32ToFloat32),
-		convert_i64_s: unaryFn(mod, Operation.ConvertSInt64ToFloat32),
-		convert_i64_u: unaryFn(mod, Operation.ConvertUInt64ToFloat32),
-		reinterpret_i32: unaryFn(mod, Operation.ReinterpretInt32),
+		convert_i32_s: unaryFn<i32, f32_t>(mod, Operation.ConvertSInt32ToFloat32),
+		convert_i32_u: unaryFn<i32, f32_t>(mod, Operation.ConvertUInt32ToFloat32),
+		convert_i64_s: unaryFn<i64, f32_t>(mod, Operation.ConvertSInt64ToFloat32),
+		convert_i64_u: unaryFn<i64, f32_t>(mod, Operation.ConvertUInt64ToFloat32),
+		reinterpret_i32: unaryFn<i32, f32_t>(mod, Operation.ReinterpretInt32),
 
-		demote_f64: unaryFn(mod, Operation.DemoteFloat64),
+		demote_f64: unaryFn<f64, f32_t>(mod, Operation.DemoteFloat64),
 
 		/** @deprecated */
 		convert_s: {

@@ -61,8 +61,8 @@ export function constant<T extends ExpressionRef>(mod: Module, binFuncName: stri
 	});
 }
 
-export function unaryFn(mod: Module, op: Operation): (value: ExpressionRef) => ExpressionRef {
-	return (value) => BinaryenObj["_BinaryenUnary"](mod[PTR], op, value) as ExpressionRef;
+export function unaryFn<P0 extends ExpressionRef, R extends ExpressionRef = P0>(mod: Module, op: Operation): (value: P0) => R {
+	return (value) => BinaryenObj["_BinaryenUnary"](mod[PTR], op, value) as R;
 }
 
 export function binaryFn(mod: Module, op: Operation): (left: ExpressionRef, right: ExpressionRef) => ExpressionRef {

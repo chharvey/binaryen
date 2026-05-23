@@ -12,6 +12,8 @@ import type {
 import {
 	type ExpressionRef,
 	Operation,
+	type i32,
+	type v128,
 } from "../../constants.ts";
 import {
 	binaryFn,
@@ -26,9 +28,9 @@ import {
 /** @see https://webassembly.github.io/spec/core/syntax/instructions.html#vector-instructions */
 export function i8x16(mod: Module) {
 	return {
-		abs: unaryFn(mod, Operation.AbsVecI8x16),
-		neg: unaryFn(mod, Operation.NegVecI8x16),
-		popcnt: unaryFn(mod, Operation.PopcntVecI8x16),
+		abs: unaryFn<v128>(mod, Operation.AbsVecI8x16),
+		neg: unaryFn<v128>(mod, Operation.NegVecI8x16),
+		popcnt: unaryFn<v128>(mod, Operation.PopcntVecI8x16),
 
 		add: binaryFn(mod, Operation.AddVecI8x16),
 		sub: binaryFn(mod, Operation.SubVecI8x16),
@@ -44,7 +46,7 @@ export function i8x16(mod: Module) {
 
 		// TODO: relaxed_laneselect
 
-		all_true: unaryFn(mod, Operation.AllTrueVecI8x16),
+		all_true: unaryFn<v128, i32>(mod, Operation.AllTrueVecI8x16),
 
 		eq: binaryFn(mod, Operation.EqVecI8x16),
 		ne: binaryFn(mod, Operation.NeVecI8x16),
@@ -61,7 +63,7 @@ export function i8x16(mod: Module) {
 		shr_s: simdShiftFn(mod, Operation.ShrSVecI8x16),
 		shr_u: simdShiftFn(mod, Operation.ShrUVecI8x16),
 
-		bitmask: unaryFn(mod, Operation.BitmaskVecI8x16),
+		bitmask: unaryFn<v128, i32>(mod, Operation.BitmaskVecI8x16),
 
 		swizzle: binaryFn(mod, Operation.SwizzleVecI8x16),
 		// TODO: relaxed_swizzle
@@ -73,7 +75,7 @@ export function i8x16(mod: Module) {
 		narrow_i16x8_s: binaryFn(mod, Operation.NarrowSVecI16x8ToVecI8x16),
 		narrow_i16x8_u: binaryFn(mod, Operation.NarrowUVecI16x8ToVecI8x16),
 
-		splat: unaryFn(mod, Operation.SplatVecI8x16),
+		splat: unaryFn<i32, v128>(mod, Operation.SplatVecI8x16),
 		extract_lane_s: simdExtractFn(mod, Operation.ExtractLaneSVecI8x16),
 		extract_lane_u: simdExtractFn(mod, Operation.ExtractLaneUVecI8x16),
 		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecI8x16),

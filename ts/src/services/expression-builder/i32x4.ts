@@ -83,7 +83,7 @@ export function i32x4(mod: Module) {
 		// TODO: relaxed_trunc_f64x2_u_zero
 
 		splat: splat<i32>(mod, Operation.SplatVecI32x4),
-		extract_lane: simdExtractFn(mod, Operation.ExtractLaneVecI32x4),
-		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecI32x4),
+		extract_lane: simdExtractFn<i32>(mod, Operation.ExtractLaneVecI32x4),
+		replace_lane: simdReplaceFn<i32>(mod, Operation.ReplaceLaneVecI32x4),
 	} as const;
 }

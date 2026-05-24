@@ -107,16 +107,16 @@ export function simdLoadStoreLaneFn<T extends ExpressionRef>(mod: Module, op: Op
 	);
 }
 
-export function simdShiftFn(mod: Module, op: Operation): (vec: ExpressionRef, shift: ExpressionRef) => ExpressionRef {
-	return (vec, shift) => BinaryenObj["_BinaryenSIMDShift"](mod[PTR], op, vec, shift) as ExpressionRef;
+export function simdShiftFn(mod: Module, op: Operation): (vec: v128, shift: i32) => v128 {
+	return (vec, shift) => BinaryenObj["_BinaryenSIMDShift"](mod[PTR], op, vec, shift) as v128;
 }
 
-export function simdExtractFn(mod: Module, op: Operation): (vec: ExpressionRef, index: number) => ExpressionRef {
-	return (vec, index) => BinaryenObj["_BinaryenSIMDExtract"](mod[PTR], op, vec, index) as ExpressionRef;
+export function simdExtractFn<T extends ExpressionRef>(mod: Module, op: Operation): (vec: v128, index: number) => T {
+	return (vec, index) => BinaryenObj["_BinaryenSIMDExtract"](mod[PTR], op, vec, index) as T;
 }
 
-export function simdReplaceFn(mod: Module, op: Operation): (vec: ExpressionRef, index: number, value: ExpressionRef) => ExpressionRef {
-	return (vec, index, value) => BinaryenObj["_BinaryenSIMDReplace"](mod[PTR], op, vec, index, value) as ExpressionRef;
+export function simdReplaceFn<T extends ExpressionRef>(mod: Module, op: Operation): (vec: v128, index: number, value: T) => v128 {
+	return (vec, index, value) => BinaryenObj["_BinaryenSIMDReplace"](mod[PTR], op, vec, index, value) as v128;
 }
 
 export function atomicLoadFn(mod: Module, typ: Type, bytes: number): (offset: number, ptr: ExpressionRef, name?: string, order?: MemoryOrder) => ExpressionRef {

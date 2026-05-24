@@ -56,7 +56,7 @@ export function f64x2(mod: Module) {
 		promote_low_f32x4: unaryFn<v128, v128>(mod, Operation.PromoteLowVecF32x4ToVecF64x2),
 
 		splat: splat<f64>(mod, Operation.SplatVecF64x2),
-		extract_lane: simdExtractFn(mod, Operation.ExtractLaneVecF64x2),
-		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecF64x2),
+		extract_lane: simdExtractFn<f64>(mod, Operation.ExtractLaneVecF64x2),
+		replace_lane: simdReplaceFn<f64>(mod, Operation.ReplaceLaneVecF64x2),
 	} as const;
 }

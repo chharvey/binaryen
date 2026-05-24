@@ -87,9 +87,9 @@ export function i16x8(mod: Module) {
 		extend_high_i8x16_u: unaryFn<v128, v128>(mod, Operation.ExtendHighUVecI8x16ToVecI16x8),
 
 		splat: splat<i32>(mod, Operation.SplatVecI16x8),
-		extract_lane_s: simdExtractFn(mod, Operation.ExtractLaneSVecI16x8),
-		extract_lane_u: simdExtractFn(mod, Operation.ExtractLaneUVecI16x8),
-		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecI16x8),
+		extract_lane_s: simdExtractFn<i32>(mod, Operation.ExtractLaneSVecI16x8),
+		extract_lane_u: simdExtractFn<i32>(mod, Operation.ExtractLaneUVecI16x8),
+		replace_lane: simdReplaceFn<i32>(mod, Operation.ReplaceLaneVecI16x8),
 
 		// @ts-expect-error
 		/** @deprecated Use {@link ExpressionBuilder#i16x8 | ExpressionBuilder#i16x8.add_sat_s} instead. */ add_saturate_s(...args) { BinaryenObj.printWarn("`.i16x8.add_saturate_s()` is deprecated; use `.i16x8.add_sat_s()` instead."); return this.add_sat_s(...args); },

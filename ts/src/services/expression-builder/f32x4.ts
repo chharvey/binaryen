@@ -56,7 +56,7 @@ export function f32x4(mod: Module) {
 		demote_f64x2_zero: unaryFn<v128, v128>(mod, Operation.DemoteZeroVecF64x2ToVecF32x4),
 
 		splat: splat<f32>(mod, Operation.SplatVecF32x4),
-		extract_lane: simdExtractFn(mod, Operation.ExtractLaneVecF32x4),
-		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecF32x4),
+		extract_lane: simdExtractFn<f32>(mod, Operation.ExtractLaneVecF32x4),
+		replace_lane: simdReplaceFn<f32>(mod, Operation.ReplaceLaneVecF32x4),
 	} as const;
 }

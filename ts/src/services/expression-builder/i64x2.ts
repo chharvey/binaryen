@@ -60,7 +60,7 @@ export function i64x2(mod: Module) {
 		extend_high_i32x4_u: unaryFn<v128, v128>(mod, Operation.ExtendHighUVecI32x4ToVecI64x2),
 
 		splat: splat<i64>(mod, Operation.SplatVecI64x2),
-		extract_lane: simdExtractFn(mod, Operation.ExtractLaneVecI64x2),
-		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecI64x2),
+		extract_lane: simdExtractFn<i64>(mod, Operation.ExtractLaneVecI64x2),
+		replace_lane: simdReplaceFn<i64>(mod, Operation.ReplaceLaneVecI64x2),
 	} as const;
 }

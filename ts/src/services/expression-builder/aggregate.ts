@@ -175,7 +175,7 @@ export function array(mod: Module) {
 			offset: i32,
 			size: i32,
 		): none => (
-			BinaryenObj["_BinaryenArrayInitData"](mod[PTR], strToStack(name), ref, index, offset, size) as none
+			preserveStack(() => BinaryenObj["_BinaryenArrayInitData"](mod[PTR], strToStack(name), ref, index, offset, size) as none)
 		),
 
 		/** Copies elements to a specified slice of an array from a given element segment. */

@@ -18,9 +18,6 @@ import {
 	none,
 	unreachable,
 } from "../../constants.ts";
-import {
-	expressionBuilder,
-} from "./expressionBuilder.ts";
 
 
 
@@ -71,7 +68,7 @@ export function blocks(mod: Module) {
 		),
 
 		/** Creates an ‘if’ or ‘if/else’ combination. */
-		if: ((condition: i32, ifTrue: ExpressionRef, ifFalse: ExpressionRef = expressionBuilder(mod).nop()) => (
+		if: ((condition: i32, ifTrue: ExpressionRef, ifFalse: ExpressionRef = parametrics(mod).nop()) => (
 			BinaryenObj["_BinaryenIf"](mod[PTR], condition, ifTrue, ifFalse)
 		)) as (
 			// next best thing to method overloads: intersection of function types

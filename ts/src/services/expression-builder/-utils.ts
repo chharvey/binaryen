@@ -80,7 +80,6 @@ export function binaryFn<P0 extends ExpressionRef, P1 extends ExpressionRef, R e
 // shorthands of `binaryFn`, with default generic params
 export function binop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof binaryFn<T, T, T>> { return binaryFn<T, T, T>(mod, op); }
 export function relop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof binaryFn<T, T, i32>> { return binaryFn<T, T, i32>(mod, op); }
-export function swizzle(mod: Module, op: Operation): ReturnType<typeof binaryFn<v128, v128, v128>> { return binaryFn<v128, v128, v128>(mod, op); }
 export function narrow(mod: Module, op: Operation): ReturnType<typeof binaryFn<v128, v128, v128>> { return binaryFn<v128, v128, v128>(mod, op); }
 
 export function loadFn(mod: Module, typ: Type, bytes: number, isSigned: boolean): (offset: number, align: number, ptr: ExpressionRef, name?: string) => ExpressionRef {

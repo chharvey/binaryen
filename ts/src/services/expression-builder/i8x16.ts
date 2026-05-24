@@ -24,7 +24,6 @@ import {
 	simdReplaceFn,
 	simdShiftFn,
 	splat,
-	swizzle,
 	testop,
 	unop,
 } from "./-utils.ts";
@@ -71,7 +70,9 @@ export function i8x16(mod: Module) {
 
 		bitmask: bitmask(mod, Operation.BitmaskVecI8x16),
 
-		swizzle: swizzle(mod, Operation.SwizzleVecI8x16),
+		swizzle: (left: v128, right: v128): v128 => (
+			BinaryenObj["_BinaryenBinary"](mod[PTR], Operation.SwizzleVecI8x16, left, right) as v128
+		),
 		// TODO: relaxed_swizzle
 
 		shuffle: (left: ExpressionRef, right: ExpressionRef, mask: readonly number[]): ExpressionRef => (

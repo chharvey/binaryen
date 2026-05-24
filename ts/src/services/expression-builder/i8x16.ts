@@ -10,7 +10,6 @@ import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
-	type ExpressionRef,
 	Operation,
 	type i32,
 	type v128,
@@ -75,8 +74,8 @@ export function i8x16(mod: Module) {
 		),
 		// TODO: relaxed_swizzle
 
-		shuffle: (left: ExpressionRef, right: ExpressionRef, mask: readonly number[]): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenSIMDShuffle"](mod[PTR], left, right, i8sToStack(mask)) as ExpressionRef)
+		shuffle: (left: v128, right: v128, mask: readonly number[]): v128 => (
+			preserveStack(() => BinaryenObj["_BinaryenSIMDShuffle"](mod[PTR], left, right, i8sToStack(mask)) as v128)
 		),
 
 		narrow_i16x8_s: narrow(mod, Operation.NarrowSVecI16x8ToVecI8x16),

@@ -9,7 +9,6 @@ import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
-	type ExpressionRef,
 	Operation,
 	type none,
 	v128 as v128_t,
@@ -69,8 +68,8 @@ export function v128(mod: Module) {
 		or: binop<v128_t>(mod, Operation.OrVec128),
 		xor: binop<v128_t>(mod, Operation.XorVec128),
 
-		bitselect: (left: ExpressionRef, right: ExpressionRef, cond: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenSIMDTernary"](mod[PTR], Operation.BitselectVec128, left, right, cond) as ExpressionRef
+		bitselect: (left: v128_t, right: v128_t, cond: v128_t): v128_t => (
+			BinaryenObj["_BinaryenSIMDTernary"](mod[PTR], Operation.BitselectVec128, left, right, cond) as v128_t
 		),
 
 		anytrue: testop<v128_t>(mod, Operation.AnyTrueVec128),

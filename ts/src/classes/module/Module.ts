@@ -1,8 +1,6 @@
 import {
 	_free,
 	BinaryenObj,
-	HEAPU8,
-	HEAPU32,
 	UTF8ToString,
 	stackAlloc,
 } from "../../-pre.ts";
@@ -335,7 +333,7 @@ export class Module {
 	/** @deprecated Use {@link Module#exports | `this.exports.addFunction`} instead. */ @replacedBy("`this.exports.addFunction`") addFunctionExport(internalName: string, externalName: string) { return this.exports.addFunction(internalName, externalName); }
 
 	/** @category Module Component Operations */
-	getMemoryInfo(name: string): Memory_ {
+	getMemoryInfo(name: string = ""): Memory_ {
 		return new Memory_(this, name);
 	}
 
@@ -411,12 +409,12 @@ export class Module {
 		return preserveStack(() => {
 			const tempBuffer = stackAlloc(BinaryenObj["_BinaryenSizeofAllocateAndWriteResult"]());
 			BinaryenObj["_BinaryenModuleAllocateAndWrite"](tempBuffer, this[PTR], strToStack(sourceMapUrl));
-			const binaryPtr = HEAPU32[tempBuffer >>> 2];
-			const binaryBytes = HEAPU32[(tempBuffer >>> 2) + 1];
-			const sourceMapPtr = HEAPU32[(tempBuffer >>> 2) + 2];
+			const binaryPtr = BinaryenObj.HEAPU32[tempBuffer >>> 2];
+			const binaryBytes = BinaryenObj.HEAPU32[(tempBuffer >>> 2) + 1];
+			const sourceMapPtr = BinaryenObj.HEAPU32[(tempBuffer >>> 2) + 2];
 			try {
 				const buffer = new Uint8Array(binaryBytes);
-				buffer.set(HEAPU8.subarray(binaryPtr, binaryPtr + binaryBytes));
+				buffer.set(BinaryenObj.HEAPU8.subarray(binaryPtr, binaryPtr + binaryBytes));
 				return typeof sourceMapUrl === "undefined"
 					? buffer
 					: {binary: buffer, sourceMap: UTF8ToString(sourceMapPtr)};

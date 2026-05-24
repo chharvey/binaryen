@@ -60,9 +60,9 @@ export function struct(mod: Module) {
 		 * **Warning:** `.get()` no longer takes the boolean `isSigned` argument, and assumes an unpacked type.
 		 * For packed types, use `.get_s()` for signed and `.get_u()` for unsigned.
 		 */
-		get: function (index: number, ref: ExpressionRef, type: Type, deprecated_isSigned?: boolean) {
+		get: function (index: number, ref: ExpressionRef, type: Type, deprecated_isSigned?: boolean): ExpressionRef {
 			return deprecated_isSigned === undefined
-				? BinaryenObj["_BinaryenStructGet"](mod[PTR], index, ref, type)
+				? BinaryenObj["_BinaryenStructGet"](mod[PTR], index, ref, type) as ExpressionRef
 				: deprecated_isSigned
 					? this.get_s(index, ref, type)
 					: this.get_u(index, ref, type);
@@ -121,9 +121,9 @@ export function array(mod: Module) {
 		 * **Warning:** `.get()` no longer takes the boolean `isSigned` argument, and assumes an unpacked type.
 		 * For packed types, use `.get_s()` for signed and `.get_u()` for unsigned.
 		 */
-		get: function (ref: ExpressionRef, index: ExpressionRef, type: Type, deprecated_isSigned?: boolean) {
+		get: function (ref: ExpressionRef, index: ExpressionRef, type: Type, deprecated_isSigned?: boolean): ExpressionRef {
 			return deprecated_isSigned === undefined
-				? BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type)
+				? BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type) as ExpressionRef
 				: deprecated_isSigned
 					? this.get_s(ref, index, type)
 					: this.get_u(ref, index, type);
@@ -173,7 +173,7 @@ export function array(mod: Module) {
 			offset: ExpressionRef,
 			size: ExpressionRef,
 		): ExpressionRef => (
-			BinaryenObj["_BinaryenArrayInitData"](mod[PTR], strToStack(name), ref, index, offset, size) as ExpressionRef
+			preserveStack(() => BinaryenObj["_BinaryenArrayInitData"](mod[PTR], strToStack(name), ref, index, offset, size) as ExpressionRef)
 		),
 
 		/** Copies elements to a specified slice of an array from a given element segment. */

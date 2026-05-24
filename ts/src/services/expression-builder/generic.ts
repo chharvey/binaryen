@@ -17,9 +17,6 @@ import {
 	none,
 	unreachable,
 } from "../../constants.ts";
-import {
-	expressionBuilder,
-} from "./expressionBuilder.ts";
 
 
 
@@ -42,8 +39,8 @@ export function parametrics(mod: Module) {
 		),
 
 		/** Creates a `(select)` of one of two values. */
-		select: (ifTrue: ExpressionRef, ifFalse: ExpressionRef): ExpressionRef => (
-			BinaryenObj["_BinaryenSelect"](mod[PTR], ifTrue, ifFalse) as ExpressionRef
+		select: (condition: ExpressionRef, ifTrue: ExpressionRef, ifFalse: ExpressionRef): ExpressionRef => (
+			BinaryenObj["_BinaryenSelect"](mod[PTR], condition, ifTrue, ifFalse) as ExpressionRef
 		),
 	} as const;
 }
@@ -70,7 +67,7 @@ export function blocks(mod: Module) {
 		),
 
 		/** Creates an ‘if’ or ‘if/else’ combination. */
-		if: (condition: ExpressionRef, ifTrue: ExpressionRef, ifFalse: ExpressionRef = expressionBuilder(mod).nop()): ExpressionRef => (
+		if: (condition: ExpressionRef, ifTrue: ExpressionRef, ifFalse: ExpressionRef = parametrics(mod).nop()): ExpressionRef => (
 			BinaryenObj["_BinaryenIf"](mod[PTR], condition, ifTrue, ifFalse) as ExpressionRef
 		),
 	} as const;

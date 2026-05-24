@@ -64,7 +64,7 @@ export function constant<T extends ExpressionRef>(mod: Module, binFuncName: stri
 	});
 }
 
-export function unaryFn<P0 extends ExpressionRef, R extends ExpressionRef>(mod: Module, op: Operation): (value: P0) => R {
+export function unaryFn<A extends ExpressionRef, R extends ExpressionRef>(mod: Module, op: Operation): (value: A) => R {
 	return (value) => BinaryenObj["_BinaryenUnary"](mod[PTR], op, value) as R;
 }
 
@@ -74,7 +74,7 @@ export function testop<T extends ExpressionRef>(mod: Module, op: Operation): Ret
 export function bitmask(mod: Module, op: Operation): ReturnType<typeof unaryFn<v128, i32>> { return unaryFn<v128, i32>(mod, op); }
 export function splat<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, v128>> { return unaryFn<T, v128>(mod, op); }
 
-export function binaryFn<P0 extends ExpressionRef, P1 extends ExpressionRef, R extends ExpressionRef>(mod: Module, op: Operation): (left: P0, right: P1) => R {
+export function binaryFn<A extends ExpressionRef, B extends ExpressionRef, R extends ExpressionRef>(mod: Module, op: Operation): (left: A, right: B) => R {
 	return (left, right) => BinaryenObj["_BinaryenBinary"](mod[PTR], op, left, right) as R;
 }
 

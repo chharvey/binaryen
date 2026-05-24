@@ -11,6 +11,7 @@ import type {
 import {
 	type ExpressionRef,
 	Operation,
+	type none,
 	v128 as v128_t,
 } from "../../constants.ts";
 import {
@@ -32,7 +33,7 @@ import {
  */
 export function v128(mod: Module) {
 	return {
-		load: loadFn(mod, v128_t, 16, false),
+		load: loadFn<v128_t>(mod, v128_t, 16, false),
 		load8x8_s: simdLoadFn(mod, Operation.Load8x8SVec128),
 		load8x8_u: simdLoadFn(mod, Operation.Load8x8UVec128),
 		load16x4_s: simdLoadFn(mod, Operation.Load16x4SVec128),
@@ -45,16 +46,16 @@ export function v128(mod: Module) {
 		load64_splat: simdLoadFn(mod, Operation.Load64SplatVec128),
 		load32_zero: simdLoadFn(mod, Operation.Load32ZeroVec128),
 		load64_zero: simdLoadFn(mod, Operation.Load64ZeroVec128),
-		load8_lane: simdLoadStoreLaneFn(mod, Operation.Load8LaneVec128),
-		load16_lane: simdLoadStoreLaneFn(mod, Operation.Load16LaneVec128),
-		load32_lane: simdLoadStoreLaneFn(mod, Operation.Load32LaneVec128),
-		load64_lane: simdLoadStoreLaneFn(mod, Operation.Load64LaneVec128),
+		load8_lane: simdLoadStoreLaneFn<v128_t>(mod, Operation.Load8LaneVec128),
+		load16_lane: simdLoadStoreLaneFn<v128_t>(mod, Operation.Load16LaneVec128),
+		load32_lane: simdLoadStoreLaneFn<v128_t>(mod, Operation.Load32LaneVec128),
+		load64_lane: simdLoadStoreLaneFn<v128_t>(mod, Operation.Load64LaneVec128),
 
-		store: storeFn(mod, v128_t, 16),
-		store8_lane: simdLoadStoreLaneFn(mod, Operation.Store8LaneVec128),
-		store16_lane: simdLoadStoreLaneFn(mod, Operation.Store16LaneVec128),
-		store32_lane: simdLoadStoreLaneFn(mod, Operation.Store32LaneVec128),
-		store64_lane: simdLoadStoreLaneFn(mod, Operation.Store64LaneVec128),
+		store: storeFn<v128_t>(mod, v128_t, 16),
+		store8_lane: simdLoadStoreLaneFn<none>(mod, Operation.Store8LaneVec128),
+		store16_lane: simdLoadStoreLaneFn<none>(mod, Operation.Store16LaneVec128),
+		store32_lane: simdLoadStoreLaneFn<none>(mod, Operation.Store32LaneVec128),
+		store64_lane: simdLoadStoreLaneFn<none>(mod, Operation.Store64LaneVec128),
 
 		/** Return a static constant v128. */
 		const: (i8s: readonly number[]): v128_t => (

@@ -29,8 +29,8 @@ import {
  */
 export function f64(mod: Module) {
 	return {
-		load: loadFn(mod, f64_t, 8, true),
-		store: storeFn(mod, f64_t, 8),
+		load: loadFn<f64_t>(mod, f64_t, 8, true),
+		store: storeFn<f64_t>(mod, f64_t, 8),
 
 		/** Return a static constant f64. */
 		const: (value: number): f64_t => (

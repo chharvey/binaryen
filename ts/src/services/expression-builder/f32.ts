@@ -29,8 +29,8 @@ import {
  */
 export function f32(mod: Module) {
 	return {
-		load: loadFn(mod, f32_t, 4, true),
-		store: storeFn(mod, f32_t, 4),
+		load: loadFn<f32_t>(mod, f32_t, 4, true),
+		store: storeFn<f32_t>(mod, f32_t, 4),
 
 		/** Return a static constant f32. */
 		const: (value: number): f32_t => (

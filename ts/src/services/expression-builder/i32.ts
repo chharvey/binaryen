@@ -51,15 +51,15 @@ function atomic(mod: Module) {
  */
 export function i32(mod: Module) {
 	return {
-		load: loadFn(mod, i32_t, 4, true),
-		load8_s: loadFn(mod, i32_t, 1, true),
-		load8_u: loadFn(mod, i32_t, 1, false),
-		load16_s: loadFn(mod, i32_t, 2, true),
-		load16_u: loadFn(mod, i32_t, 2, false),
+		load: loadFn<i32_t>(mod, i32_t, 4, true),
+		load8_s: loadFn<i32_t>(mod, i32_t, 1, true),
+		load8_u: loadFn<i32_t>(mod, i32_t, 1, false),
+		load16_s: loadFn<i32_t>(mod, i32_t, 2, true),
+		load16_u: loadFn<i32_t>(mod, i32_t, 2, false),
 
-		store: storeFn(mod, i32_t, 4),
-		store8: storeFn(mod, i32_t, 1),
-		store16: storeFn(mod, i32_t, 2),
+		store: storeFn<i32_t>(mod, i32_t, 4),
+		store8: storeFn<i32_t>(mod, i32_t, 1),
+		store16: storeFn<i32_t>(mod, i32_t, 2),
 
 		/** Return a static constant i32. */
 		const: (value: number): i32_t => (

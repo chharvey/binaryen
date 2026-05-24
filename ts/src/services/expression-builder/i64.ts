@@ -58,18 +58,18 @@ function atomic(mod: Module) {
  */
 export function i64(mod: Module) {
 	return {
-		load: loadFn(mod, i64_t, 8, true),
-		load8_s: loadFn(mod, i64_t, 1, true),
-		load8_u: loadFn(mod, i64_t, 1, false),
-		load16_s: loadFn(mod, i64_t, 2, true),
-		load16_u: loadFn(mod, i64_t, 2, false),
-		load32_s: loadFn(mod, i64_t, 4, true),
-		load32_u: loadFn(mod, i64_t, 4, false),
+		load: loadFn<i64_t>(mod, i64_t, 8, true),
+		load8_s: loadFn<i64_t>(mod, i64_t, 1, true),
+		load8_u: loadFn<i64_t>(mod, i64_t, 1, false),
+		load16_s: loadFn<i64_t>(mod, i64_t, 2, true),
+		load16_u: loadFn<i64_t>(mod, i64_t, 2, false),
+		load32_s: loadFn<i64_t>(mod, i64_t, 4, true),
+		load32_u: loadFn<i64_t>(mod, i64_t, 4, false),
 
-		store: storeFn(mod, i64_t, 8),
-		store8: storeFn(mod, i64_t, 1),
-		store16: storeFn(mod, i64_t, 2),
-		store32: storeFn(mod, i64_t, 4),
+		store: storeFn<i64_t>(mod, i64_t, 8),
+		store8: storeFn<i64_t>(mod, i64_t, 1),
+		store16: storeFn<i64_t>(mod, i64_t, 2),
+		store32: storeFn<i64_t>(mod, i64_t, 4),
 
 		/** Return a static constant i64. */
 		const: (value: number | bigint): i64_t => (

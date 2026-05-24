@@ -8,10 +8,14 @@ import {
 } from "../../constants.ts";
 import {
 	binaryFn,
+	bitmask,
 	simdExtractFn,
 	simdReplaceFn,
 	simdShiftFn,
+	splat,
+	testop,
 	unaryFn,
+	unop,
 } from "./-utils.ts";
 
 
@@ -19,8 +23,8 @@ import {
 /** @see https://webassembly.github.io/spec/core/syntax/instructions.html#vector-instructions */
 export function i32x4(mod: Module) {
 	return {
-		abs: unaryFn<v128>(mod, Operation.AbsVecI32x4),
-		neg: unaryFn<v128>(mod, Operation.NegVecI32x4),
+		abs: unop<v128>(mod, Operation.AbsVecI32x4),
+		neg: unop<v128>(mod, Operation.NegVecI32x4),
 
 		add: binaryFn(mod, Operation.AddVecI32x4),
 		sub: binaryFn(mod, Operation.SubVecI32x4),
@@ -32,7 +36,7 @@ export function i32x4(mod: Module) {
 
 		// TODO: relaxed_laneselect
 
-		all_true: unaryFn<v128, i32>(mod, Operation.AllTrueVecI32x4),
+		all_true: testop<v128>(mod, Operation.AllTrueVecI32x4),
 
 		eq: binaryFn(mod, Operation.EqVecI32x4),
 		ne: binaryFn(mod, Operation.NeVecI32x4),
@@ -49,10 +53,10 @@ export function i32x4(mod: Module) {
 		shr_s: simdShiftFn(mod, Operation.ShrSVecI32x4),
 		shr_u: simdShiftFn(mod, Operation.ShrUVecI32x4),
 
-		bitmask: unaryFn<v128, i32>(mod, Operation.BitmaskVecI32x4),
+		bitmask: bitmask(mod, Operation.BitmaskVecI32x4),
 
-		extadd_pairwise_i16x8_s: unaryFn<v128>(mod, Operation.ExtAddPairwiseSVecI16x8ToI32x4),
-		extadd_pairwise_i16x8_u: unaryFn<v128>(mod, Operation.ExtAddPairwiseUVecI16x8ToI32x4),
+		extadd_pairwise_i16x8_s: unop<v128>(mod, Operation.ExtAddPairwiseSVecI16x8ToI32x4),
+		extadd_pairwise_i16x8_u: unop<v128>(mod, Operation.ExtAddPairwiseUVecI16x8ToI32x4),
 
 		// NOTE: operation names correspond to “this” object, not instruction names
 		extmul_low_i16x8_s: binaryFn(mod, Operation.ExtMulLowSVecI32x4),
@@ -63,21 +67,21 @@ export function i32x4(mod: Module) {
 		dot_i16x8_s: binaryFn(mod, Operation.DotSVecI16x8ToVecI32x4),
 		// TODO: relaxed_dot_i8x16_i7x16_add_s
 
-		extend_low_i16x8_s: unaryFn<v128>(mod, Operation.ExtendLowSVecI16x8ToVecI32x4),
-		extend_low_i16x8_u: unaryFn<v128>(mod, Operation.ExtendLowUVecI16x8ToVecI32x4),
-		extend_high_i16x8_s: unaryFn<v128>(mod, Operation.ExtendHighSVecI16x8ToVecI32x4),
-		extend_high_i16x8_u: unaryFn<v128>(mod, Operation.ExtendHighUVecI16x8ToVecI32x4),
+		extend_low_i16x8_s: unaryFn<v128, v128>(mod, Operation.ExtendLowSVecI16x8ToVecI32x4),
+		extend_low_i16x8_u: unaryFn<v128, v128>(mod, Operation.ExtendLowUVecI16x8ToVecI32x4),
+		extend_high_i16x8_s: unaryFn<v128, v128>(mod, Operation.ExtendHighSVecI16x8ToVecI32x4),
+		extend_high_i16x8_u: unaryFn<v128, v128>(mod, Operation.ExtendHighUVecI16x8ToVecI32x4),
 
-		trunc_sat_f32x4_s: unaryFn<v128>(mod, Operation.TruncSatSVecF32x4ToVecI32x4),
-		trunc_sat_f32x4_u: unaryFn<v128>(mod, Operation.TruncSatUVecF32x4ToVecI32x4),
-		trunc_sat_f64x2_s_zero: unaryFn<v128>(mod, Operation.TruncSatZeroSVecF64x2ToVecI32x4),
-		trunc_sat_f64x2_u_zero: unaryFn<v128>(mod, Operation.TruncSatZeroUVecF64x2ToVecI32x4),
+		trunc_sat_f32x4_s: unaryFn<v128, v128>(mod, Operation.TruncSatSVecF32x4ToVecI32x4),
+		trunc_sat_f32x4_u: unaryFn<v128, v128>(mod, Operation.TruncSatUVecF32x4ToVecI32x4),
+		trunc_sat_f64x2_s_zero: unaryFn<v128, v128>(mod, Operation.TruncSatZeroSVecF64x2ToVecI32x4),
+		trunc_sat_f64x2_u_zero: unaryFn<v128, v128>(mod, Operation.TruncSatZeroUVecF64x2ToVecI32x4),
 		// TODO: relaxed_trunc_f32x4_s
 		// TODO: relaxed_trunc_f32x4_u
 		// TODO: relaxed_trunc_f64x2_s_zero
 		// TODO: relaxed_trunc_f64x2_u_zero
 
-		splat: unaryFn<i32, v128>(mod, Operation.SplatVecI32x4),
+		splat: splat<i32>(mod, Operation.SplatVecI32x4),
 		extract_lane: simdExtractFn(mod, Operation.ExtractLaneVecI32x4),
 		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecI32x4),
 	} as const;

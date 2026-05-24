@@ -15,6 +15,8 @@ import {
 	MemoryOrder,
 	Operation,
 	type Type,
+	type i32,
+	type v128,
 } from "../../constants.ts";
 
 
@@ -61,9 +63,15 @@ export function constant<T extends ExpressionRef>(mod: Module, binFuncName: stri
 	});
 }
 
-export function unaryFn<P0 extends ExpressionRef, R extends ExpressionRef = P0>(mod: Module, op: Operation): (value: P0) => R {
+export function unaryFn<P0 extends ExpressionRef, R extends ExpressionRef>(mod: Module, op: Operation): (value: P0) => R {
 	return (value) => BinaryenObj["_BinaryenUnary"](mod[PTR], op, value) as R;
 }
+
+// shorthands of `unaryFn`, with default generic params
+export function unop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, T>> { return unaryFn<T, T>(mod, op); }
+export function testop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, i32>> { return unaryFn<T, i32>(mod, op); }
+export function bitmask(mod: Module, op: Operation): ReturnType<typeof unaryFn<v128, i32>> { return unaryFn<v128, i32>(mod, op); }
+export function splat<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, v128>> { return unaryFn<T, v128>(mod, op); }
 
 export function binaryFn(mod: Module, op: Operation): (left: ExpressionRef, right: ExpressionRef) => ExpressionRef {
 	return (left, right) => BinaryenObj["_BinaryenBinary"](mod[PTR], op, left, right) as ExpressionRef;

@@ -11,7 +11,6 @@ import type {
 import {
 	type ExpressionRef,
 	Operation,
-	type i32,
 	v128 as v128_t,
 } from "../../constants.ts";
 import {
@@ -21,7 +20,8 @@ import {
 	simdLoadFn,
 	simdLoadStoreLaneFn,
 	storeFn,
-	unaryFn,
+	testop,
+	unop,
 } from "./-utils.ts";
 
 
@@ -61,7 +61,7 @@ export function v128(mod: Module) {
 			constant(mod, "_BinaryenLiteralVec128", i8sToStack(i8s))
 		),
 
-		not: unaryFn<v128_t>(mod, Operation.NotVec128),
+		not: unop<v128_t>(mod, Operation.NotVec128),
 
 		and: binaryFn(mod, Operation.AndVec128),
 		andnot: binaryFn(mod, Operation.AndNotVec128),
@@ -72,6 +72,6 @@ export function v128(mod: Module) {
 			BinaryenObj["_BinaryenSIMDTernary"](mod[PTR], Operation.BitselectVec128, left, right, cond) as ExpressionRef
 		),
 
-		anytrue: unaryFn<v128_t, i32>(mod, Operation.AnyTrueVec128),
+		anytrue: testop<v128_t>(mod, Operation.AnyTrueVec128),
 	} as const;
 }

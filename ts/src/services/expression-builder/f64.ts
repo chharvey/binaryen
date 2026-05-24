@@ -17,6 +17,7 @@ import {
 	loadFn,
 	storeFn,
 	unaryFn,
+	unop,
 } from "./-utils.ts";
 
 
@@ -39,13 +40,13 @@ export function f64(mod: Module) {
 			constant(mod, "_BinaryenLiteralFloat64Bits", BigInt(value))
 		),
 
-		abs: unaryFn<f64_t>(mod, Operation.AbsFloat64),
-		neg: unaryFn<f64_t>(mod, Operation.NegFloat64),
-		sqrt: unaryFn<f64_t>(mod, Operation.SqrtFloat64),
-		ceil: unaryFn<f64_t>(mod, Operation.CeilFloat64),
-		floor: unaryFn<f64_t>(mod, Operation.FloorFloat64),
-		trunc: unaryFn<f64_t>(mod, Operation.TruncFloat64),
-		nearest: unaryFn<f64_t>(mod, Operation.NearestFloat64),
+		abs: unop<f64_t>(mod, Operation.AbsFloat64),
+		neg: unop<f64_t>(mod, Operation.NegFloat64),
+		sqrt: unop<f64_t>(mod, Operation.SqrtFloat64),
+		ceil: unop<f64_t>(mod, Operation.CeilFloat64),
+		floor: unop<f64_t>(mod, Operation.FloorFloat64),
+		trunc: unop<f64_t>(mod, Operation.TruncFloat64),
+		nearest: unop<f64_t>(mod, Operation.NearestFloat64),
 
 		add: binaryFn(mod, Operation.AddFloat64),
 		sub: binaryFn(mod, Operation.SubFloat64),

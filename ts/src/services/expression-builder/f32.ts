@@ -17,6 +17,7 @@ import {
 	loadFn,
 	storeFn,
 	unaryFn,
+	unop,
 } from "./-utils.ts";
 
 
@@ -39,13 +40,13 @@ export function f32(mod: Module) {
 			constant(mod, "_BinaryenLiteralFloat32Bits", value)
 		),
 
-		abs: unaryFn<f32_t>(mod, Operation.AbsFloat32),
-		neg: unaryFn<f32_t>(mod, Operation.NegFloat32),
-		sqrt: unaryFn<f32_t>(mod, Operation.SqrtFloat32),
-		ceil: unaryFn<f32_t>(mod, Operation.CeilFloat32),
-		floor: unaryFn<f32_t>(mod, Operation.FloorFloat32),
-		trunc: unaryFn<f32_t>(mod, Operation.TruncFloat32),
-		nearest: unaryFn<f32_t>(mod, Operation.NearestFloat32),
+		abs: unop<f32_t>(mod, Operation.AbsFloat32),
+		neg: unop<f32_t>(mod, Operation.NegFloat32),
+		sqrt: unop<f32_t>(mod, Operation.SqrtFloat32),
+		ceil: unop<f32_t>(mod, Operation.CeilFloat32),
+		floor: unop<f32_t>(mod, Operation.FloorFloat32),
+		trunc: unop<f32_t>(mod, Operation.TruncFloat32),
+		nearest: unop<f32_t>(mod, Operation.NearestFloat32),
 
 		add: binaryFn(mod, Operation.AddFloat32),
 		sub: binaryFn(mod, Operation.SubFloat32),

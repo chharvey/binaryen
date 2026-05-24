@@ -23,7 +23,9 @@ import {
 	constant,
 	loadFn,
 	storeFn,
+	testop,
 	unaryFn,
+	unop,
 } from "./-utils.ts";
 
 
@@ -73,12 +75,12 @@ export function i64(mod: Module) {
 			constant(mod, "_BinaryenLiteralInt64", BigInt(value))
 		),
 
-		clz: unaryFn<i64_t>(mod, Operation.ClzInt64),
-		ctz: unaryFn<i64_t>(mod, Operation.CtzInt64),
-		popcnt: unaryFn<i64_t>(mod, Operation.PopcntInt64),
-		extend8_s: unaryFn<i64_t>(mod, Operation.ExtendS8Int64),
-		extend16_s: unaryFn<i64_t>(mod, Operation.ExtendS16Int64),
-		extend32_s: unaryFn<i64_t>(mod, Operation.ExtendS32Int64),
+		clz: unop<i64_t>(mod, Operation.ClzInt64),
+		ctz: unop<i64_t>(mod, Operation.CtzInt64),
+		popcnt: unop<i64_t>(mod, Operation.PopcntInt64),
+		extend8_s: unop<i64_t>(mod, Operation.ExtendS8Int64),
+		extend16_s: unop<i64_t>(mod, Operation.ExtendS16Int64),
+		extend32_s: unop<i64_t>(mod, Operation.ExtendS32Int64),
 
 		add: binaryFn(mod, Operation.AddInt64),
 		sub: binaryFn(mod, Operation.SubInt64),
@@ -113,7 +115,7 @@ export function i64(mod: Module) {
 		rotl: binaryFn(mod, Operation.RotLInt64),
 		rotr: binaryFn(mod, Operation.RotRInt64),
 
-		eqz: unaryFn<i64_t, i32>(mod, Operation.EqZInt64),
+		eqz: testop<i64_t>(mod, Operation.EqZInt64),
 
 		eq: binaryFn(mod, Operation.EqInt64),
 		ne: binaryFn(mod, Operation.NeInt64),

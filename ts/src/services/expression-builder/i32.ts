@@ -19,7 +19,9 @@ import {
 	constant,
 	loadFn,
 	storeFn,
+	testop,
 	unaryFn,
+	unop,
 } from "./-utils.ts";
 
 
@@ -63,11 +65,11 @@ export function i32(mod: Module) {
 			constant(mod, "_BinaryenLiteralInt32", value)
 		),
 
-		clz: unaryFn<i32_t>(mod, Operation.ClzInt32),
-		ctz: unaryFn<i32_t>(mod, Operation.CtzInt32),
-		popcnt: unaryFn<i32_t>(mod, Operation.PopcntInt32),
-		extend8_s: unaryFn<i32_t>(mod, Operation.ExtendS8Int32),
-		extend16_s: unaryFn<i32_t>(mod, Operation.ExtendS16Int32),
+		clz: unop<i32_t>(mod, Operation.ClzInt32),
+		ctz: unop<i32_t>(mod, Operation.CtzInt32),
+		popcnt: unop<i32_t>(mod, Operation.PopcntInt32),
+		extend8_s: unop<i32_t>(mod, Operation.ExtendS8Int32),
+		extend16_s: unop<i32_t>(mod, Operation.ExtendS16Int32),
 
 		add: binaryFn(mod, Operation.AddInt32),
 		sub: binaryFn(mod, Operation.SubInt32),
@@ -86,7 +88,7 @@ export function i32(mod: Module) {
 		rotl: binaryFn(mod, Operation.RotLInt32),
 		rotr: binaryFn(mod, Operation.RotRInt32),
 
-		eqz: unaryFn<i32_t, i32_t>(mod, Operation.EqZInt32),
+		eqz: testop<i32_t>(mod, Operation.EqZInt32),
 
 		eq: binaryFn(mod, Operation.EqInt32),
 		ne: binaryFn(mod, Operation.NeInt32),

@@ -11,10 +11,14 @@ import {
 } from "../../constants.ts";
 import {
 	binaryFn,
+	bitmask,
 	simdExtractFn,
 	simdReplaceFn,
 	simdShiftFn,
+	splat,
+	testop,
 	unaryFn,
+	unop,
 } from "./-utils.ts";
 
 
@@ -22,8 +26,8 @@ import {
 /** @see https://webassembly.github.io/spec/core/syntax/instructions.html#vector-instructions */
 export function i16x8(mod: Module) {
 	return {
-		abs: unaryFn<v128>(mod, Operation.AbsVecI16x8),
-		neg: unaryFn<v128>(mod, Operation.NegVecI16x8),
+		abs: unop<v128>(mod, Operation.AbsVecI16x8),
+		neg: unop<v128>(mod, Operation.NegVecI16x8),
 
 		add: binaryFn(mod, Operation.AddVecI16x8),
 		sub: binaryFn(mod, Operation.SubVecI16x8),
@@ -42,7 +46,7 @@ export function i16x8(mod: Module) {
 
 		// TODO: relaxed_laneselect
 
-		all_true: unaryFn<v128, i32>(mod, Operation.AllTrueVecI16x8),
+		all_true: testop<v128>(mod, Operation.AllTrueVecI16x8),
 
 		eq: binaryFn(mod, Operation.EqVecI16x8),
 		ne: binaryFn(mod, Operation.NeVecI16x8),
@@ -59,10 +63,10 @@ export function i16x8(mod: Module) {
 		shr_s: simdShiftFn(mod, Operation.ShrSVecI16x8),
 		shr_u: simdShiftFn(mod, Operation.ShrUVecI16x8),
 
-		bitmask: unaryFn<v128, i32>(mod, Operation.BitmaskVecI16x8),
+		bitmask: bitmask(mod, Operation.BitmaskVecI16x8),
 
-		extadd_pairwise_i8x16_s: unaryFn<v128>(mod, Operation.ExtAddPairwiseSVecI8x16ToI16x8),
-		extadd_pairwise_i8x16_u: unaryFn<v128>(mod, Operation.ExtAddPairwiseUVecI8x16ToI16x8),
+		extadd_pairwise_i8x16_s: unop<v128>(mod, Operation.ExtAddPairwiseSVecI8x16ToI16x8),
+		extadd_pairwise_i8x16_u: unop<v128>(mod, Operation.ExtAddPairwiseUVecI8x16ToI16x8),
 
 		// NOTE: operation names correspond to “this” object, not instruction names
 		extmul_low_i8x16_s: binaryFn(mod, Operation.ExtMulLowSVecI16x8),
@@ -75,12 +79,12 @@ export function i16x8(mod: Module) {
 		narrow_i32x4_s: binaryFn(mod, Operation.NarrowSVecI32x4ToVecI16x8),
 		narrow_i32x4_u: binaryFn(mod, Operation.NarrowUVecI32x4ToVecI16x8),
 
-		extend_low_i8x16_s: unaryFn<v128>(mod, Operation.ExtendLowSVecI8x16ToVecI16x8),
-		extend_low_i8x16_u: unaryFn<v128>(mod, Operation.ExtendLowUVecI8x16ToVecI16x8),
-		extend_high_i8x16_s: unaryFn<v128>(mod, Operation.ExtendHighSVecI8x16ToVecI16x8),
-		extend_high_i8x16_u: unaryFn<v128>(mod, Operation.ExtendHighUVecI8x16ToVecI16x8),
+		extend_low_i8x16_s: unaryFn<v128, v128>(mod, Operation.ExtendLowSVecI8x16ToVecI16x8),
+		extend_low_i8x16_u: unaryFn<v128, v128>(mod, Operation.ExtendLowUVecI8x16ToVecI16x8),
+		extend_high_i8x16_s: unaryFn<v128, v128>(mod, Operation.ExtendHighSVecI8x16ToVecI16x8),
+		extend_high_i8x16_u: unaryFn<v128, v128>(mod, Operation.ExtendHighUVecI8x16ToVecI16x8),
 
-		splat: unaryFn<i32, v128>(mod, Operation.SplatVecI16x8),
+		splat: splat<i32>(mod, Operation.SplatVecI16x8),
 		extract_lane_s: simdExtractFn(mod, Operation.ExtractLaneSVecI16x8),
 		extract_lane_u: simdExtractFn(mod, Operation.ExtractLaneUVecI16x8),
 		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecI16x8),

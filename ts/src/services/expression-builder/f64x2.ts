@@ -10,7 +10,9 @@ import {
 	binaryFn,
 	simdExtractFn,
 	simdReplaceFn,
+	splat,
 	unaryFn,
+	unop,
 } from "./-utils.ts";
 
 
@@ -18,13 +20,13 @@ import {
 /** @see https://webassembly.github.io/spec/core/syntax/instructions.html#vector-instructions */
 export function f64x2(mod: Module) {
 	return {
-		abs: unaryFn<v128>(mod, Operation.AbsVecF64x2),
-		neg: unaryFn<v128>(mod, Operation.NegVecF64x2),
-		sqrt: unaryFn<v128>(mod, Operation.SqrtVecF64x2),
-		ceil: unaryFn<v128>(mod, Operation.CeilVecF64x2),
-		floor: unaryFn<v128>(mod, Operation.FloorVecF64x2),
-		trunc: unaryFn<v128>(mod, Operation.TruncVecF64x2),
-		nearest: unaryFn<v128>(mod, Operation.NearestVecF64x2),
+		abs: unop<v128>(mod, Operation.AbsVecF64x2),
+		neg: unop<v128>(mod, Operation.NegVecF64x2),
+		sqrt: unop<v128>(mod, Operation.SqrtVecF64x2),
+		ceil: unop<v128>(mod, Operation.CeilVecF64x2),
+		floor: unop<v128>(mod, Operation.FloorVecF64x2),
+		trunc: unop<v128>(mod, Operation.TruncVecF64x2),
+		nearest: unop<v128>(mod, Operation.NearestVecF64x2),
 
 		add: binaryFn(mod, Operation.AddVecF64x2),
 		sub: binaryFn(mod, Operation.SubVecF64x2),
@@ -47,12 +49,12 @@ export function f64x2(mod: Module) {
 		le: binaryFn(mod, Operation.LeVecF64x2),
 		ge: binaryFn(mod, Operation.GeVecF64x2),
 
-		convert_low_i32x4_s: unaryFn<v128>(mod, Operation.ConvertLowSVecI32x4ToVecF64x2),
-		convert_low_i32x4_u: unaryFn<v128>(mod, Operation.ConvertLowUVecI32x4ToVecF64x2),
+		convert_low_i32x4_s: unaryFn<v128, v128>(mod, Operation.ConvertLowSVecI32x4ToVecF64x2),
+		convert_low_i32x4_u: unaryFn<v128, v128>(mod, Operation.ConvertLowUVecI32x4ToVecF64x2),
 
-		promote_low_f32x4: unaryFn<v128>(mod, Operation.PromoteLowVecF32x4ToVecF64x2),
+		promote_low_f32x4: unaryFn<v128, v128>(mod, Operation.PromoteLowVecF32x4ToVecF64x2),
 
-		splat: unaryFn<f64, v128>(mod, Operation.SplatVecF64x2),
+		splat: splat<f64>(mod, Operation.SplatVecF64x2),
 		extract_lane: simdExtractFn(mod, Operation.ExtractLaneVecF64x2),
 		replace_lane: simdReplaceFn(mod, Operation.ReplaceLaneVecF64x2),
 	} as const;

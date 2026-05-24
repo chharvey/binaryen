@@ -7,7 +7,8 @@ import {
 	type v128,
 } from "../../constants.ts";
 import {
-	binaryFn,
+	binop,
+	relop,
 	simdExtractFn,
 	simdReplaceFn,
 	splat,
@@ -28,26 +29,26 @@ export function f32x4(mod: Module) {
 		trunc: unop<v128>(mod, Operation.TruncVecF32x4),
 		nearest: unop<v128>(mod, Operation.NearestVecF32x4),
 
-		add: binaryFn(mod, Operation.AddVecF32x4),
-		sub: binaryFn(mod, Operation.SubVecF32x4),
-		mul: binaryFn(mod, Operation.MulVecF32x4),
-		div: binaryFn(mod, Operation.DivVecF32x4),
-		min: binaryFn(mod, Operation.MinVecF32x4),
-		max: binaryFn(mod, Operation.MaxVecF32x4),
-		pmin: binaryFn(mod, Operation.PMinVecF32x4),
-		pmax: binaryFn(mod, Operation.PMaxVecF32x4),
+		add: binop<v128>(mod, Operation.AddVecF32x4),
+		sub: binop<v128>(mod, Operation.SubVecF32x4),
+		mul: binop<v128>(mod, Operation.MulVecF32x4),
+		div: binop<v128>(mod, Operation.DivVecF32x4),
+		min: binop<v128>(mod, Operation.MinVecF32x4),
+		max: binop<v128>(mod, Operation.MaxVecF32x4),
+		pmin: binop<v128>(mod, Operation.PMinVecF32x4),
+		pmax: binop<v128>(mod, Operation.PMaxVecF32x4),
 		// TODO: relaxed_min
 		// TODO: relaxed_max
 
 		// TODO: relaxed_madd
 		// TODO: relaxed_nmadd
 
-		eq: binaryFn(mod, Operation.EqVecF32x4),
-		ne: binaryFn(mod, Operation.NeVecF32x4),
-		lt: binaryFn(mod, Operation.LtVecF32x4),
-		gt: binaryFn(mod, Operation.GtVecF32x4),
-		le: binaryFn(mod, Operation.LeVecF32x4),
-		ge: binaryFn(mod, Operation.GeVecF32x4),
+		eq: relop<v128>(mod, Operation.EqVecF32x4),
+		ne: relop<v128>(mod, Operation.NeVecF32x4),
+		lt: relop<v128>(mod, Operation.LtVecF32x4),
+		gt: relop<v128>(mod, Operation.GtVecF32x4),
+		le: relop<v128>(mod, Operation.LeVecF32x4),
+		ge: relop<v128>(mod, Operation.GeVecF32x4),
 
 		convert_i32x4_s: unaryFn<v128, v128>(mod, Operation.ConvertSVecI32x4ToVecF32x4),
 		convert_i32x4_u: unaryFn<v128, v128>(mod, Operation.ConvertUVecI32x4ToVecF32x4),

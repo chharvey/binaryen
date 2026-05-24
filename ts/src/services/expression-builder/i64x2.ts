@@ -7,8 +7,9 @@ import {
 	type v128,
 } from "../../constants.ts";
 import {
-	binaryFn,
+	binop,
 	bitmask,
+	relop,
 	simdExtractFn,
 	simdReplaceFn,
 	simdShiftFn,
@@ -26,20 +27,20 @@ export function i64x2(mod: Module) {
 		abs: unop<v128>(mod, Operation.AbsVecI64x2),
 		neg: unop<v128>(mod, Operation.NegVecI64x2),
 
-		add: binaryFn(mod, Operation.AddVecI64x2),
-		sub: binaryFn(mod, Operation.SubVecI64x2),
-		mul: binaryFn(mod, Operation.MulVecI64x2),
+		add: binop<v128>(mod, Operation.AddVecI64x2),
+		sub: binop<v128>(mod, Operation.SubVecI64x2),
+		mul: binop<v128>(mod, Operation.MulVecI64x2),
 
 		// TODO: relaxed_laneselect
 
 		all_true: testop<v128>(mod, Operation.AllTrueVecI64x2),
 
-		eq: binaryFn(mod, Operation.EqVecI64x2),
-		ne: binaryFn(mod, Operation.NeVecI64x2),
-		lt_s: binaryFn(mod, Operation.LtSVecI64x2),
-		gt_s: binaryFn(mod, Operation.GtSVecI64x2),
-		le_s: binaryFn(mod, Operation.LeSVecI64x2),
-		ge_s: binaryFn(mod, Operation.GeSVecI64x2),
+		eq: relop<v128>(mod, Operation.EqVecI64x2),
+		ne: relop<v128>(mod, Operation.NeVecI64x2),
+		lt_s: relop<v128>(mod, Operation.LtSVecI64x2),
+		gt_s: relop<v128>(mod, Operation.GtSVecI64x2),
+		le_s: relop<v128>(mod, Operation.LeSVecI64x2),
+		ge_s: relop<v128>(mod, Operation.GeSVecI64x2),
 
 		shl: simdShiftFn(mod, Operation.ShlVecI64x2),
 		shr_s: simdShiftFn(mod, Operation.ShrSVecI64x2),
@@ -48,10 +49,10 @@ export function i64x2(mod: Module) {
 		bitmask: bitmask(mod, Operation.BitmaskVecI64x2),
 
 		// NOTE: operation names correspond to “this” object, not instruction names
-		extmul_low_i32x4_s: binaryFn(mod, Operation.ExtMulLowSVecI64x2),
-		extmul_low_i32x4_u: binaryFn(mod, Operation.ExtMulLowUVecI64x2),
-		extmul_high_i32x4_s: binaryFn(mod, Operation.ExtMulHighSVecI64x2),
-		extmul_high_i32x4_u: binaryFn(mod, Operation.ExtMulHighUVecI64x2),
+		extmul_low_i32x4_s: binop<v128>(mod, Operation.ExtMulLowSVecI64x2),
+		extmul_low_i32x4_u: binop<v128>(mod, Operation.ExtMulLowUVecI64x2),
+		extmul_high_i32x4_s: binop<v128>(mod, Operation.ExtMulHighSVecI64x2),
+		extmul_high_i32x4_u: binop<v128>(mod, Operation.ExtMulHighUVecI64x2),
 
 		extend_low_i32x4_s: unaryFn<v128, v128>(mod, Operation.ExtendLowSVecI32x4ToVecI64x2),
 		extend_low_i32x4_u: unaryFn<v128, v128>(mod, Operation.ExtendLowUVecI32x4ToVecI64x2),

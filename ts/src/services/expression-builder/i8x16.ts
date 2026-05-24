@@ -16,12 +16,15 @@ import {
 	type v128,
 } from "../../constants.ts";
 import {
-	binaryFn,
+	binop,
 	bitmask,
+	narrow,
+	relop,
 	simdExtractFn,
 	simdReplaceFn,
 	simdShiftFn,
 	splat,
+	swizzle,
 	testop,
 	unop,
 } from "./-utils.ts";
@@ -35,32 +38,32 @@ export function i8x16(mod: Module) {
 		neg: unop<v128>(mod, Operation.NegVecI8x16),
 		popcnt: unop<v128>(mod, Operation.PopcntVecI8x16),
 
-		add: binaryFn(mod, Operation.AddVecI8x16),
-		sub: binaryFn(mod, Operation.SubVecI8x16),
-		add_sat_s: binaryFn(mod, Operation.AddSatSVecI8x16),
-		add_sat_u: binaryFn(mod, Operation.AddSatUVecI8x16),
-		sub_sat_s: binaryFn(mod, Operation.SubSatSVecI8x16),
-		sub_sat_u: binaryFn(mod, Operation.SubSatUVecI8x16),
-		avgr_u: binaryFn(mod, Operation.AvgrUVecI8x16),
-		min_s: binaryFn(mod, Operation.MinSVecI8x16),
-		min_u: binaryFn(mod, Operation.MinUVecI8x16),
-		max_s: binaryFn(mod, Operation.MaxSVecI8x16),
-		max_u: binaryFn(mod, Operation.MaxUVecI8x16),
+		add: binop<v128>(mod, Operation.AddVecI8x16),
+		sub: binop<v128>(mod, Operation.SubVecI8x16),
+		add_sat_s: binop<v128>(mod, Operation.AddSatSVecI8x16),
+		add_sat_u: binop<v128>(mod, Operation.AddSatUVecI8x16),
+		sub_sat_s: binop<v128>(mod, Operation.SubSatSVecI8x16),
+		sub_sat_u: binop<v128>(mod, Operation.SubSatUVecI8x16),
+		avgr_u: binop<v128>(mod, Operation.AvgrUVecI8x16),
+		min_s: binop<v128>(mod, Operation.MinSVecI8x16),
+		min_u: binop<v128>(mod, Operation.MinUVecI8x16),
+		max_s: binop<v128>(mod, Operation.MaxSVecI8x16),
+		max_u: binop<v128>(mod, Operation.MaxUVecI8x16),
 
 		// TODO: relaxed_laneselect
 
 		all_true: testop<v128>(mod, Operation.AllTrueVecI8x16),
 
-		eq: binaryFn(mod, Operation.EqVecI8x16),
-		ne: binaryFn(mod, Operation.NeVecI8x16),
-		lt_s: binaryFn(mod, Operation.LtSVecI8x16),
-		lt_u: binaryFn(mod, Operation.LtUVecI8x16),
-		gt_s: binaryFn(mod, Operation.GtSVecI8x16),
-		gt_u: binaryFn(mod, Operation.GtUVecI8x16),
-		le_s: binaryFn(mod, Operation.LeSVecI8x16),
-		le_u: binaryFn(mod, Operation.LeUVecI8x16),
-		ge_s: binaryFn(mod, Operation.GeSVecI8x16),
-		ge_u: binaryFn(mod, Operation.GeUVecI8x16),
+		eq: relop<v128>(mod, Operation.EqVecI8x16),
+		ne: relop<v128>(mod, Operation.NeVecI8x16),
+		lt_s: relop<v128>(mod, Operation.LtSVecI8x16),
+		lt_u: relop<v128>(mod, Operation.LtUVecI8x16),
+		gt_s: relop<v128>(mod, Operation.GtSVecI8x16),
+		gt_u: relop<v128>(mod, Operation.GtUVecI8x16),
+		le_s: relop<v128>(mod, Operation.LeSVecI8x16),
+		le_u: relop<v128>(mod, Operation.LeUVecI8x16),
+		ge_s: relop<v128>(mod, Operation.GeSVecI8x16),
+		ge_u: relop<v128>(mod, Operation.GeUVecI8x16),
 
 		shl: simdShiftFn(mod, Operation.ShlVecI8x16),
 		shr_s: simdShiftFn(mod, Operation.ShrSVecI8x16),
@@ -68,15 +71,15 @@ export function i8x16(mod: Module) {
 
 		bitmask: bitmask(mod, Operation.BitmaskVecI8x16),
 
-		swizzle: binaryFn(mod, Operation.SwizzleVecI8x16),
+		swizzle: swizzle(mod, Operation.SwizzleVecI8x16),
 		// TODO: relaxed_swizzle
 
 		shuffle: (left: ExpressionRef, right: ExpressionRef, mask: readonly number[]): ExpressionRef => (
 			preserveStack(() => BinaryenObj["_BinaryenSIMDShuffle"](mod[PTR], left, right, i8sToStack(mask)) as ExpressionRef)
 		),
 
-		narrow_i16x8_s: binaryFn(mod, Operation.NarrowSVecI16x8ToVecI8x16),
-		narrow_i16x8_u: binaryFn(mod, Operation.NarrowUVecI16x8ToVecI8x16),
+		narrow_i16x8_s: narrow(mod, Operation.NarrowSVecI16x8ToVecI8x16),
+		narrow_i16x8_u: narrow(mod, Operation.NarrowUVecI16x8ToVecI8x16),
 
 		splat: splat<i32>(mod, Operation.SplatVecI8x16),
 		extract_lane_s: simdExtractFn(mod, Operation.ExtractLaneSVecI8x16),

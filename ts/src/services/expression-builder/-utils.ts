@@ -73,9 +73,15 @@ export function testop<T extends ExpressionRef>(mod: Module, op: Operation): Ret
 export function bitmask(mod: Module, op: Operation): ReturnType<typeof unaryFn<v128, i32>> { return unaryFn<v128, i32>(mod, op); }
 export function splat<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, v128>> { return unaryFn<T, v128>(mod, op); }
 
-export function binaryFn(mod: Module, op: Operation): (left: ExpressionRef, right: ExpressionRef) => ExpressionRef {
-	return (left, right) => BinaryenObj["_BinaryenBinary"](mod[PTR], op, left, right) as ExpressionRef;
+export function binaryFn<P0 extends ExpressionRef, P1 extends ExpressionRef, R extends ExpressionRef>(mod: Module, op: Operation): (left: P0, right: P1) => R {
+	return (left, right) => BinaryenObj["_BinaryenBinary"](mod[PTR], op, left, right) as R;
 }
+
+// shorthands of `binaryFn`, with default generic params
+export function binop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof binaryFn<T, T, T>> { return binaryFn<T, T, T>(mod, op); }
+export function relop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof binaryFn<T, T, i32>> { return binaryFn<T, T, i32>(mod, op); }
+export function swizzle(mod: Module, op: Operation): ReturnType<typeof binaryFn<v128, v128, v128>> { return binaryFn<v128, v128, v128>(mod, op); }
+export function narrow(mod: Module, op: Operation): ReturnType<typeof binaryFn<v128, v128, v128>> { return binaryFn<v128, v128, v128>(mod, op); }
 
 export function loadFn(mod: Module, typ: Type, bytes: number, isSigned: boolean): (offset: number, align: number, ptr: ExpressionRef, name?: string) => ExpressionRef {
 	return (offset, align, ptr, name) => (

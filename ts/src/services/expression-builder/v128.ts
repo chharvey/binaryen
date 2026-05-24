@@ -14,7 +14,7 @@ import {
 	v128 as v128_t,
 } from "../../constants.ts";
 import {
-	binaryFn,
+	binop,
 	constant,
 	loadFn,
 	simdLoadFn,
@@ -63,10 +63,10 @@ export function v128(mod: Module) {
 
 		not: unop<v128_t>(mod, Operation.NotVec128),
 
-		and: binaryFn(mod, Operation.AndVec128),
-		andnot: binaryFn(mod, Operation.AndNotVec128),
-		or: binaryFn(mod, Operation.OrVec128),
-		xor: binaryFn(mod, Operation.XorVec128),
+		and: binop<v128_t>(mod, Operation.AndVec128),
+		andnot: binop<v128_t>(mod, Operation.AndNotVec128),
+		or: binop<v128_t>(mod, Operation.OrVec128),
+		xor: binop<v128_t>(mod, Operation.XorVec128),
 
 		bitselect: (left: ExpressionRef, right: ExpressionRef, cond: ExpressionRef): ExpressionRef => (
 			BinaryenObj["_BinaryenSIMDTernary"](mod[PTR], Operation.BitselectVec128, left, right, cond) as ExpressionRef

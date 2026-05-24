@@ -133,7 +133,7 @@ export class TypeBuilder {
 	 * @param index the index of the type to set
 	 * @param superType the supertype
 	 */
-	setSubType(index: number, superType: Type): void {
+	setSubType(index: number, superType: HeapType): void {
 		BinaryenObj["_TypeBuilderSetSubType"](this.#ptr, index, superType);
 	}
 

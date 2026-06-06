@@ -198,7 +198,7 @@ If you rely on Binaryen.TS and spot an issue, please consider sending a PR our w
 See the generated <strong>ExpressionBuilder</strong> docs for all available functions and details.</p>
 <p>Note: For brevity, glob-like syntax <code>_{s,u}</code> is used to mean “<code>_s</code> and <code>_u</code>”.</p>
 <ul>
-<li>Parametric Instructions
+<li>parametrics
 <ul>
 <li><code>.nop()</code></li>
 <li><code>.unreachable()</code></li>
@@ -235,8 +235,10 @@ See the generated <strong>ExpressionBuilder</strong> docs for all available func
 <li>tables and memories
 <ul>
 <li><code>.table.get()</code>, <code>.table.set()</code>, <code>.table.size()</code>, <code>.table.grow()</code></li>
+<li><s><code>.table.fill()</code>, <code>.table.copy()</code>, <code>table.init()</code></s>; ⛔️ not yet supported</li>
 <li><code>.memory.size()</code>, <code>.memory.grow()</code>, <code>.memory.fill()</code>, <code>.memory.copy()</code>, <code>.memory.init()</code>,</li>
-<li><code>.elem.drop()</code>, <code>.data.drop()</code></li>
+<li><s><code>.elem.drop()</code></s>; ⛔️ not yet supported</li>
+<li><code>.data.drop()</code></li>
 </ul>
 </li>
 <li>references
@@ -327,13 +329,13 @@ See the generated <strong>ExpressionBuilder</strong> docs for all available func
 <li><code>.{i16x8,i32x4,i64x2}.mul()</code></li>
 <li><code>.{i8x16,i16x8}.avgr_u()</code></li>
 <li><code>.i16x8.q15mulr_sat_s()</code></li>
-<li><code>.i16x8.relaxed_q15mulr_s()</code></li>
+<li><s><code>.i16x8.relaxed_q15mulr_s()</code></s>; ⛔️ not yet supported</li>
 <li><code>.{i8x16,i16x8,i32x4}.min{s,u}()</code></li>
 <li><code>.{i8x16,i16x8,i32x4}.max{s,u}()</code></li>
 </ul>
 <blockquote></blockquote>
 <ul>
-<li><code>.{i8x16,i16x8,i32x4,i64x2}.relaxed_laneselect()</code></li>
+<li><s><code>.{i8x16,i16x8,i32x4,i64x2}.relaxed_laneselect()</code></s>; ⛔️ not yet supported</li>
 <li><code>.{i8x16,i16x8,i32x4,i64x2}.all_true()</code></li>
 <li><code>.{i8x16,i16x8,i32x4,i64x2}.eq()</code></li>
 <li><code>.{i8x16,i16x8,i32x4,i64x2}.ne()</code></li>
@@ -347,7 +349,8 @@ See the generated <strong>ExpressionBuilder</strong> docs for all available func
 <li><code>.{i8x16,i16x8,i32x4,i64x2}.shl()</code></li>
 <li><code>.{i8x16,i16x8,i32x4,i64x2}.shr{s,u}()</code></li>
 <li><code>.{i8x16,i16x8,i32x4,i64x2}.bitmask()</code></li>
-<li><code>.i8x16.swizzle()</code>, <code>.i8x16.relaxed_swizzle()</code></li>
+<li><code>.i8x16.swizzle()</code></li>
+<li><s><code>.i8x16.relaxed_swizzle()</code></s>; ⛔️ not yet supported</li>
 <li><code>.i8x16.shuffle()</code></li>
 </ul>
 <blockquote></blockquote>
@@ -355,22 +358,23 @@ See the generated <strong>ExpressionBuilder</strong> docs for all available func
 <li><code>.i16x8.extadd_pairwise_i8x16_{s,u}()</code>, <code>.i32x4.extadd_pairwise_i16x8_{s,u}()</code></li>
 <li><code>.i16x8.extmul_{low,high}_i8x16_{s,u}()</code>, <code>.i32x4.extmul_{low,high}_i16x8_{s,u}()</code>, <code>.i64x2.extmul_{low,high}_i32x4_{s,u}()</code></li>
 <li><code>.i32x4.dot_i16x8_s()</code></li>
-<li><code>.i16x8.relaxed_dot_i8x16_i7x16_s()</code></li>
-<li><code>.i32x4.relaxed_dot_i8x16_i7x16_add_s()</code></li>
+<li><s><code>.i16x8.relaxed_dot_i8x16_i7x16_s()</code></s>; ⛔️ not yet supported</li>
+<li><s><code>.i32x4.relaxed_dot_i8x16_i7x16_add_s()</code></s>; ⛔️ not yet supported</li>
 <li><code>.i8x16.narrow_i16x8_{s,u}()</code>, <code>.i16x8.narrow_i32x4_{s,u}()</code></li>
 </ul>
 <blockquote></blockquote>
 <ul>
 <li><code>.i16x8.extend_{low,high}_i8x16_{s,u}()</code>, <code>.i32x4.extend_{low,high}_i16x8_{s,u}()</code>, <code>.i64x2.extend_{low,high}_i32x4_{s,u}()</code></li>
 <li><code>.i32x4.trunc_sat_f32x4_{s,u}()</code>, <code>.i32x4.trunc_sat_f64x2_{s,u}_zero()</code></li>
-<li><code>.i32x4.relaxed_trunc_f32x4_{s,u}()</code>, <code>.i32x4.relaxed_trunc_f64x2_{s,u}_zero()</code></li>
+<li><s><code>.i32x4.relaxed_trunc_f32x4_{s,u}()</code>, <code>.i32x4.relaxed_trunc_f64x2_{s,u}_zero()</code></s>; ⛔️ not yet supported</li>
 </ul>
 </li>
 <li>SIMD floats
 <ul>
 <li><code>.{f32x4,f64x2}.abs()</code>, <code>.{f32x4,f64x2}.neg()</code>, <code>.{f32x4,f64x2}.sqrt()</code>, <code>.{f32x4,f64x2}.ceil()</code>, <code>.{f32x4,f64x2}.floor()</code>, <code>.{f32x4,f64x2}.trunc()</code>, <code>.{f32x4,f64x2}.nearest()</code></li>
-<li><code>.{f32x4,f64x2}.add()</code>, <code>.{f32x4,f64x2}.sub()</code>, <code>.{f32x4,f64x2}.mul()</code>, <code>.{f32x4,f64x2}.div()</code>, <code>.{f32x4,f64x2}.min()</code>, <code>.{f32x4,f64x2}.max()</code>, <code>.{f32x4,f64x2}.pmin()</code>, <code>.{f32x4,f64x2}.pmax()</code>, <code>.{f32x4,f64x2}.relaxed_min()</code>, <code>.{f32x4,f64x2}.relaxed_max()</code></li>
-<li><code>.{f32x4,f64x2}.relaxed_madd()</code>, <code>.{f32x4,f64x2}.relaxed_nmadd()</code></li>
+<li><code>.{f32x4,f64x2}.add()</code>, <code>.{f32x4,f64x2}.sub()</code>, <code>.{f32x4,f64x2}.mul()</code>, <code>.{f32x4,f64x2}.div()</code>, <code>.{f32x4,f64x2}.min()</code>, <code>.{f32x4,f64x2}.max()</code>, <code>.{f32x4,f64x2}.pmin()</code>, <code>.{f32x4,f64x2}.pmax()</code></li>
+<li><s><code>.{f32x4,f64x2}.relaxed_min()</code>, <code>.{f32x4,f64x2}.relaxed_max()</code></s>; ⛔️ not yet supported</li>
+<li><s><code>.{f32x4,f64x2}.relaxed_madd()</code>, <code>.{f32x4,f64x2}.relaxed_nmadd()</code></s>; ⛔️ not yet supported</li>
 <li><code>.{f32x4,f64x2}.eq()</code>, <code>.{f32x4,f64x2}.ne()</code>, <code>.{f32x4,f64x2}.lt()</code>, <code>.{f32x4,f64x2}.gt()</code>, <code>.{f32x4,f64x2}.le()</code>, <code>.{f32x4,f64x2}.ge()</code></li>
 <li><code>.f32x4.convert_i32x4_{s,u}()</code>, <code>.f64x2.convert_low_i32x4_{s,u}()</code></li>
 <li><code>.f32x4.demote_f64x2_zero()</code>, <code>.f64x2.promote_low_f32x4()</code></li>
@@ -390,20 +394,30 @@ They can be used to inspect and manipulate expressions.
 See generated docs for fields, methods, and descriptions of each.</p>
 <ul>
 <li><code>expressions.Expression</code> (root class)</li>
-<li>parametric instructions
+<li>Parametric Expressions
 <ul>
 <li><code>expressions.Drop</code></li>
 <li><code>expressions.Select</code></li>
 </ul>
 </li>
-<li>control instructions
+<li>Control Expressions
 <ul>
 <li><code>expressions.Block</code></li>
 <li><code>expressions.Loop</code></li>
+<li><code>expressions.If</code></li>
 <li><code>expressions.Break</code></li>
+<li><code>expressions.Switch</code></li>
+<li><code>expressions.BrOn</code></li>
+<li><code>expressions.Call</code></li>
+<li><code>expressions.CallRef</code></li>
+<li><code>expressions.CallIndirect</code></li>
+<li><code>expressions.Return</code></li>
+<li><code>expressions.Throw</code></li>
+<li><code>expressions.Rethrow</code></li>
+<li><code>expressions.Try</code></li>
 </ul>
 </li>
-<li>variable instructions
+<li>Variable Expressions
 <ul>
 <li><code>expressions.LocalGet</code></li>
 <li><code>expressions.LocalSet</code></li>
@@ -411,13 +425,119 @@ See generated docs for fields, methods, and descriptions of each.</p>
 <li><code>expressions.GlobalSet</code></li>
 </ul>
 </li>
-<li>numeric instructions
+<li>Table Expressions
+<ul>
+<li><code>expressions.TableGet</code></li>
+<li><code>expressions.TableSet</code></li>
+<li><code>expressions.TableSize</code></li>
+<li><code>expressions.TableGrow</code></li>
+</ul>
+</li>
+<li>Memory Expressions
+<ul>
+<li><code>expressions.Load</code></li>
+<li><code>expressions.Store</code></li>
+<li><code>expressions.SIMDLoad</code></li>
+<li><code>expressions.SIMDLoadStoreLane</code></li>
+<li><code>expressions.MemorySize</code></li>
+<li><code>expressions.MemoryGrow</code></li>
+<li><code>expressions.MemoryFill</code></li>
+<li><code>expressions.MemoryCopy</code></li>
+<li><code>expressions.MemoryInit</code></li>
+<li><code>expressions.DataDrop</code></li>
+</ul>
+</li>
+<li>Reference Expressions
+<ul>
+<li><code>expressions.RefFunc</code></li>
+<li><code>expressions.RefIsNull</code></li>
+<li><code>expressions.RefAs</code></li>
+<li><code>expressions.RefEq</code></li>
+<li><code>expressions.RefTest</code></li>
+<li><code>expressions.RefCast</code></li>
+<li><code>expressions.RefI31</code></li>
+<li><code>expressions.I31Get</code></li>
+</ul>
+</li>
+<li>Aggregate Expressions
+<ul>
+<li><code>expressions.TupleMake</code></li>
+<li><code>expressions.TupleExtract</code></li>
+<li><code>expressions.StructNew</code></li>
+<li><code>expressions.StructGet</code></li>
+<li><code>expressions.StructSet</code></li>
+<li><code>expressions.ArrayNew</code></li>
+<li><code>expressions.ArrayNewFixed</code></li>
+<li><code>expressions.ArrayNewData</code></li>
+<li><code>expressions.ArrayNewElem</code></li>
+<li><code>expressions.ArrayGet</code></li>
+<li><code>expressions.ArraySet</code></li>
+<li><code>expressions.ArrayLen</code></li>
+<li><code>expressions.ArrayFill</code></li>
+<li><code>expressions.ArrayCopy</code></li>
+<li><code>expressions.ArrayInitData</code></li>
+<li><code>expressions.ArrayInitElem</code></li>
+</ul>
+</li>
+<li>Numeric Expressions
 <ul>
 <li><code>expressions.Const</code></li>
+<li><code>expressions.Unary</code></li>
+<li><code>expressions.Binary</code></li>
+<li><code>expressions.WideIntAddSub</code></li>
+<li><code>expressions.WideIntMul</code></li>
+</ul>
+</li>
+<li>Vector Expressions
+<ul>
+<li><code>expressions.SIMDTernary</code></li>
+<li><code>expressions.SIMDShift</code></li>
+<li><code>expressions.SIMDShuffle</code></li>
+<li><code>expressions.SIMDExtract</code></li>
+<li><code>expressions.SIMDReplace</code></li>
+</ul>
+</li>
+<li>Atomic Expressions
+<ul>
+<li><code>expressions.AtomicRMW</code></li>
+<li><code>expressions.AtomicCmpxchg</code></li>
+<li><code>expressions.AtomicWait</code></li>
+<li><code>expressions.AtomicNotify</code></li>
+<li><code>expressions.AtomicFence</code></li>
+</ul>
+</li>
+<li>String Expressions
+<ul>
+<li><code>expressions.StringNew</code></li>
+<li><code>expressions.StringConst</code></li>
+<li><code>expressions.StringMeasure</code></li>
+<li><code>expressions.StringEncode</code></li>
+<li><code>expressions.StringConcat</code></li>
+<li><code>expressions.StringEq</code></li>
+<li><code>expressions.StringWTF16Get</code></li>
+<li><code>expressions.StringSliceWTF</code></li>
 </ul>
 </li>
 </ul>
 <h2 id="⚠️-deprecations-renames-and-moves" class="tsd-anchor-link">⚠️ Deprecations, Renames, and Moves<a href="#⚠️-deprecations-renames-and-moves" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="deprecation-roadmap" class="tsd-anchor-link">Deprecation Roadmap<a href="#deprecation-roadmap" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>This section lists all bindings that have been deprecated in favor of another binding name or its relocation.
+These deprecations are marked with <code>/** @deprecated */</code> doc-comments so they can be picked up by intellisense and linting tools.</p>
+<p>Additionally, most of these bindings log a warning to the console notifying their deprecation and what they should be replaced with.
+E.g., when running the code, you’ll see the following in standard output:</p>
+<blockquote>
+<p>&quot;<code>.returnCall()</code> is deprecated; use <code>.return_call()</code> instead.&quot;</p>
+</blockquote>
+<ol>
+<li>For the time being, we’ll leave these deprecations in place with their runtime warnings.</li>
+<li>In a future major version of Binaryen.TS, we’ll convert from logging strings to logging actual <code>Error</code> objects (with stacks),
+which are more verbose and should be more attention-grabbing.
+These messages will be sent to the ‘error’ output instead of ‘standard’.</li>
+<li>Then in another release we’ll resort to <em>throwing</em> the error instead of just logging it.
+This will be a breaking change; at this stage the deprecations should be considered <strong>obsolete</strong>
+and this serves as a final warning that they will be removed soon.</li>
+<li>Then in yet another release we’ll remove all deprecations.</li>
+</ol>
 <h3 id="enums-and-types" class="tsd-anchor-link">Enums and Types<a href="#enums-and-types" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>Enum names have been singularized.</p>
 <ul>
@@ -433,6 +553,7 @@ See generated docs for fields, methods, and descriptions of each.</p>
 <li><code>MemoryInfo</code>         → <code>Module.Memory</code></li>
 <li><code>TableInfo</code>          → <code>Module.Table</code></li>
 <li><code>FunctionInfo</code>       → <code>Module.Function</code></li>
+<li><code>MemorySegmentInfo</code>  → <code>Module.DataSegment</code></li>
 <li><code>ElementSegmentInfo</code> → <code>Module.ElementSegment</code></li>
 <li><code>ExportInfo</code>         → <code>Module.Export</code></li>
 </ul>
@@ -444,7 +565,6 @@ See generated docs for fields, methods, and descriptions of each.</p>
 <li><code>IfInfo</code>         → <code>expressions.If</code></li>
 <li>etc.</li>
 </ul>
-<p><s><code>MemorySegmentInfo</code></s> ❌ has been removed.</p>
 <h3 id="modules" class="tsd-anchor-link">Modules<a href="#modules" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>Module components previously at the top level have been moved under the <code>Module</code> namespace.</p>
 <ul>
@@ -457,6 +577,7 @@ See generated docs for fields, methods, and descriptions of each.</p>
 <li><code>getGlobalInfo(global)</code>          → <code>new Module.Global(global)</code></li>
 <li><code>getTableInfo(table)</code>            → <code>new Module.Table(table)</code></li>
 <li><code>getFunctionInfo(func)</code>          → <code>new Module.Function(func)</code></li>
+<li><code>getMemorySegmentInfo(segment)</code>  → <code>new Module.DataSegment(segment)</code></li>
 <li><code>getElementSegmentInfo(segment)</code> → <code>new Module.ElementSegment(segment)</code></li>
 <li><code>getExportInfo(xport)</code>           → <code>new Module.Export(xport)</code></li>
 </ul>
@@ -465,7 +586,6 @@ See generated docs for fields, methods, and descriptions of each.</p>
 <li><code>Module#getMemoryInfo(name)</code> has not changed.</li>
 <li><code>Module#getDataSegmentInfo(name)</code> has not changed.</li>
 <li>global <code>getExpressionInfo(expr)</code> has not changed.</li>
-<li>global <s><code>getMemorySegmentInfo()</code></s> ❌ has been removed.</li>
 </ul>
 <p>Most of the <code>Module</code> class’s instance methods relating to module component manipulation have been moved.</p>
 <ul>
@@ -590,4 +710,4 @@ Some of them have also been renamed to align with the WASM spec.</p>
 </ul>
 </li>
 </ul>
-</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#api-overview"><span>API <wbr/>Overview</span></a><ul><li><ul><li><a href="#contents"><span>Contents</span></a></li><li><a href="#icon-legend"><span>Icon <wbr/>Legend</span></a></li></ul></li><li><a href="#top-level-symbols"><span>Top-<wbr/>Level <wbr/>Symbols</span></a></li><li><ul><li><a href="#typescript-types"><span>Type<wbr/>Script <wbr/>Types</span></a></li><li><a href="#constants"><span>Constants</span></a></li><li><a href="#enums"><span>Enums</span></a></li><li><a href="#global-bindings"><span>Global <wbr/>Bindings</span></a></li></ul></li><li><a href="#module-manipulation"><span>Module <wbr/>Manipulation</span></a></li><li><a href="#expression-building"><span>Expression <wbr/>Building</span></a></li><li><a href="#expression-manipulation"><span>Expression <wbr/>Manipulation</span></a></li><li><a href="#⚠️-deprecations-renames-and-moves"><span>⚠️ <wbr/>Deprecations, <wbr/>Renames, and <wbr/>Moves</span></a></li><li><ul><li><a href="#enums-and-types"><span>Enums and <wbr/>Types</span></a></li><li><a href="#modules"><span>Modules</span></a></li><li><a href="#expression-builder-methods"><span>Expression <wbr/>Builder <wbr/>Methods</span></a></li><li><a href="#settings"><span>Settings</span></a></li></ul></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="../modules.html">Binaryen.TS</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#api-overview"><span>API <wbr/>Overview</span></a><ul><li><ul><li><a href="#contents"><span>Contents</span></a></li><li><a href="#icon-legend"><span>Icon <wbr/>Legend</span></a></li></ul></li><li><a href="#top-level-symbols"><span>Top-<wbr/>Level <wbr/>Symbols</span></a></li><li><ul><li><a href="#typescript-types"><span>Type<wbr/>Script <wbr/>Types</span></a></li><li><a href="#constants"><span>Constants</span></a></li><li><a href="#enums"><span>Enums</span></a></li><li><a href="#global-bindings"><span>Global <wbr/>Bindings</span></a></li></ul></li><li><a href="#module-manipulation"><span>Module <wbr/>Manipulation</span></a></li><li><a href="#expression-building"><span>Expression <wbr/>Building</span></a></li><li><a href="#expression-manipulation"><span>Expression <wbr/>Manipulation</span></a></li><li><a href="#⚠️-deprecations-renames-and-moves"><span>⚠️ <wbr/>Deprecations, <wbr/>Renames, and <wbr/>Moves</span></a></li><li><ul><li><a href="#deprecation-roadmap"><span>Deprecation <wbr/>Roadmap</span></a></li><li><a href="#enums-and-types"><span>Enums and <wbr/>Types</span></a></li><li><a href="#modules"><span>Modules</span></a></li><li><a href="#expression-builder-methods"><span>Expression <wbr/>Builder <wbr/>Methods</span></a></li><li><a href="#settings"><span>Settings</span></a></li></ul></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="../modules.html">Binaryen.TS</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>

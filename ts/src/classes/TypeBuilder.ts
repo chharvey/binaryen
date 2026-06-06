@@ -1,6 +1,5 @@
 import {
 	BinaryenObj,
-	HEAPU32,
 	stackAlloc,
 } from "../-pre.ts";
 import {
@@ -79,7 +78,7 @@ export class TypeBuilder {
 				packedTypes[i] = packedType;
 				mutables[i] = +mutable;
 			}
-			BinaryenObj["_TypeBuilderSetStructType"](
+			return BinaryenObj["_TypeBuilderSetStructType"](
 				this.#ptr,
 				index,
 				i32sToStack(types),
@@ -168,7 +167,7 @@ export class TypeBuilder {
 			}
 			const types = new Array(numTypes);
 			for (let i = 0; i < numTypes; i++) {
-				types[i] = HEAPU32[(array >>> 2) + i];
+				types[i] = BinaryenObj.HEAPU32[(array >>> 2) + i];
 			}
 			return types;
 		});

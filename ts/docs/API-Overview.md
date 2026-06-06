@@ -176,7 +176,7 @@ See the generated **ExpressionBuilder** docs for all available functions and det
 
 Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”.
 
-- Parametric Instructions
+- parametrics
 	- `.nop()`
 	- `.unreachable()`
 	- `.drop()`
@@ -200,8 +200,10 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.global.set()`
 - tables and memories
 	- `.table.get()`, `.table.set()`, `.table.size()`, `.table.grow()`
+	- ~~`.table.fill()`, `.table.copy()`, `table.init()`~~; ⛔️ not yet supported
 	- `.memory.size()`, `.memory.grow()`, `.memory.fill()`, `.memory.copy()`, `.memory.init()`,
-	- `.elem.drop()`, `.data.drop()`
+	- ~~`.elem.drop()`~~; ⛔️ not yet supported
+	- `.data.drop()`
 - references
 	- `.ref.func()`, `.ref.null()`, `.ref.is_null()`, `.ref.as_non_null()`, `.ref.eq()`, `.ref.test()`, `.ref.cast()`
 	- `.ref.i31()`, `i31.get_{s,u}()`
@@ -269,11 +271,11 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.{i16x8,i32x4,i64x2}.mul()`
 	- `.{i8x16,i16x8}.avgr_u()`
 	- `.i16x8.q15mulr_sat_s()`
-	- `.i16x8.relaxed_q15mulr_s()`
+	- ~~`.i16x8.relaxed_q15mulr_s()`~~; ⛔️ not yet supported
 	- `.{i8x16,i16x8,i32x4}.min{s,u}()`
 	- `.{i8x16,i16x8,i32x4}.max{s,u}()`
 	>
-	- `.{i8x16,i16x8,i32x4,i64x2}.relaxed_laneselect()`
+	- ~~`.{i8x16,i16x8,i32x4,i64x2}.relaxed_laneselect()`~~; ⛔️ not yet supported
 	- `.{i8x16,i16x8,i32x4,i64x2}.all_true()`
 	- `.{i8x16,i16x8,i32x4,i64x2}.eq()`
 	- `.{i8x16,i16x8,i32x4,i64x2}.ne()`
@@ -285,23 +287,25 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.{i8x16,i16x8,i32x4,i64x2}.shl()`
 	- `.{i8x16,i16x8,i32x4,i64x2}.shr{s,u}()`
 	- `.{i8x16,i16x8,i32x4,i64x2}.bitmask()`
-	- `.i8x16.swizzle()`, `.i8x16.relaxed_swizzle()`
+	- `.i8x16.swizzle()`
+	- ~~`.i8x16.relaxed_swizzle()`~~; ⛔️ not yet supported
 	- `.i8x16.shuffle()`
 	>
 	- `.i16x8.extadd_pairwise_i8x16_{s,u}()`, `.i32x4.extadd_pairwise_i16x8_{s,u}()`
 	- `.i16x8.extmul_{low,high}_i8x16_{s,u}()`, `.i32x4.extmul_{low,high}_i16x8_{s,u}()`, `.i64x2.extmul_{low,high}_i32x4_{s,u}()`
 	- `.i32x4.dot_i16x8_s()`
-	- `.i16x8.relaxed_dot_i8x16_i7x16_s()`
-	- `.i32x4.relaxed_dot_i8x16_i7x16_add_s()`
+	- ~~`.i16x8.relaxed_dot_i8x16_i7x16_s()`~~; ⛔️ not yet supported
+	- ~~`.i32x4.relaxed_dot_i8x16_i7x16_add_s()`~~; ⛔️ not yet supported
 	- `.i8x16.narrow_i16x8_{s,u}()`, `.i16x8.narrow_i32x4_{s,u}()`
 	>
 	- `.i16x8.extend_{low,high}_i8x16_{s,u}()`, `.i32x4.extend_{low,high}_i16x8_{s,u}()`, `.i64x2.extend_{low,high}_i32x4_{s,u}()`
 	- `.i32x4.trunc_sat_f32x4_{s,u}()`, `.i32x4.trunc_sat_f64x2_{s,u}_zero()`
-	- `.i32x4.relaxed_trunc_f32x4_{s,u}()`, `.i32x4.relaxed_trunc_f64x2_{s,u}_zero()`
+	- ~~`.i32x4.relaxed_trunc_f32x4_{s,u}()`, `.i32x4.relaxed_trunc_f64x2_{s,u}_zero()`~~; ⛔️ not yet supported
 - SIMD floats
 	- `.{f32x4,f64x2}.abs()`, `.{f32x4,f64x2}.neg()`, `.{f32x4,f64x2}.sqrt()`, `.{f32x4,f64x2}.ceil()`, `.{f32x4,f64x2}.floor()`, `.{f32x4,f64x2}.trunc()`, `.{f32x4,f64x2}.nearest()`
-	- `.{f32x4,f64x2}.add()`, `.{f32x4,f64x2}.sub()`, `.{f32x4,f64x2}.mul()`, `.{f32x4,f64x2}.div()`, `.{f32x4,f64x2}.min()`, `.{f32x4,f64x2}.max()`, `.{f32x4,f64x2}.pmin()`, `.{f32x4,f64x2}.pmax()`, `.{f32x4,f64x2}.relaxed_min()`, `.{f32x4,f64x2}.relaxed_max()`
-	- `.{f32x4,f64x2}.relaxed_madd()`, `.{f32x4,f64x2}.relaxed_nmadd()`
+	- `.{f32x4,f64x2}.add()`, `.{f32x4,f64x2}.sub()`, `.{f32x4,f64x2}.mul()`, `.{f32x4,f64x2}.div()`, `.{f32x4,f64x2}.min()`, `.{f32x4,f64x2}.max()`, `.{f32x4,f64x2}.pmin()`, `.{f32x4,f64x2}.pmax()`
+	- ~~`.{f32x4,f64x2}.relaxed_min()`, `.{f32x4,f64x2}.relaxed_max()`~~; ⛔️ not yet supported
+	- ~~`.{f32x4,f64x2}.relaxed_madd()`, `.{f32x4,f64x2}.relaxed_nmadd()`~~; ⛔️ not yet supported
 	- `.{f32x4,f64x2}.eq()`, `.{f32x4,f64x2}.ne()`, `.{f32x4,f64x2}.lt()`, `.{f32x4,f64x2}.gt()`, `.{f32x4,f64x2}.le()`, `.{f32x4,f64x2}.ge()`
 	- `.f32x4.convert_i32x4_{s,u}()`, `.f64x2.convert_low_i32x4_{s,u}()`
 	- `.f32x4.demote_f64x2_zero()`, `.f64x2.promote_low_f32x4()`
@@ -318,24 +322,118 @@ They can be used to inspect and manipulate expressions.
 See generated docs for fields, methods, and descriptions of each.
 
 - `expressions.Expression` (root class)
-- parametric instructions
+- Parametric Expressions
 	- `expressions.Drop`
 	- `expressions.Select`
-- control instructions
+- Control Expressions
 	- `expressions.Block`
 	- `expressions.Loop`
+	- `expressions.If`
 	- `expressions.Break`
-- variable instructions
+	- `expressions.Switch`
+	- `expressions.BrOn`
+	- `expressions.Call`
+	- `expressions.CallRef`
+	- `expressions.CallIndirect`
+	- `expressions.Return`
+	- `expressions.Throw`
+	- `expressions.Rethrow`
+	- `expressions.Try`
+- Variable Expressions
 	- `expressions.LocalGet`
 	- `expressions.LocalSet`
 	- `expressions.GlobalGet`
 	- `expressions.GlobalSet`
-- numeric instructions
+- Table Expressions
+	- `expressions.TableGet`
+	- `expressions.TableSet`
+	- `expressions.TableSize`
+	- `expressions.TableGrow`
+- Memory Expressions
+	- `expressions.Load`
+	- `expressions.Store`
+	- `expressions.SIMDLoad`
+	- `expressions.SIMDLoadStoreLane`
+	- `expressions.MemorySize`
+	- `expressions.MemoryGrow`
+	- `expressions.MemoryFill`
+	- `expressions.MemoryCopy`
+	- `expressions.MemoryInit`
+	- `expressions.DataDrop`
+- Reference Expressions
+	- `expressions.RefFunc`
+	- `expressions.RefIsNull`
+	- `expressions.RefAs`
+	- `expressions.RefEq`
+	- `expressions.RefTest`
+	- `expressions.RefCast`
+	- `expressions.RefI31`
+	- `expressions.I31Get`
+- Aggregate Expressions
+	- `expressions.TupleMake`
+	- `expressions.TupleExtract`
+	- `expressions.StructNew`
+	- `expressions.StructGet`
+	- `expressions.StructSet`
+	- `expressions.ArrayNew`
+	- `expressions.ArrayNewFixed`
+	- `expressions.ArrayNewData`
+	- `expressions.ArrayNewElem`
+	- `expressions.ArrayGet`
+	- `expressions.ArraySet`
+	- `expressions.ArrayLen`
+	- `expressions.ArrayFill`
+	- `expressions.ArrayCopy`
+	- `expressions.ArrayInitData`
+	- `expressions.ArrayInitElem`
+- Numeric Expressions
 	- `expressions.Const`
+	- `expressions.Unary`
+	- `expressions.Binary`
+	- `expressions.WideIntAddSub`
+	- `expressions.WideIntMul`
+- Vector Expressions
+	- `expressions.SIMDTernary`
+	- `expressions.SIMDShift`
+	- `expressions.SIMDShuffle`
+	- `expressions.SIMDExtract`
+	- `expressions.SIMDReplace`
+- Atomic Expressions
+	- `expressions.AtomicRMW`
+	- `expressions.AtomicCmpxchg`
+	- `expressions.AtomicWait`
+	- `expressions.AtomicNotify`
+	- `expressions.AtomicFence`
+- String Expressions
+	- `expressions.StringNew`
+	- `expressions.StringConst`
+	- `expressions.StringMeasure`
+	- `expressions.StringEncode`
+	- `expressions.StringConcat`
+	- `expressions.StringEq`
+	- `expressions.StringWTF16Get`
+	- `expressions.StringSliceWTF`
 
 
 
 ## ⚠️ Deprecations, Renames, and Moves
+### Deprecation Roadmap
+This section lists all bindings that have been deprecated in favor of another binding name or its relocation.
+These deprecations are marked with `/** @deprecated */` doc-comments so they can be picked up by intellisense and linting tools.
+
+Additionally, most of these bindings log a warning to the console notifying their deprecation and what they should be replaced with.
+E.g., when running the code, you’ll see the following in standard output:
+> "`.returnCall()` is deprecated; use `.return_call()` instead."
+
+1. For the time being, we’ll leave these deprecations in place with their runtime warnings.
+2. In a future major version of Binaryen.TS, we’ll convert from logging strings to logging actual `Error` objects (with stacks),
+which are more verbose and should be more attention-grabbing.
+These messages will be sent to the ‘error’ output instead of ‘standard’.
+3. Then in another release we’ll resort to *throwing* the error instead of just logging it.
+This will be a breaking change; at this stage the deprecations should be considered **obsolete**
+and this serves as a final warning that they will be removed soon.
+4. Then in yet another release we’ll remove all deprecations.
+
 ### Enums and Types
 Enum names have been singularized.
 - `ExpressionIds` &rarr; `ExpressionId`
@@ -349,6 +447,7 @@ Enum names have been singularized.
 - `MemoryInfo`         &rarr; `Module.Memory`
 - `TableInfo`          &rarr; `Module.Table`
 - `FunctionInfo`       &rarr; `Module.Function`
+- `MemorySegmentInfo`  &rarr; `Module.DataSegment`
 - `ElementSegmentInfo` &rarr; `Module.ElementSegment`
 - `ExportInfo`         &rarr; `Module.Export`
 
@@ -358,8 +457,6 @@ Enum names have been singularized.
 - `LoopInfo`       &rarr; `expressions.Loop`
 - `IfInfo`         &rarr; `expressions.If`
 - etc.
-
-~~`MemorySegmentInfo`~~ ❌ has been removed.
 
 
 ### Modules
@@ -372,13 +469,13 @@ Most `get*Info()` functions have been replaced by their corresponding class cons
 - `getGlobalInfo(global)`          &rarr; `new Module.Global(global)`
 - `getTableInfo(table)`            &rarr; `new Module.Table(table)`
 - `getFunctionInfo(func)`          &rarr; `new Module.Function(func)`
+- `getMemorySegmentInfo(segment)`  &rarr; `new Module.DataSegment(segment)`
 - `getElementSegmentInfo(segment)` &rarr; `new Module.ElementSegment(segment)`
 - `getExportInfo(xport)`           &rarr; `new Module.Export(xport)`
 >
 - `Module#getMemoryInfo(name)` has not changed.
 - `Module#getDataSegmentInfo(name)` has not changed.
 - global `getExpressionInfo(expr)` has not changed.
-- global ~~`getMemorySegmentInfo()`~~ ❌ has been removed.
 
 Most of the `Module` class’s instance methods relating to module component manipulation have been moved.
 - `Module#addTag()`      &rarr; `Module#tags.add()`

@@ -1,8 +1,6 @@
 import {
 	_free,
 	BinaryenObj,
-	HEAPU8,
-	HEAPU32,
 	UTF8ToString,
 	stackAlloc,
 } from "../../-pre.ts";
@@ -229,9 +227,18 @@ export class Module {
 		].includes(typ)) {
 			return BinaryenObj["_BinaryenPop"](this[PTR], typ);
 		} else {
-			throw new Error(`Unexpected type ${ typ }.`);
+			throw new Error(`\`Module#pop()\` was called with an unexpected type: \`${ typ }\`.`);
 		}
 	}
+
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly funcref = {pop: () => { BinaryenObj.printWarn("`.funcref.pop()` is deprecated; use `.pop(funcref)` instead."); return this.pop(funcref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly externref = {pop: () => { BinaryenObj.printWarn("`.externref.pop()` is deprecated; use `.pop(externref)` instead."); return this.pop(externref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly anyref = {pop: () => { BinaryenObj.printWarn("`.anyref.pop()` is deprecated; use `.pop(anyref)` instead."); return this.pop(anyref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly eqref = {pop: () => { BinaryenObj.printWarn("`.eqref.pop()` is deprecated; use `.pop(eqref)` instead."); return this.pop(eqref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly i31ref = {pop: () => { BinaryenObj.printWarn("`.i31ref.pop()` is deprecated; use `.pop(i31ref)` instead."); return this.pop(i31ref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly structref = {pop: () => { BinaryenObj.printWarn("`.structref.pop()` is deprecated; use `.pop(structref)` instead."); return this.pop(structref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly arrayref = {pop: () => { BinaryenObj.printWarn("`.arrayref.pop()` is deprecated; use `.pop(arrayref)` instead."); return this.pop(arrayref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly stringref = {pop: () => { BinaryenObj.printWarn("`.stringref.pop()` is deprecated; use `.pop(stringref)` instead."); return this.pop(stringref); }};
 
 	/**
 	 * Gets the side effects of the specified expression.
@@ -335,7 +342,7 @@ export class Module {
 	/** @deprecated Use {@link Module#exports | `this.exports.addFunction`} instead. */ @replacedBy("`this.exports.addFunction`") addFunctionExport(internalName: string, externalName: string) { return this.exports.addFunction(internalName, externalName); }
 
 	/** @category Module Component Operations */
-	getMemoryInfo(name: string): Memory_ {
+	getMemoryInfo(name: string = ""): Memory_ {
 		return new Memory_(this, name);
 	}
 
@@ -352,11 +359,13 @@ export class Module {
 	 */
 	emitText(): string {
 		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteText"](this[PTR]);
-		const text = UTF8ToString(textPtr);
-		if (textPtr) {
-			_free(textPtr);
+		try {
+			return UTF8ToString(textPtr);
+		} finally {
+			if (textPtr) {
+				_free(textPtr);
+			}
 		}
-		return text;
 	}
 
 	/**
@@ -365,11 +374,13 @@ export class Module {
 	 */
 	emitStackIR(): string {
 		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteStackIR"](this[PTR]);
-		const text = UTF8ToString(textPtr);
-		if (textPtr) {
-			_free(textPtr);
+		try {
+			return UTF8ToString(textPtr);
+		} finally {
+			if (textPtr) {
+				_free(textPtr);
+			}
 		}
-		return text;
 	}
 
 	/**
@@ -411,12 +422,12 @@ export class Module {
 		return preserveStack(() => {
 			const tempBuffer = stackAlloc(BinaryenObj["_BinaryenSizeofAllocateAndWriteResult"]());
 			BinaryenObj["_BinaryenModuleAllocateAndWrite"](tempBuffer, this[PTR], strToStack(sourceMapUrl));
-			const binaryPtr = HEAPU32[tempBuffer >>> 2];
-			const binaryBytes = HEAPU32[(tempBuffer >>> 2) + 1];
-			const sourceMapPtr = HEAPU32[(tempBuffer >>> 2) + 2];
+			const binaryPtr = BinaryenObj.HEAPU32[tempBuffer >>> 2];
+			const binaryBytes = BinaryenObj.HEAPU32[(tempBuffer >>> 2) + 1];
+			const sourceMapPtr = BinaryenObj.HEAPU32[(tempBuffer >>> 2) + 2];
 			try {
 				const buffer = new Uint8Array(binaryBytes);
-				buffer.set(HEAPU8.subarray(binaryPtr, binaryPtr + binaryBytes));
+				buffer.set(BinaryenObj.HEAPU8.subarray(binaryPtr, binaryPtr + binaryBytes));
 				return typeof sourceMapUrl === "undefined"
 					? buffer
 					: {binary: buffer, sourceMap: UTF8ToString(sourceMapPtr)};

@@ -25,6 +25,7 @@ export default [
 			/* # Layout & Formatting */
 			/* ## Indentation, Spacing, and Alignment */
 			"@stylistic/arrow-spacing": "error",
+			"@stylistic/block-spacing": "error",
 			"@stylistic/comma-spacing": "error",
 			"@stylistic/dot-location": ["error", "property"],
 			"@stylistic/function-call-spacing": "error",
@@ -104,7 +105,6 @@ export default [
 			"prefer-template": "error",
 
 			/* ## Variable Declarations */
-			"init-declarations": "error",
 			"no-shadow": "error",
 			"no-use-before-define": "error",
 			"one-var": ["error", "never"],
@@ -145,8 +145,6 @@ export default [
 
 			/* # Best Practices */
 			/* ## Variable Declarations */
-			"init-declarations": "off",
-			"@typescript-eslint/init-declarations": "error",
 			"no-shadow": "off",
 			"@typescript-eslint/no-shadow": "error",
 			"no-unused-vars": "off",

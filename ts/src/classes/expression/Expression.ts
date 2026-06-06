@@ -23,7 +23,7 @@ export class Expression {
 	/**
 	 * Construct a new Expression object given an ID and reference.
 	 *
-	 * Without an ID, you can still call {@link getExpressionInfo | `getExpressionInfo(expr)`},
+	 * Without an ID, you can still call {@link Expression | `Expression(expr)`} (without `new`),
 	 * which will compute the ID and construct an Expression object from there.
 	 * @param exprId the expression “kind” id
 	 * @param expr the expression reference
@@ -46,6 +46,26 @@ export class Expression {
 
 	finalize(): void {
 		BinaryenObj["_BinaryenExpressionFinalize"](this._ptr);
+	}
+
+	/**
+	 * Adds to this object enumerable own properties that are computed from getter methods.
+	 * Useful when calling `JSON.stringify`:
+	 * ```ts
+	 * JSON.stringify(this.toJson());
+	 * ```
+	 */
+	toJson(): Record<string, number | string> {
+		const json: Record<string, number | string> = {
+			id: this.id,
+			type: this.type,
+		};
+		for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(Reflect.getPrototypeOf(this)))) {
+			if ("get" in descriptor) {
+				json[name] = descriptor.get.call(this);
+			}
+		}
+		return json;
 	}
 
 	toText(): string {

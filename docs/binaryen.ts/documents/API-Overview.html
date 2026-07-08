@@ -612,6 +612,7 @@ and this serves as a final warning that they will be removed soon.</li>
 <li><code>Module#setFeatures()</code>        → <code>Module#features</code></li>
 </ul>
 <p>Global <code>getSideEffects(expr, mod)</code> has been moved to <code>Module#getSideEffects()</code> where it lives alongside <code>Module#copyExpression()</code>.</p>
+<p><code>Module#emitAsmjs</code> logs asm.js code to stdout instead of returning a string. (Until C++ API supports an asm.js-string-returning function.)</p>
 <p>All expression creation methods (<code>.nop()</code>, <code>.drop()</code>, <code>.block()</code>, <code>.call()</code>, etc.) directly on <code>Module</code>
 were functions for building expressions, and have migrated to <code>Module#wasm</code>, an <a href="#expression-building">Expression Builder</a>.</p>
 <p>All “type” properties (<code>.i32</code>, <code>.i64</code>, etc) on <code>Module</code> previously served as namespaces containing similar functions.

@@ -15,7 +15,7 @@ options-pinned.h
 /out/
 
 # generated documentation
-# docs/ # this is commented out only on branch `gh-pages` so docs can be published
+# /docs/ # this is commented out only on branch `gh-pages` so docs can be published
 
 # files related to building in-tree
 CMakeFiles

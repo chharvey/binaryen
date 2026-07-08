@@ -16,8 +16,8 @@
   "type": "module",
   "main": "./dist/binaryen.js",
   "scripts": {
-    "make": "rm -rf ../build/ && emcmake cmake -S ../ -B ../build/ && emmake make -C ../build/ binaryen_js",
-    "postmake": "rm -rf ./build/ && mkdir -p ./build/ && cp -R ../build/bin/ ./build/",
+    "make": "emcmake cmake -S ../ -B ../build/ && emmake make -C ../build/ binaryen_js",
+    "postmake": "rm -rf ./build/ && mkdir -p ./build/ && cp -R ../build/bin/binaryen_js.* ./build/",
     "check": "../check.py binaryenjs --binaryen-bin='../build/bin'",
     "compile": "rm -rf ./dist/ && tsc && tsc --project ./test/tsconfig.json",
     "lint": "eslint ./",
@@ -27,7 +27,10 @@
     "build": "npm run compile && npm run lint && npm run docs && npm run test",
     "prepublishOnly": "npm run make && npm run check && npm run build"
   },
-  "files": ["./build/", "./dist/"],
+  "files": [
+    "./build/",
+    "./dist/"
+  ],
   "imports": {
     "#binaryen-raw": {
       "types": "./src/types/binaryen_js.d.ts",
@@ -46,12 +49,12 @@
     "typescript-eslint": "^8.59.1"
   },
   "engines": {
-    "node": "^20 || ^22 || ^24 || ^26"
+    "node": ">= 22"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": "^22 || ^24 || ^26"
+      "version": ">= 22"
     },
     "packageManager": {
       "name": "npm"

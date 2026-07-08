@@ -13,6 +13,9 @@
 
   (memory 0)
 
+  ;; CHECK:      (global $g-f32 (mut f32) (f32.const -3))
+  (global $g-f32 (mut f32) (f32.const -3))
+
   ;; CHECK:      (func $and-and (param $i1 i32) (result i32)
   ;; CHECK-NEXT:  (i32.and
   ;; CHECK-NEXT:   (local.get $i1)
@@ -10978,7 +10981,7 @@
   ;; CHECK:      (func $tee-with-unreachable-value (result f64)
   ;; CHECK-NEXT:  (local $var$0 i32)
   ;; CHECK-NEXT:  (block $label$1 (result f64)
-  ;; CHECK-NEXT:   (local.tee $var$0
+  ;; CHECK-NEXT:   (local.set $var$0
   ;; CHECK-NEXT:    (br_if $label$1
   ;; CHECK-NEXT:     (f64.const 1)
   ;; CHECK-NEXT:     (unreachable)
@@ -15828,6 +15831,55 @@
       )
     ))
   )
+  ;; CHECK:      (func $optimize-float-points-stateful (result f32)
+  ;; CHECK-NEXT:  (f32.abs
+  ;; CHECK-NEXT:   (f32.mul
+  ;; CHECK-NEXT:    (f32.neg
+  ;; CHECK-NEXT:     (block (result f32)
+  ;; CHECK-NEXT:      (global.set $g-f32
+  ;; CHECK-NEXT:       (f32.add
+  ;; CHECK-NEXT:        (global.get $g-f32)
+  ;; CHECK-NEXT:        (f32.const 2)
+  ;; CHECK-NEXT:       )
+  ;; CHECK-NEXT:      )
+  ;; CHECK-NEXT:      (global.get $g-f32)
+  ;; CHECK-NEXT:     )
+  ;; CHECK-NEXT:    )
+  ;; CHECK-NEXT:    (f32.neg
+  ;; CHECK-NEXT:     (block (result f32)
+  ;; CHECK-NEXT:      (global.set $g-f32
+  ;; CHECK-NEXT:       (f32.add
+  ;; CHECK-NEXT:        (global.get $g-f32)
+  ;; CHECK-NEXT:        (f32.const 2)
+  ;; CHECK-NEXT:       )
+  ;; CHECK-NEXT:      )
+  ;; CHECK-NEXT:      (global.get $g-f32)
+  ;; CHECK-NEXT:     )
+  ;; CHECK-NEXT:    )
+  ;; CHECK-NEXT:   )
+  ;; CHECK-NEXT:  )
+  ;; CHECK-NEXT: )
+  (func $optimize-float-points-stateful (result f32)
+    (f32.abs
+      (f32.mul
+        ;; LHS
+        (f32.neg
+          (block (result f32)
+            (global.set $g-f32 (f32.add (global.get $g-f32) (f32.const 2)))
+            (global.get $g-f32)
+          )
+        )
+        ;; RHS - The increment of the global causes this to produce a different
+        ;; result than the LHS, so we cannot optimize out the f32.abs.
+        (f32.neg
+          (block (result f32)
+            (global.set $g-f32 (f32.add (global.get $g-f32) (f32.const 2)))
+            (global.get $g-f32)
+          )
+        )
+      )
+    )
+  )
   ;; CHECK:      (func $ternary (param $x i32) (param $y i32)
   ;; CHECK-NEXT:  (drop
   ;; CHECK-NEXT:   (i32.eqz
@@ -18652,7 +18704,7 @@
   ;; CHECK-NEXT:    (i32.const 1)
   ;; CHECK-NEXT:   )
   ;; CHECK-NEXT:  )
-  ;; CHECK-NEXT:  (local.tee $temp
+  ;; CHECK-NEXT:  (local.set $temp
   ;; CHECK-NEXT:   (unreachable)
   ;; CHECK-NEXT:  )
   ;; CHECK-NEXT: )

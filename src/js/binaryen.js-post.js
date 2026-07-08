@@ -195,6 +195,7 @@ function initializeConstants() {
     'RelaxedAtomics',
     'CustomPageSizes',
     'WideArithmetic',
+    'CompactImports',
     'All'
   ].forEach(name => {
     Module['Features'][name] = Module['_BinaryenFeature' + name]();
@@ -2480,8 +2481,8 @@ function wrapModule(module, self = {}) {
   };
 
   self['atomic'] = {
-    'fence'() {
-      return Module['_BinaryenAtomicFence'](module);
+    'fence'(order = Module['MemoryOrder']['seqcst']) {
+      return Module['_BinaryenAtomicFence'](module, order);
     }
   };
 
@@ -3386,6 +3387,15 @@ Module['parseText'] = function(text) {
   const buffer = _malloc(text.length + 1);
   stringToAscii(text, buffer);
   const ptr = handleFatalError(() => Module['_BinaryenModuleParse'](buffer));
+  _free(buffer);
+  return wrapModule(ptr);
+};
+
+// Parses text format to a module with the given feature set enabled
+Module['parseTextWithFeatures'] = function(text, features) {
+  const buffer = _malloc(text.length + 1);
+  stringToAscii(text, buffer);
+  const ptr = handleFatalError(() => Module['_BinaryenModuleParseWithFeatures'](buffer, features));
   _free(buffer);
   return wrapModule(ptr);
 };

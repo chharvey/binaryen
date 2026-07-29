@@ -99,7 +99,7 @@ Functions (see generated docs for descriptions):
 - `emitText(expr: ExpressionRef): string`
 - `readBinary(data: Uint8Array): Module`
 - `readBinaryWithFeatures(data: Uint8Array, features: Feature): Module`
-- `parseText(text: string): Module`
+- `parseText(text: string, features?: Feature): Module`
 - `exit(status: number): void`
 - `createType(types: readonly Type[]): Type`
 - `expandType(typ: Type): Type[]`
@@ -313,6 +313,8 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.{i8x16,i16x8,i32x4,i64x2,f32x4,f64x2}.splat()`
 	- `.{i8x16,i16x8}.extract_lane_{s,u}()`, `.{i32x4,i64x2,f32x4,f64x2}.extract_lane()`
 	- `.{i8x16,i16x8,i32x4,i64x2,f32x4,f64x2}.replace_lane()`
+- 🌱 StringRef proposal
+	- `string.const()`
 
 
 
@@ -497,6 +499,8 @@ Some of `Module`’s instance methods have been converted into getters/setters:
 - `Module#setFeatures()`        &rarr; `Module#features`
 
 Global `getSideEffects(expr, mod)` has been moved to `Module#getSideEffects()` where it lives alongside `Module#copyExpression()`.
+
+`Module#emitAsmjs` logs asm.js code to stdout instead of returning a string. (Until C++ API supports an asm.js-string-returning function.)
 
 All expression creation methods (`.nop()`, `.drop()`, `.block()`, `.call()`, etc.) directly on `Module`
 were functions for building expressions, and have migrated to `Module#wasm`, an [Expression Builder](#expression-building).

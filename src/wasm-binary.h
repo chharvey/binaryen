@@ -364,12 +364,16 @@ enum BrOnCastFlag {
 
 constexpr uint32_t ExactImport = 1 << 5;
 
-constexpr uint32_t HasBackingArrayMask = 1 << 4;
-constexpr uint32_t HasMemoryOrderMask = 1 << 5;
+constexpr uint32_t HasMemoryOrderMask = 1 << 4;
+constexpr uint32_t HasBackingArrayMask = 1 << 5;
 constexpr uint32_t HasMemoryIndexMask = 1 << 6;
 
 constexpr uint8_t HasTableInitializer = 0x40;
 constexpr uint8_t TableReservedByte = 0x00;
+
+// TODO(sbc): Use upstream names for these schemes if/when they are decided.
+constexpr uint8_t CompactImportsSharedModule = 0x7f;
+constexpr uint8_t CompactImportsSharedAll = 0x7e;
 
 enum EncodedType {
   // value types
@@ -379,9 +383,8 @@ enum EncodedType {
   f64 = -0x4,  // 0x7c
   v128 = -0x5, // 0x7b
   // packed types
-  i8 = -0x8,         // 0x78
-  i16 = -0x9,        // 0x77
-  waitQueue = -0x24, // 0x5c
+  i8 = -0x8,  // 0x78
+  i16 = -0x9, // 0x77
   // reference types
   nullfuncref = -0xd,   // 0x73
   nullexternref = -0xe, // 0x72
@@ -421,21 +424,23 @@ enum EncodedType {
 };
 
 enum EncodedHeapType {
-  nofunc = -0xd,   // 0x73
-  noext = -0xe,    // 0x72
-  none = -0xf,     // 0x71
-  func = -0x10,    // 0x70
-  ext = -0x11,     // 0x6f
-  any = -0x12,     // 0x6e
-  eq = -0x13,      // 0x6d
-  exn = -0x17,     // 0x69
-  noexn = -0xc,    // 0x74
-  cont = -0x18,    // 0x68
-  nocont = -0x0b,  // 0x75
-  i31 = -0x14,     // 0x6c
-  struct_ = -0x15, // 0x6b
-  array = -0x16,   // 0x6a
-  string = -0x19,  // 0x67
+  nofunc = -0xd,       // 0x73
+  noext = -0xe,        // 0x72
+  none = -0xf,         // 0x71
+  func = -0x10,        // 0x70
+  ext = -0x11,         // 0x6f
+  any = -0x12,         // 0x6e
+  eq = -0x13,          // 0x6d
+  exn = -0x17,         // 0x69
+  noexn = -0xc,        // 0x74
+  cont = -0x18,        // 0x68
+  nocont = -0x0b,      // 0x75
+  i31 = -0x14,         // 0x6c
+  struct_ = -0x15,     // 0x6b
+  array = -0x16,       // 0x6a
+  string = -0x19,      // 0x67
+  waitqueue = -0x24,   // 0x5c
+  nowaitqueue = -0x25, // 0x5b
 };
 
 namespace CustomSections {
@@ -475,6 +480,7 @@ extern const char* RelaxedAtomicsFeature;
 extern const char* MultibyteFeature;
 extern const char* CustomPageSizesFeature;
 extern const char* WideArithmeticFeature;
+extern const char* CompactImportsFeature;
 
 enum Subsection {
   NameModule = 0,
@@ -716,7 +722,8 @@ enum ASTNodes {
   AtomicFence = 0x03,
   Pause = 0x04,
   StructWait = 0x05,
-  StructNotify = 0x06,
+  WaitqueueNotify = 0x06,
+  WaitqueueNew = 0x07,
 
   I32AtomicLoad = 0x10,
   I64AtomicLoad = 0x11,
@@ -1480,10 +1487,10 @@ public:
   std::optional<BufferWithRandomAccess> getRemovableIfUnusedHintsBuffer();
   std::optional<BufferWithRandomAccess> getJSCalledHintsBuffer();
   std::optional<BufferWithRandomAccess> getIdempotentHintsBuffer();
+  std::optional<BufferWithRandomAccess> getToolchainInlineHintsBuffer();
 
   // helpers
   void writeInlineString(std::string_view name);
-  void writeEscapedName(std::string_view name);
   void writeInlineBuffer(const char* data, size_t size);
   void writeData(const char* data, size_t size);
 
@@ -1677,6 +1684,23 @@ public:
                           uint8_t& pageSizeLog2,
                           Address defaultIfNoMax);
   void readImports();
+  void readImport(Name module, Name base, uint32_t kind);
+
+  void addImport(std::unique_ptr<Function> func);
+  void addImport(std::unique_ptr<Table> table);
+  void addImport(std::unique_ptr<Memory> memory);
+  void addImport(std::unique_ptr<Global> global);
+  void addImport(std::unique_ptr<Tag> tag);
+
+  std::unique_ptr<Function>
+  readFunctionImport(Name module, Name base, uint32_t kind);
+  std::unique_ptr<Table> readTableImport(Name module, Name base);
+  std::unique_ptr<Memory> readMemoryImport(Name module, Name base);
+  std::unique_ptr<Global> readGlobalImport(Name module, Name base);
+  std::unique_ptr<Tag> readTagImport(Name module, Name base);
+
+  template<typename T, typename ReadFunc>
+  void readCompactImportsShared(Name module, ReadFunc readFunc);
 
   // The signatures of each function, including imported functions, given in the
   // import and function sections. Store HeapTypes instead of Signatures because
@@ -1757,7 +1781,6 @@ public:
 
   void readTags();
 
-  static Name escape(Name name);
   void readNames(size_t sectionPos, size_t payloadLen);
   void readFeatures(size_t sectionPos, size_t payloadLen);
   void readDylink(size_t payloadLen);
@@ -1780,6 +1803,7 @@ public:
   void readRemovableIfUnusedHints(size_t payloadLen);
   void readJSCalledHints(size_t payloadLen);
   void readIdempotentHints(size_t payloadLen);
+  void readToolchainInlineHints(size_t payloadLen);
 
   std::tuple<Address, Address, Index, MemoryOrder, BackingType>
   readMemoryAccess(bool isAtomic, bool isRMW);

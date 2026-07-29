@@ -9,6 +9,10 @@ import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
+	type ExpressionRef,
+	MemoryOrder,
+} from "../../constants.ts";
+import {
 	array,
 	struct,
 	tuple,
@@ -38,6 +42,9 @@ import {
 	i31,
 	ref,
 } from "./reference.ts";
+import {
+	string,
+} from "./string.ts";
 import {
 	table,
 } from "./table.ts";
@@ -81,6 +88,7 @@ export function expressionBuilder(mod: Module) {
 		tuple: tuple(mod),
 		struct: struct(mod),
 		array: array(mod),
+		string: string(mod),
 		i32: i32(mod),
 		i64: i64(mod),
 		f32: f32(mod),
@@ -92,7 +100,7 @@ export function expressionBuilder(mod: Module) {
 		i64x2: i64x2(mod),
 		f32x4: f32x4(mod),
 		f64x2: f64x2(mod),
-		atomic: {fence: () => BinaryenObj["_BinaryenAtomicFence"](mod[PTR])},
+		atomic: {fence: (order: MemoryOrder = MemoryOrder.SeqCst): ExpressionRef => BinaryenObj["_BinaryenAtomicFence"](mod[PTR], order) as ExpressionRef},
 	} as const;
 }
 

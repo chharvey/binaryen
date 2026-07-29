@@ -13,8 +13,6 @@ suite("binaryen", () => {
 		assert.ok(__pre.BinaryenObj);
 		assert.ok(__pre._malloc);
 		assert.ok(__pre._free);
-		assert.ok(__pre.out);
-		assert.ok(__pre.err);
 		assert.ok(__pre.stackSave);
 		assert.ok(__pre.stackRestore);
 		assert.ok(__pre.stackAlloc);
@@ -151,7 +149,7 @@ suite("binaryen", () => {
 
 	test(".Feature", () => {
 		// NOTE: the length is twice the number of members due to how TypeScript emits enums.
-		assert.strictEqual(Object.entries(binaryen.Feature).length, 52);
+		assert.strictEqual(Object.entries(binaryen.Feature).length, 54);
 
 		assert.strictEqual(binaryen.Feature.MVP, 0);
 		assert.strictEqual(binaryen.Feature.Atomics, 1 << 0);
@@ -182,7 +180,8 @@ suite("binaryen", () => {
 		// @ts-expect-error
 		assert.strictEqual(binaryen.Feature.Multibyte, undefined); assert.notStrictEqual(binaryen.Feature.Multibyte, 1 << 24);
 		assert.strictEqual(binaryen.Feature.WideArithmetic, 1 << 25);
-		assert.strictEqual(binaryen.Feature.All, (1 << 26) - 1);
+		assert.strictEqual(binaryen.Feature.CompactImports, 1 << 26);
+		assert.strictEqual(binaryen.Feature.All, (1 << 27) - 1);
 	});
 
 

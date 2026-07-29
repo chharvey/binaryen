@@ -25,7 +25,7 @@ BINARYEN_CORES=1 BINARYEN_PASS_DEBUG=1 afl-fuzz -i afl-testcases/ -o afl-finding
 script covers different options being passed)
 """
 
-# ruff: noqa: COM819, ARG002
+# ruff: file-ignore[prohibited-trailing-comma, unused-method-argument]
 
 import contextlib
 import difflib
@@ -52,8 +52,8 @@ assert sys.version_info >= (3, 10), 'requires Python 3.10'
 # parameters
 
 # feature options that are always passed to the tools.
-# XXX fp16 is not yet stable, remove from here when it is
-CONSTANT_FEATURE_OPTS = ['--all-features', '--disable-fp16']
+# XXX fp16 and multibyte are not yet stable, remove from here when they are.
+CONSTANT_FEATURE_OPTS = ['--all-features', '--disable-fp16', '--disable-multibyte']
 
 INPUT_SIZE_MIN = 1024
 INPUT_SIZE_MEAN = 40 * 1024
@@ -228,18 +228,6 @@ def randomize_fuzz_settings():
         GEN_ARGS += ['--legalize-and-prune-js-interface']
     else:
         LEGALIZE = False
-
-    # if GC is enabled then run --dce at the very end, to ensure that our
-    # binaries validate in other VMs, due to how non-nullable local validation
-    # and unreachable code interact. see
-    #   https://github.com/WebAssembly/binaryen/pull/5665
-    #   https://github.com/WebAssembly/binaryen/issues/5599
-    if '--disable-gc' not in FEATURE_OPTS:
-        GEN_ARGS += ['--dce']
-
-        # Add --dce not only when generating the original wasm but to the
-        # optimizations we use to create any other wasm file.
-        FUZZ_OPTS += ['--dce']
 
     if CLOSED_WORLD:
         GEN_ARGS += [CLOSED_WORLD_FLAG]
@@ -450,13 +438,6 @@ FUZZ_EXEC_EXPORT_PREFIX = '[fuzz-exec] export'
 # --fuzz-exec reports a stack limit using this notation
 STACK_LIMIT = '[trap stack limit]'
 
-# V8 reports this error in rare cases due to limitations in our handling of non-
-# nullable locals in unreachable code, see
-#   https://github.com/WebAssembly/binaryen/pull/5665
-#   https://github.com/WebAssembly/binaryen/issues/5599
-# and also see the --dce workaround below that also links to those issues.
-V8_UNINITIALIZED_NONDEF_LOCAL = 'uninitialized non-defaultable local'
-
 # JS exceptions are logged as exception thrown: REASON
 EXCEPTION_PREFIX = 'exception thrown: '
 
@@ -655,8 +636,6 @@ def run_vm(cmd, checked=True):
             # strings in this list for known issues (to which more need to be
             # added as necessary).
             HOST_LIMIT_PREFIX,
-            # see comment above on this constant
-            V8_UNINITIALIZED_NONDEF_LOCAL,
             # V8 does not accept nullable stringviews
             # (https://github.com/WebAssembly/binaryen/pull/6574)
             'expected (ref stringview_wtf16), got nullref',
@@ -1170,7 +1149,7 @@ class Wasm2JS(TestCaseHandler):
             # of the wrong type - which would be cast on use, but if we remove
             # the casts, we end up returning null here and not 0, which the
             # fuzzer can notice.
-            x = re.sub(r' null', ' 0', x)
+            x = x.replace(r' null', ' 0')
 
             # wasm2js converts exports to valid JS forms, which affects some of
             # the names in the test suite. Fix those up.
@@ -2138,8 +2117,8 @@ class Two(TestCaseHandler):
                 assert b.startswith(FUZZ_EXEC_NOTE_RESULT)
                 assert a.count(' => ') == 1
                 assert b.count(' => ') == 1
-                a_prefix, a_result = a.split(' => ')
-                b_prefix, b_result = b.split(' => ')
+                a_prefix, _a_result = a.split(' => ')
+                _b_prefix, b_result = b.split(' => ')
                 # Copy a's prefix with b's result.
                 merged_output_lines[i] = a_prefix + ' => ' + b_result
 

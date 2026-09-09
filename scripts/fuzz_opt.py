@@ -76,6 +76,7 @@ DISALLOWED_FEATURES_IN_V8 = [
     'strings',
     'stack-switching',
     'multibyte',
+    'relaxed-atomics',
 ]
 
 
@@ -864,9 +865,11 @@ class D8:
 
     @override
     def can_compare_to_self(self):
-        # With nans, VM differences can confuse us, so only very simple VMs
-        # can compare to themselves after opts in that case.
-        return not NANS
+        # With nans or relaxed SIMD, VM differences can confuse us, including
+        # differences between binaryen and V8 (binaryen's behavior can get
+        # "baked" into the wasm when it precomputes code, so we cannot compare
+        # V8's output before binaryen opts and after binaryen opts).
+        return not NANS and all_disallowed(['relaxed-simd'])
 
     @override
     def can_compare_to_other(self, other):
@@ -919,7 +922,7 @@ class Wasm2C:
         if random.random() < 0.5:
             return False
         # wasm2c doesn't support most features
-        return all_disallowed(['exception-handling', 'simd', 'threads', 'bulk-memory', 'nontrapping-float-to-int', 'tail-call', 'sign-ext', 'reference-types', 'multivalue', 'gc', 'custom-descriptors', 'relaxed-atomics', 'wide-arithmetic'])
+        return all_disallowed(['exception-handling', 'simd', 'threads', 'bulk-memory', 'nontrapping-float-to-int', 'tail-call', 'sign-ext', 'reference-types', 'multivalue', 'gc', 'custom-descriptors', 'acquire-release-atomics', 'relaxed-atomics', 'wide-arithmetic'])
 
     @override
     def run(self, wasm):
@@ -1005,7 +1008,7 @@ class CompareVMs(TestCaseHandler):
                     D8(),
                     D8Liftoff(),
                     D8Turboshaft(),
-                    # FIXME: Temprorary disable. See issue #4741 for more details
+                    # FIXME: Temporary disable. See issue #4741 for more details
                     # Wasm2C(),
                     # Wasm2C2Wasm()
                     ]
@@ -1250,7 +1253,7 @@ class Wasm2JS(TestCaseHandler):
         # implement wasm suspending using JS async/await.
         if JSPI:
             return False
-        return all_disallowed(['exception-handling', 'simd', 'threads', 'bulk-memory', 'nontrapping-float-to-int', 'tail-call', 'sign-ext', 'reference-types', 'multivalue', 'gc', 'multimemory', 'memory64', 'custom-descriptors', 'relaxed-atomics', 'wide-arithmetic'])
+        return all_disallowed(['exception-handling', 'simd', 'threads', 'tail-call', 'reference-types', 'multivalue', 'gc', 'multimemory', 'memory64', 'custom-descriptors', 'acquire-release-atomics', 'relaxed-atomics', 'wide-arithmetic'])
 
 
 # Returns the wat for a wasm file. If it is already wat, it just returns that
@@ -1369,7 +1372,7 @@ class TrapsNeverHappen(TestCaseHandler):
             # "[fuzz-exec] export bar".
             call_start = before.rfind(FUZZ_EXEC_EXPORT_PREFIX, 0, trap_index)
             if call_start < 0:
-                # the trap happened before we called an export, so it occured
+                # the trap happened before we called an export, so it occurred
                 # during startup (the start function, or memory segment
                 # operations, etc.). in that case there is nothing for us to
                 # compare here; just leave.
@@ -2048,10 +2051,11 @@ class Two(TestCaseHandler):
         compare(output, optimized_output, 'Two-Opt')
 
         # If we can, also test in V8. We also cannot compare if there are NaNs
-        # (as optimizations can lead to different outputs), and we must
-        # disallow some features.
+        # or relaxed SIMD (as binaryen optimizations can lead to different
+        # outputs from V8), and we must disallow features that don't even work
+        # in V8.
         # TODO: relax some of these
-        if NANS or not all_disallowed(DISALLOWED_FEATURES_IN_V8):
+        if NANS or not all_disallowed(['relaxed-simd']) or not all_disallowed(DISALLOWED_FEATURES_IN_V8):
             return
 
         output = run_d8_wasm(wasm, args=[second_wasm])
@@ -2571,7 +2575,7 @@ testcase_handlers = [
     TrapsNeverHappen(),
     CtorEval(),
     Merge(),
-#    Split(), # Will reenable after stabilized
+#    Split(), # Will re-enable after stabilized
     RoundtripText(),
     ClusterFuzz(),
     Two(),
@@ -2687,6 +2691,7 @@ opt_choices = [
     ("--code-pushing",),
     ("--code-folding",),
     ("--const-hoisting",),
+    ("--constraint-analysis",),
     ("--dae",),
     ("--dae-optimizing",),
     ("--dae2",),

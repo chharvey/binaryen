@@ -280,6 +280,9 @@ void PassRegistry::registerPasses() {
   registerPass("limit-segments",
                "attempt to merge segments to fit within web limits",
                createLimitSegmentsPass);
+  registerPass("make-shared-objects",
+               "Make structs and arrays shared and functions unshared",
+               createMakeSharedObjectsPass);
   registerPass("mark-js-called",
                "mark js called functions (using configureAll) as doing so",
                createMarkJSCalledPass);
@@ -300,7 +303,7 @@ void PassRegistry::registerPasses() {
   registerPass(
     "merge-blocks", "merges blocks to their parents", createMergeBlocksPass);
   registerPass("merge-similar-functions",
-               "merges similar functions when benefical",
+               "merges similar functions when beneficial",
                createMergeSimilarFunctionsPass);
   registerPass(
     "merge-locals", "merges locals when beneficial", createMergeLocalsPass);
@@ -737,7 +740,10 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
     "remove-unused-brs"); // coalesce-locals opens opportunities
   addIfNoDWARFIssues(
     "remove-unused-names");           // remove-unused-brs opens opportunities
-  addIfNoDWARFIssues("merge-blocks"); // clean up remove-unused-brs new blocks
+  if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
+    addIfNoDWARFIssues("constraint-analysis");
+  }
+  addIfNoDWARFIssues("merge-blocks"); // clean up new blocks from last passes
   // late propagation
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 2) {
     addIfNoDWARFIssues("precompute-propagate");

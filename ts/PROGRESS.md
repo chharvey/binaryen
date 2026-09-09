@@ -90,7 +90,9 @@ Add to this checklist as the JS is updated; check when migrated to TS.
 | `br_on_null`            | line 2541 | generic.ts           | [x] | [x] | [ ] |
 | `br_on_cast`            |           | generic.ts           | [x] | [x] | [ ] |
 | `br_on_cast_fail`       |           | generic.ts           | [x] | [x] | [ ] |
-| `struct`                | line 2557 | aggregate.ts         | [x] | [x] | [ ] |
+| `struct`                | line 2583 | aggregate.ts         | [x] | [x] | [ ] |
+| `waitqueue`             |           | aggregate.ts         | [x] | [x] | [ ] |
+| `publish`               |           | aggregate.ts         | [x] | [x] | [ ] |
 | `array`                 |           | aggregate.ts         | [x] | [x] | [ ] |
 | `string`                |           | string.ts            | [x] | [x] | [ ] |
 
@@ -210,7 +212,6 @@ Add to this checklist as the JS is updated; check when migrated to TS.
 | ------------------------------------ | --------- | ------------------ | ---- | ------------ | ----- |
 | `emitText`                           | line 3307 | globals.ts         | [x] | [x] | [ ] |
 | `readBinary`                         | line 3358 | globals.ts         | [x] | [x] | [ ] |
-| `readBinaryWithFeatures`             |           | globals.ts         | [x] | [x] | [ ] |
 | `parseText`                          |           | globals.ts         | [x] | [x] | [ ] |
 | `getOptimizeLevel`                   | line 3384 | SettingsService.ts | [x] | [x] | [ ] |
 | `setOptimizeLevel`                   |           | SettingsService.ts | [x] | [x] | [ ] |
@@ -305,6 +306,10 @@ Add to this checklist as the JS is updated; check when migrated to TS.
 | `StructNew`         |           | aggregates.ts   | [x] | [x] | [ ] |
 | `StructGet`         |           | aggregates.ts   | [x] | [x] | [ ] |
 | `StructSet`         |           | aggregates.ts   | [x] | [x] | [ ] |
+| `StructWait`        |           | aggregates.ts   | [x] | [x] | [ ] |
+| `WaitqueueNew`      |           | aggregates.ts   | [x] | [x] | [ ] |
+| `WaitqueueNotify`   |           | aggregates.ts   | [x] | [x] | [ ] |
+| `Publish`           |           | aggregates.ts   | [x] | [x] | [ ] |
 | `ArrayNew`          |           | aggregates.ts   | [x] | [x] | [ ] |
 | `ArrayNewFixed`     |           | aggregates.ts   | [x] | [x] | [ ] |
 | `ArrayNewData`      |           | aggregates.ts   | [x] | [x] | [ ] |

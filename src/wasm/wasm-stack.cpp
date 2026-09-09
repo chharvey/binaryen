@@ -2755,6 +2755,11 @@ void BinaryInstWriter::visitWaitqueueNotify(WaitqueueNotify* curr) {
     << U32LEB(BinaryConsts::WaitqueueNotify);
 }
 
+void BinaryInstWriter::visitPublish(Publish* curr) {
+  o << static_cast<int8_t>(BinaryConsts::AtomicPrefix)
+    << U32LEB(BinaryConsts::Publish);
+}
+
 void BinaryInstWriter::visitArrayNew(ArrayNew* curr) {
   o << static_cast<int8_t>(BinaryConsts::GCPrefix);
   if (curr->isWithDefault()) {
@@ -3541,7 +3546,8 @@ void BinaryInstWriter::emitMemoryAccess(size_t alignment,
     case MemoryOrder::Unordered:
     case MemoryOrder::SeqCst:
       break;
-    case MemoryOrder::AcqRel: {
+    case MemoryOrder::AcqRel:
+    case MemoryOrder::Relaxed: {
       shouldWriteMemoryOrder = true;
       alignmentBits |= BinaryConsts::HasMemoryOrderMask;
       break;

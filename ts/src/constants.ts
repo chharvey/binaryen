@@ -74,6 +74,32 @@ export const f64: Type = BinaryenObj["_BinaryenTypeFloat64"]() as Type;
 /** 128-bit vector (SIMD). */
 export const v128: Type = BinaryenObj["_BinaryenTypeVec128"]() as Type;
 
+// ### Heap Types ### //
+/** Heap type `any`. */
+export const any: HeapType = BinaryenObj["_BinaryenHeapTypeAny"]() as HeapType;
+/** Heap type `eq`. */
+export const eq: HeapType = BinaryenObj["_BinaryenHeapTypeEq"]() as HeapType;
+/** Heap type `i31`. */
+export const i31: HeapType = BinaryenObj["_BinaryenHeapTypeI31"]() as HeapType;
+/** Heap type `struct`. */
+export const struct: HeapType = BinaryenObj["_BinaryenHeapTypeStruct"]() as HeapType;
+/** Heap type `array`. */
+export const array: HeapType = BinaryenObj["_BinaryenHeapTypeArray"]() as HeapType;
+/** Heap type `none`. */
+// export const none: HeapType = BinaryenObj["_BinaryenHeapTypeNone"]() as HeapType; // TODO: reconcile with the `none` type above, defined as `BinaryenObj["_BinaryenTypeNone"]()`
+/** Heap type `func`. */
+export const func: HeapType = BinaryenObj["_BinaryenHeapTypeFunc"]() as HeapType;
+/** Heap type `exn`. */
+// export const exn: HeapType = BinaryenObj["_BinaryenHeapTypeExn"]() as HeapType; // TODO: uncomment once supported in Binaryen
+/** Heap type `extern`. */
+export const extern: HeapType = BinaryenObj["_BinaryenHeapTypeExt"]() as HeapType;
+/** Heap type `nofunc`. */
+export const nofunc: HeapType = BinaryenObj["_BinaryenHeapTypeNofunc"]() as HeapType;
+/** Heap type `noexn`. */
+// export const noexn: HeapType = BinaryenObj["_BinaryenHeapTypeNoexn"]() as HeapType; // TODO: uncomment once supported in Binaryen
+/** Heap type `noextern`. */
+export const noextern: HeapType = BinaryenObj["_BinaryenHeapTypeNoext"]() as HeapType;
+
 // ### Reference Types ### //
 /** `(ref null any)` */
 export const anyref: Type = BinaryenObj["_BinaryenTypeAnyref"]() as Type;
@@ -85,14 +111,14 @@ export const i31ref: Type = BinaryenObj["_BinaryenTypeI31ref"]() as Type;
 export const structref: Type = BinaryenObj["_BinaryenTypeStructref"]() as Type;
 /** `(ref null array)` */
 export const arrayref: Type = BinaryenObj["_BinaryenTypeArrayref"]() as Type;
+/** `(ref null none)` */
+export const nullref: Type = BinaryenObj["_BinaryenTypeNullref"]() as Type;
 /** `(ref null func)` */
 export const funcref: Type = BinaryenObj["_BinaryenTypeFuncref"]() as Type;
 /** `(ref null exn)` */
 // export const exnref: Type = BinaryenObj["_BinaryenTypeExnref"]() as Type; // TODO: uncomment once supported in Binaryen
 /** `(ref null extern)` */
 export const externref: Type = BinaryenObj["_BinaryenTypeExternref"]() as Type;
-/** `(ref null none)` */
-export const nullref: Type = BinaryenObj["_BinaryenTypeNullref"]() as Type;
 /** `(ref null nofunc)` */
 export const nullfuncref: Type = BinaryenObj["_BinaryenTypeNullFuncref"]() as Type;
 /** `(ref null noexn)` */
@@ -107,6 +133,8 @@ export const i16: PackedType = BinaryenObj["_BinaryenPackedTypeInt16"]() as Pack
 
 // ### Proposed Types ### //
 // These types are not yet in the WASM spec. Move them to their respective sections once finalized.
+/** Heap type `string`. */
+export const string: HeapType = BinaryenObj["_BinaryenHeapTypeString"]() as HeapType;
 /** `(ref null string)` */
 export const stringref: Type = BinaryenObj["_BinaryenTypeStringref"]() as Type;
 
@@ -193,6 +221,10 @@ export enum ExpressionId {
 	StructSet = BinaryenObj["_BinaryenStructSetId"](),
 	// TODO: StructRMW
 	// TODO: StructCmpxchg
+	StructWait = BinaryenObj["_BinaryenStructWaitId"](),
+	WaitqueueNew = BinaryenObj["_BinaryenWaitqueueNewId"](),
+	WaitqueueNotify = BinaryenObj["_BinaryenWaitqueueNotifyId"](),
+	Publish = BinaryenObj["_BinaryenPublishId"](),
 	ArrayNew = BinaryenObj["_BinaryenArrayNewId"](),
 	ArrayNewFixed = BinaryenObj["_BinaryenArrayNewFixedId"](),
 	ArrayNewData = BinaryenObj["_BinaryenArrayNewDataId"](),
@@ -261,6 +293,7 @@ export enum SideEffect {
 	Throws = BinaryenObj["_BinaryenSideEffectThrows"](),
 	DanglingPop = BinaryenObj["_BinaryenSideEffectDanglingPop"](),
 	TrapsNeverHappen = BinaryenObj["_BinaryenSideEffectTrapsNeverHappen"](),
+	Suspends = BinaryenObj["_BinaryenSideEffectSuspends"](),
 	Any = BinaryenObj["_BinaryenSideEffectAny"](),
 }
 
@@ -758,6 +791,7 @@ export enum Operation {
  */
 export enum MemoryOrder {
 	Unordered = BinaryenObj["_BinaryenMemoryOrderUnordered"](),
-	SeqCst = BinaryenObj["_BinaryenMemoryOrderSeqCst"](),
+	Relaxed = BinaryenObj["_BinaryenMemoryOrderRelaxed"](),
 	AcqRel = BinaryenObj["_BinaryenMemoryOrderAcqRel"](),
+	SeqCst = BinaryenObj["_BinaryenMemoryOrderSeqCst"](),
 }

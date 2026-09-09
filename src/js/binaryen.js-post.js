@@ -52,6 +52,26 @@ function initializeConstants() {
     Module[entry[0]] = Module['_BinaryenType' + entry[1]]();
   });
 
+  [
+    ['func', 'Func'],
+    ['extern', 'Ext'],
+    ['any', 'Any'],
+    ['eq', 'Eq'],
+    ['i31', 'I31'],
+    ['struct', 'Struct'],
+    ['array', 'Array'],
+    ['string', 'String'],
+    /*
+    TODO: Reconcile with `none` above (line 32).
+    Maybe keep this as 'none' and change the above to 'void'?
+    ['none', 'None'],
+    */
+    ['noextern', 'Noext'],
+    ['nofunc', 'Nofunc'],
+  ].forEach(entry => {
+    Module[entry[0]] = Module['_BinaryenHeapType' + entry[1]]();
+  });
+
   [ ['notPacked', 'NotPacked'],
     ['i8', 'Int8'],
     ['i16', 'Int16']
@@ -124,6 +144,10 @@ function initializeConstants() {
     'StructNew',
     'StructGet',
     'StructSet',
+    'StructWait',
+    'WaitqueueNew',
+    'WaitqueueNotify',
+    'Publish',
     'ArrayNew',
     'ArrayNewFixed',
     'ArrayNewData',
@@ -162,8 +186,9 @@ function initializeConstants() {
   // MemoryOrder for atomic operations
   Module['MemoryOrder'] = {};
   [ 'Unordered',
-    'SeqCst',
-    'AcqRel'
+    'Relaxed',
+    'AcqRel',
+    'SeqCst'
    ].forEach(name => {
     Module['MemoryOrder'][name.toLowerCase()] = Module['_BinaryenMemoryOrder' + name]()
    });
@@ -192,10 +217,11 @@ function initializeConstants() {
     'FP16',
     'BulkMemoryOpt',
     'CallIndirectOverlong',
-    'RelaxedAtomics',
+    'AcquireReleaseAtomics',
     'CustomPageSizes',
     'WideArithmetic',
     'CompactImports',
+    'RelaxedAtomics',
     'All'
   ].forEach(name => {
     Module['Features'][name] = Module['_BinaryenFeature' + name]();
@@ -641,6 +667,7 @@ function initializeConstants() {
     'Throws',
     'DanglingPop',
     'TrapsNeverHappen',
+    'Suspends',
     'Any'
   ].forEach(name => {
     Module['SideEffects'][name] = Module['_BinaryenSideEffect' + name]();
@@ -2438,8 +2465,8 @@ function wrapModule(module, self = {}) {
   };
 
   self['ref'] = {
-    'null'(type) {
-      return Module['_BinaryenRefNull'](module, type);
+    'null'(heaptype) {
+      return Module['_BinaryenRefNull'](module, heaptype);
     },
     'is_null'(value) {
       return Module['_BinaryenRefIsNull'](module, value);
@@ -2569,7 +2596,23 @@ function wrapModule(module, self = {}) {
     },
     'set'(index, ref, value) {
       return Module['_BinaryenStructSet'](module, index, ref, value);
+    },
+    'wait'(ref, index, expected, timeout, waitqueue) {
+      return Module['_BinaryenStructWait'](module, ref, index, expected, timeout, waitqueue);
     }
+  };
+
+  self['waitqueue'] = {
+    'new'() {
+      return Module['_BinaryenWaitqueueNew'](module);
+    },
+    'notify'(waitqueue, count) {
+      return Module['_BinaryenWaitqueueNotify'](module, waitqueue, count);
+    }
+  };
+
+  self['publish'] = function(ref) {
+    return Module['_BinaryenPublish'](module, ref);
   };
 
   self['array'] = {
@@ -3368,30 +3411,23 @@ function handleFatalError(func) {
   }
 }
 
-// Parses a binary to a module
-
 // If building with Emscripten ASSERTIONS, there is a property added to
 // Module to guard against users mistakening using the removed readBinary()
 // API. We must defuse that carefully.
 Object.defineProperty(Module, 'readBinary', { writable: true });
 
-Module['readBinary'] = function(data) {
+// Parses a binary to a module with the given feature set enabled. `features` defaults to MVP.
+Module['readBinary'] = function(data, features) {
   const buffer = _malloc(data.length);
   HEAP8.set(data, buffer);
-  const ptr = handleFatalError(() => Module['_BinaryenModuleRead'](buffer, data.length));
+  const ptr = features === undefined
+    ? handleFatalError(() => Module['_BinaryenModuleRead'](buffer, data.length))
+    : handleFatalError(() => Module['_BinaryenModuleReadWithFeatures'](buffer, data.length, features));
   _free(buffer);
   return wrapModule(ptr);
 };
 
-Module['readBinaryWithFeatures'] = function(data, features) {
-  const buffer = _malloc(data.length);
-  HEAP8.set(data, buffer);
-  const ptr = handleFatalError(() => Module['_BinaryenModuleReadWithFeatures'](buffer, data.length, features));
-  _free(buffer);
-  return wrapModule(ptr);
-};
-
-// Parses text format to a module with the given feature set enabled.
+// Parses text format to a module with the given feature set enabled. `features` defaults to MVP.
 Module['parseText'] = function(text, features) {
   const buffer = _malloc(text.length + 1);
   stringToAscii(text, buffer);
@@ -4911,6 +4947,65 @@ Module['StructSet'] = makeExpressionWrapper(Module['_BinaryenStructSetId'](), {
   },
   'setValue'(expr, value) {
     Module['_BinaryenStructSetSetValue'](expr, value);
+  }
+});
+
+Module['StructWait'] = makeExpressionWrapper(Module['_BinaryenStructWaitId'](), {
+  'getRef'(expr) {
+    return Module['_BinaryenStructWaitGetRef'](expr);
+  },
+  'setRef'(expr, ref) {
+    Module['_BinaryenStructWaitSetRef'](expr, ref);
+  },
+  'getIndex'(expr) {
+    return Module['_BinaryenStructWaitGetIndex'](expr);
+  },
+  'setIndex'(expr, index) {
+    Module['_BinaryenStructWaitSetIndex'](expr, index);
+  },
+  'getExpected'(expr) {
+    return Module['_BinaryenStructWaitGetExpected'](expr);
+  },
+  'setExpected'(expr, expectedExpr) {
+    Module['_BinaryenStructWaitSetExpected'](expr, expectedExpr);
+  },
+  'getTimeout'(expr) {
+    return Module['_BinaryenStructWaitGetTimeout'](expr);
+  },
+  'setTimeout'(expr, timeoutExpr) {
+    Module['_BinaryenStructWaitSetTimeout'](expr, timeoutExpr);
+  },
+  'getWaitqueue'(expr) {
+    return Module['_BinaryenStructWaitGetWaitqueue'](expr);
+  },
+  'setWaitqueue'(expr, waitqueueExpr) {
+    Module['_BinaryenStructWaitSetWaitqueue'](expr, waitqueueExpr);
+  }
+});
+
+Module['WaitqueueNew'] = makeExpressionWrapper(Module['_BinaryenWaitqueueNewId'](), {});
+
+Module['WaitqueueNotify'] = makeExpressionWrapper(Module['_BinaryenWaitqueueNotifyId'](), {
+  'getWaitqueue'(expr) {
+    return Module['_BinaryenWaitqueueNotifyGetWaitqueue'](expr);
+  },
+  'setWaitqueue'(expr, waitqueueExpr) {
+    Module['_BinaryenWaitqueueNotifySetWaitqueue'](expr, waitqueueExpr);
+  },
+  'getCount'(expr) {
+    return Module['_BinaryenWaitqueueNotifyGetCount'](expr);
+  },
+  'setCount'(expr, countExpr) {
+    Module['_BinaryenWaitqueueNotifySetCount'](expr, countExpr);
+  }
+});
+
+Module['Publish'] = makeExpressionWrapper(Module['_BinaryenPublishId'](), {
+  'getRef'(expr) {
+    return Module['_BinaryenPublishGetRef'](expr);
+  },
+  'setRef'(expr, refExpr) {
+    Module['_BinaryenPublishSetRef'](expr, refExpr);
   }
 });
 

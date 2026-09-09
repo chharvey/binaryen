@@ -1324,7 +1324,7 @@
 
   ;; CHECK:      (func $br_on_cast_desc_eq_fail-trap-on-null (type $7) (param $ref (ref null $struct)) (param $desc (ref null (exact $desc)))
   ;; CHECK-NEXT:  (drop
-  ;; CHECK-NEXT:   (block $l (result (ref null $struct))
+  ;; CHECK-NEXT:   (block $l (result (ref none))
   ;; CHECK-NEXT:    (drop
   ;; CHECK-NEXT:     (block
   ;; CHECK-NEXT:      (drop
@@ -1349,7 +1349,7 @@
   ;; CHECK-NEXT: )
   ;; NTRAP:      (func $br_on_cast_desc_eq_fail-trap-on-null (type $7) (param $ref (ref null $struct)) (param $desc (ref null (exact $desc)))
   ;; NTRAP-NEXT:  (drop
-  ;; NTRAP-NEXT:   (block $l (result (ref null $struct))
+  ;; NTRAP-NEXT:   (block $l (result (ref none))
   ;; NTRAP-NEXT:    (drop
   ;; NTRAP-NEXT:     (block
   ;; NTRAP-NEXT:      (drop
@@ -1456,6 +1456,74 @@
           (local.get $null)
         )
         (struct.new $desc)
+      )
+    )
+  )
+
+  ;; CHECK:      (func $ref.cast_desc_eq-ref.cast (type $22) (param $x anyref)
+  ;; CHECK-NEXT:  (drop
+  ;; CHECK-NEXT:   (ref.cast_desc_eq (ref $struct)
+  ;; CHECK-NEXT:    (ref.cast (ref $struct)
+  ;; CHECK-NEXT:     (local.get $x)
+  ;; CHECK-NEXT:    )
+  ;; CHECK-NEXT:    (block (result (ref null $desc))
+  ;; CHECK-NEXT:     (return)
+  ;; CHECK-NEXT:    )
+  ;; CHECK-NEXT:   )
+  ;; CHECK-NEXT:  )
+  ;; CHECK-NEXT:  (drop
+  ;; CHECK-NEXT:   (ref.cast_desc_eq (ref (exact $struct))
+  ;; CHECK-NEXT:    (local.get $x)
+  ;; CHECK-NEXT:    (struct.new_default $desc)
+  ;; CHECK-NEXT:   )
+  ;; CHECK-NEXT:  )
+  ;; CHECK-NEXT: )
+  ;; NTRAP:      (func $ref.cast_desc_eq-ref.cast (type $22) (param $x anyref)
+  ;; NTRAP-NEXT:  (local $1 (ref $struct))
+  ;; NTRAP-NEXT:  (local $2 (ref null $desc))
+  ;; NTRAP-NEXT:  (drop
+  ;; NTRAP-NEXT:   (block (result (ref $struct))
+  ;; NTRAP-NEXT:    (local.set $1
+  ;; NTRAP-NEXT:     (ref.cast (ref $struct)
+  ;; NTRAP-NEXT:      (local.get $x)
+  ;; NTRAP-NEXT:     )
+  ;; NTRAP-NEXT:    )
+  ;; NTRAP-NEXT:    (local.set $2
+  ;; NTRAP-NEXT:     (block (result (ref null $desc))
+  ;; NTRAP-NEXT:      (return)
+  ;; NTRAP-NEXT:     )
+  ;; NTRAP-NEXT:    )
+  ;; NTRAP-NEXT:    (local.get $1)
+  ;; NTRAP-NEXT:   )
+  ;; NTRAP-NEXT:  )
+  ;; NTRAP-NEXT:  (drop
+  ;; NTRAP-NEXT:   (ref.cast_desc_eq (ref (exact $struct))
+  ;; NTRAP-NEXT:    (local.get $x)
+  ;; NTRAP-NEXT:    (struct.new_default $desc)
+  ;; NTRAP-NEXT:   )
+  ;; NTRAP-NEXT:  )
+  ;; NTRAP-NEXT: )
+  (func $ref.cast_desc_eq-ref.cast (param $x anyref)
+    ;; As above with ref.as_non_null, removing the inner ref.cast would allow
+    ;; reaching the return before the cast check, so we do not optimize. (In
+    ;; NTRAP mode we end up removing the outer cast, separately.)
+    (drop
+      (ref.cast_desc_eq (ref $struct)
+        (ref.cast (ref $struct)
+          (local.get $x)
+        )
+        (block (result (ref null $desc))
+          (return)
+        )
+      )
+    )
+    ;; Without dangerous effects we can remove the inner cast.
+    (drop
+      (ref.cast_desc_eq (ref $struct)
+        (ref.cast (ref $struct)
+          (local.get $x)
+        )
+        (struct.new $desc)  ;; this has no effects
       )
     )
   )

@@ -1360,7 +1360,7 @@ struct PrintExpressionContents
         o << "f16x8.demote_f64x2_zero";
         break;
       case InvalidUnary:
-        WASM_UNREACHABLE("unvalid unary operator");
+        WASM_UNREACHABLE("invalid unary operator");
     }
     restoreNormalColor(o);
   }
@@ -2033,7 +2033,7 @@ struct PrintExpressionContents
         break;
 
       case InvalidBinary:
-        WASM_UNREACHABLE("unvalid binary operator");
+        WASM_UNREACHABLE("invalid binary operator");
     }
     restoreNormalColor(o);
   }
@@ -2329,6 +2329,9 @@ struct PrintExpressionContents
       case MemoryOrder::AcqRel:
         o << " acqrel";
         break;
+      case MemoryOrder::Relaxed:
+        o << " relaxed";
+        break;
     }
   }
 
@@ -2405,6 +2408,7 @@ struct PrintExpressionContents
   void visitWaitqueueNotify(WaitqueueNotify* curr) {
     printMedium(o, "waitqueue.notify");
   }
+  void visitPublish(Publish* curr) { printMedium(o, "publish"); }
   void visitArrayNew(ArrayNew* curr) {
     printMedium(o, "array.new");
     if (curr->isWithDefault()) {
@@ -3881,13 +3885,13 @@ static std::ostream& printStackIR(StackIR* ir, PrintSExpression& printer) {
     }
     switch (inst->op) {
       case StackInst::Basic: {
-        doIndent();
         // Pop is a pseudo instruction and should not be printed in the stack IR
         // format to make it valid wat form.
         if (inst->origin->is<Pop>()) {
-          break;
+          continue;
         }
 
+        doIndent();
         PrintExpressionContents(printer).visit(inst->origin);
         break;
       }
@@ -4041,6 +4045,9 @@ std::ostream& operator<<(std::ostream& os, wasm::MemoryOrder mo) {
   switch (mo) {
     case wasm::MemoryOrder::Unordered:
       os << "Unordered";
+      break;
+    case wasm::MemoryOrder::Relaxed:
+      os << "Relaxed";
       break;
     case wasm::MemoryOrder::SeqCst:
       os << "SeqCst";

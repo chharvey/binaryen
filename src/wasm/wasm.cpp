@@ -76,11 +76,12 @@ const char* FP16Feature = "fp16";
 const char* BulkMemoryOptFeature = "bulk-memory-opt";
 const char* CallIndirectOverlongFeature = "call-indirect-overlong";
 const char* CustomDescriptorsFeature = "custom-descriptors";
-const char* RelaxedAtomicsFeature = "relaxed-atomics";
+const char* AcquireReleaseAtomicsFeature = "acquire-release-atomics";
 const char* MultibyteFeature = "multibyte";
 const char* CustomPageSizesFeature = "custom-page-sizes";
 const char* WideArithmeticFeature = "wide-arithmetic";
 const char* CompactImportsFeature = "compact-imports";
+const char* RelaxedAtomicsFeature = "relaxed-atomics";
 
 } // namespace BinaryConsts::CustomSections
 
@@ -1212,6 +1213,10 @@ void BrOn::finalize() {
       if (castType.isNullable()) {
         // Nulls take the branch, so the result is non-nullable.
         type = ref->type.with(NonNullable);
+      } else if (desc && desc->type.isNull()) {
+        // Cast will never be executed and the instruction will not be emitted.
+        // Model this with an uninhabitable result type.
+        type = desc->type.with(NonNullable);
       } else {
         // Nulls do not take the branch, so the result is non-nullable only if
         // the input is.
@@ -1259,6 +1264,11 @@ Type BrOn::getSentType() {
       // The same as the result type of br_on_cast (if reachable).
       if (ref->type == Type::unreachable) {
         return Type::unreachable;
+      }
+      if (desc && desc->type.isNull()) {
+        // Cast will never be executed and the branch will not be taken.
+        // Model this with an uninhabitable sent type.
+        return desc->type.with(NonNullable);
       }
       if (castType.isNullable()) {
         return ref->type.with(NonNullable);
@@ -1346,6 +1356,8 @@ void WaitqueueNotify::finalize() {
     type = Type::i32;
   }
 }
+
+void Publish::finalize() { type = ref->type; }
 
 void ArrayNew::finalize() {
   if (size->type == Type::unreachable ||

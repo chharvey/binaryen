@@ -100,10 +100,11 @@ function test_features() {
   console.log("Features.ExtendedConst: " + binaryen.Features.ExtendedConst);
   console.log("Features.Strings: " + binaryen.Features.Strings);
   console.log("Features.MultiMemory: " + binaryen.Features.MultiMemory);
-  console.log("Features.RelaxedAtomics: " + binaryen.Features.RelaxedAtomics);
+  console.log("Features.AcquireReleaseAtomics: " + binaryen.Features.AcquireReleaseAtomics);
   console.log("Features.CustomPageSizes: " + binaryen.Features.CustomPageSizes);
   console.log("Features.WideArithmetic: " + binaryen.Features.WideArithmetic);
   console.log("Features.CompactImports: " + binaryen.Features.CompactImports);
+  console.log("Features.RelaxedAtomics: " + binaryen.Features.RelaxedAtomics);
   console.log("Features.All: " + binaryen.Features.All);
 }
 
@@ -603,13 +604,13 @@ function test_core() {
     module.return_call_indirect("t0", makeInt32(2449), [ makeInt32(13), makeInt64(37, 0), makeFloat32(1.3), makeFloat64(3.7) ], iIfF, binaryen.i32),
 
     // Reference types
-    module.ref.is_null(module.ref.null(binaryen.externref)),
-    module.ref.is_null(module.ref.null(binaryen.funcref)),
+    module.ref.is_null(module.ref.null(binaryen.extern)),
+    module.ref.is_null(module.ref.null(binaryen.func)),
     module.ref.is_null(module.ref.func("foobar", foobarType)),
-    module.select(temp10, module.ref.null(binaryen.funcref), module.ref.func("foobar", foobarType)),
+    module.select(temp10, module.ref.null(binaryen.func), module.ref.func("foobar", foobarType)),
 
     // GC
-    module.ref.eq(module.ref.null(binaryen.eqref), module.ref.null(binaryen.eqref)),
+    module.ref.eq(module.ref.null(binaryen.eq), module.ref.null(binaryen.eq)),
 
     // Exception handling
     module.try(
@@ -1059,14 +1060,14 @@ function test_binaries_with_features() {
   binaryen.setDebugInfo(false);
   module.dispose();
 
-  module = binaryen.readBinaryWithFeatures(buffer, features);
+  module = binaryen.readBinary(buffer, features);
 
   assert(module.validate());
   console.log("module loaded from binary with features:");
   console.log(module.emitText());
   module.dispose();
 
-  module = binaryen.readBinaryWithFeatures(buffer, binaryen.Features.MVP);
+  module = binaryen.readBinary(buffer, binaryen.Features.MVP);
   assert(!module.validate());
   module.dispose();
 }
@@ -1295,7 +1296,7 @@ function test_relaxed_atomics() {
     fence,
   ], binaryen.auto);
 
-  module.addFunction("relaxed-atomics", binaryen.none, binaryen.none, [], body);
+  module.addFunction("acquire-release-atomics", binaryen.none, binaryen.none, [], body);
 
   console.log(module.emitText());
   module.dispose();

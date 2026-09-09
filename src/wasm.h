@@ -70,8 +70,9 @@ struct Address {
 
 enum class MemoryOrder : uint8_t {
   Unordered,
-  SeqCst,
+  Relaxed,
   AcqRel,
+  SeqCst,
 };
 
 enum class IRProfile { Normal, Poppy };
@@ -782,6 +783,7 @@ public:
     WideIntMulId,
     WaitqueueNewId,
     WaitqueueNotifyId,
+    PublishId,
     NumExpressionIds
   };
   Id _id;
@@ -1837,6 +1839,16 @@ public:
 
   Expression* waitqueue;
   Expression* count;
+
+  void finalize();
+};
+
+class Publish : public SpecificExpression<Expression::PublishId> {
+public:
+  Publish() = default;
+  Publish(MixedArena& allocator) : Publish() {}
+
+  Expression* ref;
 
   void finalize();
 };

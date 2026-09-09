@@ -808,14 +808,22 @@ struct TypeBuilder {
   // function.
   template<typename F> void copyHeapType(size_t i, HeapType type, F map) {
     assert(!type.isBasic());
+    // Supertypes, descriptor types, and described types cannot be basic heap
+    // types. Only set them if the mapping takes them to defined types.
     if (auto super = type.getDeclaredSuperType()) {
-      setSubType(i, map(*super));
+      if (auto mapped = map(*super); !mapped.isBasic()) {
+        setSubType(i, mapped);
+      }
     }
     if (auto desc = type.getDescriptorType()) {
-      setDescriptor(i, map(*desc));
+      if (auto mapped = map(*desc); !mapped.isBasic()) {
+        setDescriptor(i, mapped);
+      }
     }
     if (auto desc = type.getDescribedType()) {
-      setDescribed(i, map(*desc));
+      if (auto mapped = map(*desc); !mapped.isBasic()) {
+        setDescribed(i, mapped);
+      }
     }
     setOpen(i, type.isOpen());
     setShared(i, type.getShared());
@@ -825,8 +833,11 @@ struct TypeBuilder {
         return t;
       }
       assert(t.isRef());
-      return getTempRefType(
-        map(t.getHeapType()), t.getNullability(), t.getExactness());
+      auto mapped = map(t.getHeapType());
+      auto null = t.getNullability();
+      // References to basic heap types cannot be exact.
+      auto exact = mapped.isBasic() ? Inexact : t.getExactness();
+      return getTempRefType(mapped, null, exact);
     };
     auto copyType = [&](Type t) -> Type {
       if (t.isTuple()) {
@@ -899,6 +910,7 @@ struct TypeBuilder {
   void createRecGroup(size_t i, size_t length);
 
   void setOpen(size_t i, bool open = true);
+  bool isOpen(size_t i) const;
   void setShared(size_t i, Shareability share = Shared);
 
   enum class ErrorReasonKind {
@@ -936,6 +948,8 @@ struct TypeBuilder {
     InvalidUnsharedDescribes,
     // The custom descriptors feature is missing.
     RequiresCustomDescriptors,
+    // The descriptor and described types have mismatched finality.
+    MismatchedDescriptorFinality,
     // Two rec groups with different shapes would have the same shapes after
     // the binary writer generalizes refined types that use disabled features.
     RecGroupCollision,
@@ -1025,6 +1039,7 @@ struct TypeBuilder {
       builder.setOpen(index, open);
       return *this;
     }
+    bool isOpen() const { return builder.isOpen(index); }
     Entry& setShared(Shareability share = Shared) {
       builder.setShared(index, share);
       return *this;

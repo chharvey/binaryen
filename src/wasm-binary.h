@@ -476,11 +476,12 @@ extern const char* FP16Feature;
 extern const char* BulkMemoryOptFeature;
 extern const char* CallIndirectOverlongFeature;
 extern const char* CustomDescriptorsFeature;
-extern const char* RelaxedAtomicsFeature;
+extern const char* AcquireReleaseAtomicsFeature;
 extern const char* MultibyteFeature;
 extern const char* CustomPageSizesFeature;
 extern const char* WideArithmeticFeature;
 extern const char* CompactImportsFeature;
+extern const char* RelaxedAtomicsFeature;
 
 enum Subsection {
   NameModule = 0,
@@ -724,6 +725,7 @@ enum ASTNodes {
   StructWait = 0x05,
   WaitqueueNotify = 0x06,
   WaitqueueNew = 0x07,
+  Publish = 0x0f,
 
   I32AtomicLoad = 0x10,
   I64AtomicLoad = 0x11,
@@ -1234,6 +1236,7 @@ enum ASTNodes {
 
   OrderSeqCst = 0x0,
   OrderAcqRel = 0x1,
+  OrderRelaxed = 0x2,
   StructAtomicGet = 0x5c,
   StructAtomicGetS = 0x5d,
   StructAtomicGetU = 0x5e,

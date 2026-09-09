@@ -158,7 +158,7 @@ struct FunctionInfo {
   std::unordered_map<HeapType, ParamLocations> forwardedToIndirectParams;
 
   // Locations forwarded to this function's result. These locations will become
-  // used if the result turns out ot be used.
+  // used if the result turns out to be used.
   std::vector<Location> resultSources;
 
   // For each parameter of this function, the list of locations that will become
@@ -638,8 +638,12 @@ struct GraphBuilder : public WalkerPass<ExpressionStackWalker<GraphBuilder>> {
       HeapType rootType = getRootType(type);
       Location source = TypeResultLoc{rootType};
       if (isReturn) {
-        forwardToResult(source);
-        funcInfos[index].tailCalleeTypes.push_back(rootType);
+        if (optimizeReferencedFuncs) {
+          forwardToResult(source);
+          funcInfos[index].tailCalleeTypes.push_back(rootType);
+        } else {
+          funcInfos[index].resultUsage = used.getTop();
+        }
       } else if (optimizeReferencedFuncs) {
         getValueFromLocation(curr, source);
       }

@@ -24,6 +24,170 @@ namespace wasm::constraint {
 
 namespace {
 
+std::optional<SpansU2>
+getSpansInternal(const Constraint& c, std::optional<Type> type, bool exact) {
+  using namespace Abstract;
+
+  auto* cc = std::get_if<Literal>(&c.term);
+  if (cc) {
+    // If passed in, the type must be right.
+    assert(!type || *type == cc->type);
+
+    type = cc->type;
+  }
+
+  if (type && !type->isInteger()) {
+    // References etc. do not convert to spans.
+    return {};
+  }
+
+  // Maximum values, as represented as uint64_t's. We generate spans on unsigned
+  // values, converting signed ones to their unsigned representations.
+  uint64_t maxUnsigned = type && *type == Type::i32
+                           ? std::numeric_limits<uint32_t>::max()
+                           : std::numeric_limits<uint64_t>::max();
+  uint64_t maxSigned = type && *type == Type::i32
+                         ? std::numeric_limits<int32_t>::max()
+                         : std::numeric_limits<int64_t>::max();
+  uint64_t minSigned = maxSigned + 1;
+
+  if (!cc) {
+    // Not comparing to a constant, so we can't infer anything exact, but might
+    // if we just need something we can prove, and if we know the type.
+    if (exact || !type) {
+      return {};
+    }
+
+    switch (c.op) {
+      // x < y, i.e., x is less than *something*, proves x != MAX_INT.
+      case LtS:
+        // In the signed case, this is a pair of spans: all to the left and all
+        // to the right of MAX_INT.
+        return SpansU2{{0, maxSigned - 1}, {maxSigned + 1, maxUnsigned}};
+      case LtU:
+        return SpansU2{{0, maxUnsigned - 1}};
+
+      // Similarly, x > y proves x != MIN_INT.
+      case GtS:
+        return SpansU2{{0, minSigned - 1}, {minSigned + 1, maxUnsigned}};
+      case GtU:
+        return SpansU2{{1, maxUnsigned}};
+
+      default: {
+      }
+    }
+
+    return {};
+  }
+
+  auto x = cc->getUnsigned();
+
+  switch (c.op) {
+    case Eq:
+      return SpansU2{{x, x}};
+    case Ne:
+      if (x == 0) {
+        return SpansU2{{1, maxUnsigned}};
+      }
+      if (x == maxUnsigned) {
+        return SpansU2{{0, maxUnsigned - 1}};
+      }
+      return SpansU2{{0, x - 1}, {x + 1, maxUnsigned}};
+
+    case LtS:
+      if (x == minSigned) {
+        // Less than the lowest possible number is an empty span.
+        return SpansU2{};
+      }
+      if (x > maxSigned) {
+        // A negative number, so just a single span.
+        return SpansU2{{maxSigned + 1, x - 1}};
+      }
+      if (x == 0) {
+        // All negative numbers are possible.
+        return SpansU2{{maxSigned + 1, maxUnsigned}};
+      }
+      // A positive number, so all negative ones are possible, and some
+      // positive.
+      return SpansU2{{0, x - 1}, {maxSigned + 1, maxUnsigned}};
+    case LtU:
+      if (x == 0) {
+        // Less than the lowest possible number is an empty span.
+        return SpansU2{};
+      }
+      return SpansU2{{0, x - 1}};
+    case LeS:
+      if (x > maxSigned) {
+        // A negative number, so just a single span.
+        return SpansU2{{maxSigned + 1, x}};
+      }
+      if (x == maxSigned) {
+        // All numbers are possible.
+        return SpansU2{{0, maxUnsigned}};
+      }
+      // A non-negative number, so all negative ones are possible, and some
+      // positive.
+      return SpansU2{{0, x}, {maxSigned + 1, maxUnsigned}};
+    case LeU:
+      return SpansU2{{0, x}};
+
+    case GtS:
+      if (x == maxSigned) {
+        // Greater than the highest possible number is an empty span.
+        return SpansU2{};
+      }
+      if (x <= maxSigned) {
+        // A non-negative number, so just a single span.
+        return SpansU2{{x + 1, maxSigned}};
+      }
+      if (x == maxUnsigned) {
+        // GtS negative one, so 0 and above.
+        return SpansU2{{0, maxSigned}};
+      }
+      // A negative number, so all positive ones are possible, and some
+      // negative.
+      return SpansU2{{0, maxSigned}, {x + 1, maxUnsigned}};
+    case GtU:
+      if (x == maxUnsigned) {
+        // Greater than the highest possible number is an empty span.
+        return SpansU2{};
+      }
+      return SpansU2{{x + 1, maxUnsigned}};
+    case GeS:
+      if (x == minSigned) {
+        // All numbers are possible.
+        return SpansU2{{0, maxUnsigned}};
+      }
+      if (x <= maxSigned) {
+        // A non-negative number, so just a single span.
+        return SpansU2{{x, maxSigned}};
+      }
+      // A negative number, so all positive ones are possible, and some
+      // negative.
+      return SpansU2{{0, maxSigned}, {x, maxUnsigned}};
+    case GeU:
+      return SpansU2{{x, maxUnsigned}};
+
+    default: {
+    }
+  }
+
+  return {};
+}
+
+} // anonymous namespace
+
+std::optional<SpansU2> Constraint::getSpans(std::optional<Type> type) const {
+  return getSpansInternal(*this, type, true);
+}
+
+std::optional<SpansU2>
+Constraint::getProvenSpans(std::optional<Type> type) const {
+  return getSpansInternal(*this, type, false);
+}
+
+namespace {
+
 Result TrueFalse(bool x) { return x ? True : False; }
 
 Result TrueFalse(Literal x) { return TrueFalse(x.getUnsigned()); }
@@ -40,9 +204,9 @@ Result provesConstantPair(Abstract::Op aOp,
   if (aOp == Eq) {
     switch (bOp) {
       case Eq:
-        return TrueFalse(aConstant == bConstant);
+        return TrueFalse(aConstant.eq(bConstant));
       case Ne:
-        return TrueFalse(aConstant != bConstant);
+        return TrueFalse(aConstant.ne(bConstant));
       case LtS:
         return TrueFalse(aConstant.ltS(bConstant));
       case LeS:
@@ -66,14 +230,14 @@ Result provesConstantPair(Abstract::Op aOp,
 
   // a != A =?=> a == B. False if A = B, else unknown.
   if (aOp == Ne && bOp == Eq) {
-    if (aConstant == bConstant) {
+    if (aConstant.eq(bConstant).getInteger()) {
       return False;
     }
   }
 
   // a != A =?=> a != B. True if A = B, else unknown.
   if (aOp == Ne && bOp == Ne) {
-    if (aConstant == bConstant) {
+    if (aConstant.eq(bConstant).getInteger()) {
       return True;
     }
   }
@@ -88,6 +252,66 @@ Result provesConstantPair(Abstract::Op aOp,
   }
 
   // TODO: handle all the rest of >, >=, <, and <=
+  return Unknown;
+}
+
+// Evaluate whether a => b, where a and b are operations on identical terms.
+Result provesTermEqualPair(Abstract::Op aOp, Abstract::Op bOp) {
+  using namespace Abstract;
+
+  // Trivial cases where aOp == bOp or aOp == !bOp are taken care of elsewhere.
+  assert(aOp != bOp && aOp != Abstract::negateRelational(bOp));
+
+  switch (aOp) {
+    case Eq:
+      // == proves >= etc. true, and > (without =) false
+      if (bOp == LeU || bOp == LeS || bOp == GeU || bOp == GeS) {
+        return True;
+      }
+      if (bOp == LtU || bOp == LtS || bOp == GtU || bOp == GtS) {
+        return False;
+      }
+      break;
+    case LtS:
+      // < proves <=, != true and ==, > false
+      if (bOp == LeS || bOp == Ne) {
+        return True;
+      }
+      if (bOp == Eq || bOp == GtS) {
+        return False;
+      }
+      break;
+    case GtS:
+      // Ditto, with G instead of L.
+      if (bOp == GeS || bOp == Ne) {
+        return True;
+      }
+      if (bOp == Eq || bOp == LtS) {
+        return False;
+      }
+      break;
+    case LtU:
+      // Ditto, with unsigned.
+      if (bOp == LeU || bOp == Ne) {
+        return True;
+      }
+      if (bOp == Eq || bOp == GtU) {
+        return False;
+      }
+      break;
+    case GtU:
+      // Ditto, with G instead of L.
+      if (bOp == GeU || bOp == Ne) {
+        return True;
+      }
+      if (bOp == Eq || bOp == LtU) {
+        return False;
+      }
+      break;
+    default: {
+    }
+  }
+
   return Unknown;
 }
 
@@ -107,7 +331,46 @@ Result provesPair(const Constraint& a, const Constraint& b) {
   auto* aConstant = std::get_if<Literal>(&a.term);
   auto* bConstant = std::get_if<Literal>(&b.term);
   if (aConstant && bConstant) {
-    return provesConstantPair(a.op, *aConstant, b.op, *bConstant);
+    auto result = provesConstantPair(a.op, *aConstant, b.op, *bConstant);
+    if (result != Unknown) {
+      return result;
+    }
+  }
+
+  // If we can represent both as spans, we can calculate that way. At least one
+  // must be a constant in this case, so that we know the type.
+  if (aConstant || bConstant) {
+    auto type = aConstant ? aConstant->type : bConstant->type;
+    // Use proven spans for a, and exact for b. This allows us to do
+    // a => proven spans for a => exact spans for b => b.
+    if (auto aSpans = a.getProvenSpans(type)) {
+      if (auto bSpans = b.getSpans(type)) {
+        if (aSpans->empty()) {
+          // An empty span implies a contradiction (e.g. x > MAX_INT), as it
+          // means no possible number can apply. And contradictions prove
+          // anything.
+          return True;
+        }
+        if (bSpans->empty()) {
+          // Anything that is not a contradiction can prove a contradiction.
+          return False;
+        }
+        if (bSpans->contains(*aSpans)) {
+          // b's values contains a's, e.g., b = { 0 < x < 10 } and
+          // a = { 3 < x < 7 }, so a => b.
+          return True;
+        }
+        if (!bSpans->hasOverlap(*aSpans)) {
+          // There is no overlap at all, e.g., { 0 < x < 10 } vs { 20 < x < 30
+          // }, both cannot be true and each proves the other false.
+          return False;
+        }
+      }
+    }
+  }
+
+  if (a.term == b.term) {
+    return provesTermEqualPair(a.op, b.op);
   }
 
   return Unknown;
@@ -209,11 +472,70 @@ std::optional<Constraint> fusedApproximateAndPair(const Constraint& a,
   return {};
 }
 
+bool isImmediateContradiction(const Constraint& c) {
+  using namespace Abstract;
+
+  auto* cc = std::get_if<Literal>(&c.term);
+  if (!cc) {
+    // Only operations on constants can be immediate contradictions.
+    return false;
+  }
+
+  if (!cc->type.isInteger()) {
+    return false;
+  }
+
+  auto minSigned = cc->type == Type::i32 ? std::numeric_limits<int32_t>::min()
+                                         : std::numeric_limits<int64_t>::min();
+  auto maxSigned = cc->type == Type::i32 ? std::numeric_limits<int32_t>::max()
+                                         : std::numeric_limits<int64_t>::max();
+  auto maxUnsigned = cc->type == Type::i32
+                       ? std::numeric_limits<uint32_t>::max()
+                       : std::numeric_limits<uint64_t>::max();
+
+  switch (c.op) {
+    case LtS:
+      if (cc->getInteger() == minSigned) {
+        // Less than the lowest possible number.
+        return true;
+      }
+      break;
+    case LtU:
+      if (cc->getInteger() == 0) {
+        // Less than the lowest possible number.
+        return true;
+      }
+      break;
+    case GtS:
+      if (cc->getInteger() == maxSigned) {
+        // Greater than the highest possible number.
+        return true;
+      }
+      break;
+    case GtU:
+      if (cc->getUnsigned() == maxUnsigned) {
+        // Greater than the highest possible number.
+        return true;
+      }
+      break;
+    default: {
+    }
+  }
+
+  return false;
+}
+
 } // anonymous namespace
 
 void AndedConstraintSet::approximateAnd(const Constraint& c) {
   if (provesEverything()) {
     // Nothing to add.
+    return;
+  }
+
+  // We don't store contradictions: identify them and mark us as such.
+  if (isImmediateContradiction(c)) {
+    setProvesEverything();
     return;
   }
 
@@ -238,6 +560,8 @@ void AndedConstraintSet::approximateAnd(const Constraint& c) {
       return;
     }
   }
+
+  // TODO: use Spans here when possible
 
   if (size() < MaxConstraints) {
     // Insert into the right place, keeping us sorted.
@@ -265,6 +589,44 @@ std::optional<Constraint> approximateOrTermEqualPair(const Abstract::Op aOp,
   if (aOp == Eq && bOp == GtS) {
     return Constraint{GeS, term};
   }
+  if (aOp == Eq && bOp == GtU) {
+    return Constraint{GeU, term};
+  }
+
+  // x > C || x >= C  ===  x >= C
+  if (aOp == GtS && bOp == GeS) {
+    return Constraint{GeS, term};
+  }
+  if (aOp == GtU && bOp == GeU) {
+    return Constraint{GeU, term};
+  }
+
+  // TODO: all the rest
+
+  return {};
+}
+
+// Do an OR of a pair of constraints where the terms are adjacent constants: a
+// operates on C, and b on C+1.
+std::optional<Constraint> approximateOrAdjacentConstantPair(
+  const Abstract::Op aOp, const Literal& aConstant, const Abstract::Op bOp) {
+  using namespace Abstract;
+
+  // x == C || x >= C+1  ===  x >= C, if C+1 does not overflow.
+  if (aOp == Eq && bOp == GeS && !aConstant.isSignedMax()) {
+    return Constraint{GeS, {aConstant}};
+  }
+  if (aOp == Eq && bOp == GeU && !aConstant.isUnsignedMax()) {
+    return Constraint{GeU, {aConstant}};
+  }
+
+  // x > C || x >= C+1  ===  x > C, if C+1 does not overflow.
+  if (aOp == GtS && bOp == GeS && !aConstant.isSignedMax()) {
+    return Constraint{GtS, {aConstant}};
+  }
+  if (aOp == GtU && bOp == GeU && !aConstant.isUnsignedMax()) {
+    return Constraint{GtU, {aConstant}};
+  }
 
   // TODO: all the rest
 
@@ -279,6 +641,18 @@ std::optional<Constraint> approximateOrPair(const Constraint& a,
   if (a.term == b.term) {
     if (auto result = approximateOrTermEqualPair(a.op, b.op, a.term)) {
       return result;
+    }
+  }
+
+  // See if we operate on constants N, N+1.
+  if (auto* ac = std::get_if<Literal>(&a.term)) {
+    if (auto* bc = std::get_if<Literal>(&b.term)) {
+      if (ac->type == bc->type && ac->type.isInteger() &&
+          ac->add(Literal::makeFromInt32(1, ac->type)) == *bc) {
+        if (auto result = approximateOrAdjacentConstantPair(a.op, *ac, b.op)) {
+          return result;
+        }
+      }
     }
   }
 
@@ -350,6 +724,8 @@ bool AndedConstraintSet::approximateOr(const AndedConstraintSet& other) {
     return true;
   }
 
+  // TODO: use Spans here when possible
+
   // For more complex cases, do a detailed analysis.
   auto result = detailedApproximateOr(*this, other);
   auto changed = (result != *this);
@@ -370,7 +746,7 @@ std::optional<LocalConstraint> LocalConstraint::parse(Expression* curr) {
   };
 
   if (auto* unary = curr->dynCast<Unary>()) {
-    if (Abstract::getUnary(unary->type, Abstract::EqZ) == unary->op) {
+    if (Abstract::getUnary(unary->value->type, Abstract::EqZ) == unary->op) {
       return parseEqZArgument(unary->value);
     }
     return {};
@@ -417,7 +793,7 @@ std::optional<LocalConstraint> LocalConstraint::parse(Expression* curr) {
                     Abstract::GtU,
                     Abstract::GeS,
                     Abstract::GeU}) {
-      if (Abstract::getBinary(binary->type, op) == binary->op) {
+      if (Abstract::getBinary(binary->left->type, op) == binary->op) {
         return parseBinaryArguments(op, binary->left, binary->right);
       }
     }
@@ -448,7 +824,7 @@ void LocalConstraint::flip() {
   constraint.term = Term{local};
   local = other;
   if (Abstract::isRelationalAntisymmetric(constraint.op)) {
-    constraint.op = Abstract::negateRelational(constraint.op);
+    constraint.op = Abstract::flipRelational(constraint.op);
   } else {
     // All we support for now are symmetric and antisymmetric operations.
     assert(Abstract::isRelationalSymmetric(constraint.op));
@@ -456,6 +832,11 @@ void LocalConstraint::flip() {
 }
 
 void BasicBlockConstraintMap::set(Index index, const Constraint& c) {
+  set(index, AndedConstraintSet{c});
+}
+
+void BasicBlockConstraintMap::set(Index index,
+                                  const AndedConstraintSet& constraints) {
   // We should not set values in unreachable code.
   assert(!unreachable);
 
@@ -463,8 +844,131 @@ void BasicBlockConstraintMap::set(Index index, const Constraint& c) {
   eraseStaleRefs(index);
   map.erase(index);
 
-  // Apply the constraint.
-  approximateAnd(index, c);
+  // Apply the constraints, if there are any.
+  if (constraints.provesNothing()) {
+    setProvesNothing(index);
+  } else {
+    for (auto& c : constraints) {
+      approximateAnd(index, c);
+    }
+  }
+}
+
+void BasicBlockConstraintMap::set(Index index, Expression* value) {
+  using namespace Match;
+  using namespace Abstract;
+
+  // Apply a constraint to a value, x = C.
+  if (Properties::isSingleConstantExpression(value)) {
+    auto c = Properties::getLiteral(value);
+    set(index, Constraint{Eq, {c}});
+    return;
+  }
+
+  // Apply a constraint to a local, x = y.
+  if (auto* get = value->dynCast<LocalGet>()) {
+    set(index, Constraint{Eq, {get->index}});
+    return;
+  }
+  if (auto* tee = value->dynCast<LocalSet>()) {
+    set(index, Constraint{Eq, {tee->index}});
+    return;
+  }
+
+  // Apply an increment of a local, x = y + 1.
+  Index y;
+  if (matches(value, binary(Add, local(&y), ival(1)))) {
+    // The local y must have old constraints that we know how to increment and
+    // transform into new ones.
+    const auto old = get(y);
+    auto new_ = old;
+
+    // If we see an unsigned upper bound but not a lower one, we can add a
+    // lower one (if we do not overflow). That is, if we see x < 100, x++, then
+    // we can not only update x < 100 to x <= 100, but also add x > 0 (since 0
+    // is impossible after the ++). This is not possible for signed operations,
+    // since x++ does not prove x > 0 there (0 is not the only value that is
+    // <= 0).
+    bool hasUnsignedUpperBound = false;
+    Type type;
+
+    // Iterate over the old constraints and increment each one.
+    for (auto iter = new_.begin(); iter != new_.end();) {
+      auto& c = *iter;
+      auto* N = std::get_if<Literal>(&c.term);
+      if (!N) {
+        // A non-constant term, which we don't know how to increment. Simply
+        // remove it: we are losing proving power here, but doing so is never
+        // invalid.
+        iter = new_.erase(iter);
+        continue;
+      }
+      type = N->type;
+
+      switch (c.op) {
+        // x == N, x++  =>  x == N+1.
+        case Eq:
+          *N = N->add(Literal::makeFromInt32(1, N->type));
+          break;
+        // x >= N, x++  =>  x > N if no overflow
+        case GeS:
+          if (old.proves({LtS, {Literal::makeSignedMax(N->type)}}) != True) {
+            iter = new_.erase(iter);
+            continue;
+          }
+          c.op = GtS;
+          break;
+        case GeU:
+          if (old.proves({LtU, {Literal::makeUnsignedMax(N->type)}}) != True) {
+            iter = new_.erase(iter);
+            continue;
+          }
+          c.op = GtU;
+          break;
+        // x < N, x++  =>  x <= N
+        case LtS:
+          c.op = LeS;
+          break;
+        case LtU:
+          c.op = LeU;
+          hasUnsignedUpperBound = true;
+          break;
+        // x <= N, x++ => x <= N+1 if no overflow
+        case LeS:
+          if (N->isSignedMax()) {
+            iter = new_.erase(iter);
+            continue;
+          }
+          *N = N->add(Literal::makeFromInt32(1, N->type));
+          break;
+        case LeU:
+          if (N->isUnsignedMax()) {
+            iter = new_.erase(iter);
+            continue;
+          }
+          *N = N->add(Literal::makeFromInt32(1, N->type));
+          hasUnsignedUpperBound = true;
+          break;
+        default:
+          // Something we don't recognize.
+          iter = new_.erase(iter);
+          continue;
+      }
+
+      ++iter;
+    }
+
+    if (hasUnsignedUpperBound) {
+      // We know we did not overflow (we are bounded from above), so add x > 0.
+      new_.approximateAnd({GtU, {Literal::makeFromInt32(0, type)}});
+    }
+
+    set(index, new_);
+    return;
+  }
+
+  // We know and can prove nothing.
+  setProvesNothing(index);
 }
 
 void BasicBlockConstraintMap::setProvesNothing(Index index) {
@@ -521,11 +1025,19 @@ void BasicBlockConstraintMap::approximateAndInternal(Index index,
     actual = flipped.constraint;
   }
 
-  // Never add constraints to ourselves (x == x, etc., which can happen due to
-  // copying/flipping).
   if (auto* other = std::get_if<Index>(&actual.term)) {
+    // Never add constraints to ourselves (x == x, etc., which can happen due to
+    // copying/flipping).
     if (*other == index) {
       return;
+    }
+
+    // If we are applying a constraint to another local, and we know that
+    // local's value, propagate it. That is, if x == 42, then if we try to apply
+    // y < x we instead apply y < 42, which is better.
+    auto otherConstraints = get(*other);
+    if (auto lit = otherConstraints.getLiteral()) {
+      actual.term = Term{*lit};
     }
   }
 
@@ -582,6 +1094,20 @@ void BasicBlockConstraintMap::approximateAndInternal(Index index,
   }
 }
 
+Result BasicBlockConstraintMap::proves(LocalConstraint condition) const {
+  // As in approximateAnd, above, if the term is a local that we know something
+  // about, propagate it. TODO: even without equality, we can add more
+  // constraints here (e.g. x < y and y < 10 can lead to proving x < 10)
+  if (auto* other = std::get_if<Index>(&condition.constraint.term)) {
+    auto otherConstraints = get(*other);
+    if (auto lit = otherConstraints.getLiteral()) {
+      condition.constraint.term = Term{*lit};
+    }
+  }
+
+  return get(condition.local).proves(condition.constraint);
+}
+
 void BasicBlockConstraintMap::noteRefs(Index index, const Constraint& c) {
   if (auto* i = std::get_if<Index>(&c.term)) {
     refs[*i].insert(index);
@@ -620,7 +1146,7 @@ std::ostream& operator<<(std::ostream& o, const Constraint& c) {
   if (auto* cc = std::get_if<Literal>(&c.term)) {
     o << *cc;
   } else if (auto* i = std::get_if<Index>(&c.term)) {
-    o << "Index(" << *i << ')';
+    o << "$" << *i;
   }
   o << '}';
   return o;

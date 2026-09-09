@@ -54,7 +54,7 @@ std::vector<Type> getLoggableTypes(const FeatureSet& features) {
 }
 
 std::vector<MemoryOrder> getMemoryOrders(const FeatureSet& features) {
-  return features.hasRelaxedAtomics()
+  return features.hasAcquireReleaseAtomics()
            ? std::vector{MemoryOrder::AcqRel, MemoryOrder::SeqCst}
            : std::vector{MemoryOrder::SeqCst};
 }
@@ -968,12 +968,12 @@ void TranslateToFuzzReader::finalizeTable() {
       }
     }
 
-    // The code above raises table->initial to a size large enough to accomodate
-    // all of its segments, with the intention of avoiding a trap during
-    // startup. However a single segment of (say) size 4GB would have a table of
-    // that size, which will use a lot of memory and execute very slowly, so we
-    // prefer in the fuzzer to trap on such a thing. To achieve that, set a
-    // reasonable limit for the maximum table size.
+    // The code above raises table->initial to a size large enough to
+    // accommodate all of its segments, with the intention of avoiding a trap
+    // during startup. However a single segment of (say) size 4GB would have a
+    // table of that size, which will use a lot of memory and execute very
+    // slowly, so we prefer in the fuzzer to trap on such a thing. To achieve
+    // that, set a reasonable limit for the maximum table size.
     //
     // This also avoids an issue that arises from table->initial being an
     // Address (64 bits) but Table::kMaxSize being an Index (32 bits), as a
@@ -2839,6 +2839,10 @@ Expression* TranslateToFuzzReader::_makeConcrete(Type type) {
                 &Self::makeStringMeasure,
                 &Self::makeStringGet);
   }
+  if (type == Type::i64) {
+    options.add(FeatureSet::WideArithmetic | FeatureSet::Multivalue,
+                &Self::makeWideIntExtract);
+  }
   if (type.isTuple()) {
     if (type == Types::getI64Pair() && oneIn(2)) {
       options.add(FeatureSet::WideArithmetic, &Self::makeWideIntExpression);
@@ -2866,8 +2870,10 @@ Expression* TranslateToFuzzReader::_makeConcrete(Type type) {
     if (type.isCastable()) {
       // Exact casts are only allowed with custom descriptors enabled.
       if (type.isInexact() || wasm.features.hasCustomDescriptors()) {
+        // Casts are very fundamental to WasmGC, and a potential source of
+        // security issues, so we prioritize them as very important.
         options.add(FeatureSet::ReferenceTypes | FeatureSet::GC,
-                    &Self::makeRefCast);
+                    WeightedOption{&Self::makeRefCast, VeryImportant});
       }
     }
     if (heapType.getDescribedType()) {
@@ -3549,6 +3555,15 @@ Expression* TranslateToFuzzReader::makeWideIntMul(Type type) {
 
 Expression* TranslateToFuzzReader::makeWideIntExpression(Type type) {
   return oneIn(2) ? makeWideIntAddSub(type) : makeWideIntMul(type);
+}
+
+Expression* TranslateToFuzzReader::makeWideIntExtract(Type type) {
+  assert(wasm.features.hasWideArithmetic());
+  assert(wasm.features.hasMultivalue());
+  assert(type == Type::i64);
+  auto* child = makeWideIntExpression(Types::getI64Pair());
+  Index index = upTo(2);
+  return builder.makeTupleExtract(child, index);
 }
 
 Expression* TranslateToFuzzReader::makeTupleExtract(Type type) {

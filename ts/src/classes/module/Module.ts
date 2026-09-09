@@ -101,11 +101,12 @@ export enum Feature {
 	BulkMemoryOpt = BinaryenObj["_BinaryenFeatureBulkMemoryOpt"](),
 	CallIndirectOverlong = BinaryenObj["_BinaryenFeatureCallIndirectOverlong"](),
 	// TODO: CustomDescriptors
-	RelaxedAtomics = BinaryenObj["_BinaryenFeatureRelaxedAtomics"](),
+	AcquireReleaseAtomics = BinaryenObj["_BinaryenFeatureAcquireReleaseAtomics"](),
 	CustomPageSizes = BinaryenObj["_BinaryenFeatureCustomPageSizes"](),
 	// TODO: Multibyte
 	WideArithmetic = BinaryenObj["_BinaryenFeatureWideArithmetic"](),
 	CompactImports = BinaryenObj["_BinaryenFeatureCompactImports"](),
+	RelaxedAtomics = BinaryenObj["_BinaryenFeatureRelaxedAtomics"](),
 	All = BinaryenObj["_BinaryenFeatureAll"](),
 }
 

@@ -6,6 +6,7 @@ else()
 endif()
 
 set(unittest_SOURCES
+  abstract.cpp
   arena.cpp
   cast-check.cpp
   cfg.cpp
@@ -14,6 +15,7 @@ set(unittest_SOURCES
   delta_debugging.cpp
   dfa_minimization.cpp
   disjoint_sets.cpp
+  effects.cpp
   graph.cpp
   int128.cpp
   leaves.cpp
@@ -30,6 +32,7 @@ set(unittest_SOURCES
   printing.cpp
   public-type-validator.cpp
   scc.cpp
+  span.cpp
   stringify.cpp
   subtype-exprs.cpp
   suffix_tree.cpp

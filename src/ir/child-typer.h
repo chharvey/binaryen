@@ -83,7 +83,7 @@ template<typename Subtype> struct ChildTyper : OverriddenVisitor<Subtype> {
     }
   }
 
-  // Disambiguate betwween Type and VarType.
+  // Disambiguate between Type and VarType.
   void note(Expression** childp, Type::BasicType type) {
     note(childp, VarType{Type(type)});
   }
@@ -1041,7 +1041,11 @@ template<typename Subtype> struct ChildTyper : OverriddenVisitor<Subtype> {
 
     note(&curr->ref, Type(*ht, Nullable));
     note(&curr->waitqueue, Type(HeapTypes::sharedWaitqueue, Nullable));
-    note(&curr->expected, Type(Type::BasicType::i32));
+    auto expectedType = ht->getStruct().fields[curr->index].type;
+    if (expectedType.isRef()) {
+      expectedType = Type(HeapTypes::eq.getBasic(Shared), Nullable);
+    }
+    note(&curr->expected, expectedType);
     note(&curr->timeout, Type(Type::BasicType::i64));
   }
 
@@ -1050,6 +1054,11 @@ template<typename Subtype> struct ChildTyper : OverriddenVisitor<Subtype> {
   void visitWaitqueueNotify(WaitqueueNotify* curr) {
     note(&curr->waitqueue, Type(HeapTypes::sharedWaitqueue, Nullable));
     note(&curr->count, Type(Type::BasicType::i32));
+  }
+
+  void visitPublish(Publish* curr) {
+    // Polymorphic over heap types.
+    note(&curr->ref, VarRef{Nullable, VarHeapType{0u}});
   }
 
   void visitArrayNew(ArrayNew* curr) {

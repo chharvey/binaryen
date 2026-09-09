@@ -19,6 +19,11 @@
 // inference whether other things are true given a set of constraints, like
 // { x == 10 } => { x >= 5 }.
 //
+// This code follows the basic rules of logic, like the law of the excluded
+// middle and so forth. Things that do not follow basic logic, like floating-
+// point NaNs (where both x < y and x >= y are possible, with NaNs), may not be
+// handled correctly. The caller must ensure that no such input is possible.
+//
 
 #ifndef wasm_ir_constraint_h
 #define wasm_ir_constraint_h
@@ -27,6 +32,7 @@
 
 #include "ir/abstract.h"
 #include "support/inplace_vector.h"
+#include "support/span.h"
 #include "support/utilities.h"
 #include "wasm.h"
 
@@ -63,6 +69,22 @@ struct Constraint {
   Constraint negate() const {
     return Constraint{Abstract::negateRelational(op), term};
   }
+
+  // Convert the constraint into constant spans, if possible. For example,
+  // "<= 100 (unsigned)" turns into the span [0, 100]. We use SpansU2 because
+  // that can also handle signed operations stored in the unsigned range (see
+  // span.h).
+  //
+  // An optional type may be passed in. If not, the type is inferred from the
+  // term, when possible.
+  std::optional<SpansU2> getSpans(std::optional<Type> type = {}) const;
+
+  // Get spans we can prove. This is less precise than getSpans, which gets
+  // *exact* spans for the Constraint. Here we only return spans that we can
+  // prove are true. For example, x < y cannot be represented exactly using a
+  // span (y is not a constant), but that x is smaller than *something* proves
+  // x is not MAX_INT, so we can return the span [MIN_INT, MAX_INT - 1].
+  std::optional<SpansU2> getProvenSpans(std::optional<Type> type = {}) const;
 };
 
 // We limit constraints to a low number to ensure good performance even with
@@ -194,6 +216,18 @@ struct AndedConstraintSet : inplace_vector<Constraint, MaxConstraints> {
     setProvesNothing();
     push_back(c);
   }
+
+  // If the set of constraints shows us as equal to a literal, return it.
+  std::optional<Literal> getLiteral() const {
+    for (auto& c : *this) {
+      if (c.op == Abstract::Eq) {
+        if (auto* cc = std::get_if<Literal>(&c.term)) {
+          return *cc;
+        }
+      }
+    }
+    return {};
+  }
 };
 
 // A local plus a constraint on it.
@@ -251,8 +285,14 @@ struct BasicBlockConstraintMap {
     assert(map.empty());
   }
 
-  // Apply a constraint to a local.
+  // Apply a constraint to a local, replacing anything before.
   void set(Index index, const Constraint& c);
+
+  // Apply a set of constraints to a local, replacing anything before.
+  void set(Index index, const AndedConstraintSet& constraints);
+
+  // Set the value in an expression to a local, replacing anything before.
+  void set(Index index, Expression* value);
 
   // Mark a local as unknown and able to prove nothing.
   void setProvesNothing(Index index);
@@ -285,9 +325,8 @@ struct BasicBlockConstraintMap {
     approximateAndInternal(index, c);
   }
 
-  // TODO: Add proves() here, which could do things like: if asked x == y, we
-  // can answer False if we see x == c1, y == c2, and the constants c1, c2
-  // differ.
+  // Check a condition on a local, given all we know about all other locals.
+  Result proves(LocalConstraint condition) const;
 
   bool operator!=(const BasicBlockConstraintMap& other) {
     return unreachable != other.unreachable || map != other.map;

@@ -14,8 +14,6 @@ import type {
 	HeapType,
 	ExpressionRef,
 	Type,
-	i32,
-	none,
 } from "../../constants.ts";
 
 
@@ -81,8 +79,8 @@ export function struct(mod: Module) {
 		),
 
 		/** Sets a struct entry at an index. */
-		set: (index: number, ref: ExpressionRef, value: ExpressionRef): none => (
-			BinaryenObj["_BinaryenStructSet"](mod[PTR], index, ref, value) as none
+		set: (index: number, ref: ExpressionRef, value: ExpressionRef): ExpressionRef.none => (
+			BinaryenObj["_BinaryenStructSet"](mod[PTR], index, ref, value) as ExpressionRef.none
 		),
 
 		/** [description] */
@@ -124,12 +122,12 @@ export function publish(mod: Module) {
 export function array(mod: Module) {
 	return {
 		/** Allocates a new array and initializes it with the given operand (repeated). */
-		new: <T extends ExpressionRef>(heapType: HeapType, size: i32, operand: ExpressionRef): T => (
+		new: <T extends ExpressionRef>(heapType: HeapType, size: ExpressionRef.i32, operand: ExpressionRef): T => (
 			BinaryenObj["_BinaryenArrayNew"](mod[PTR], heapType, size, operand) as T
 		),
 
 		/** Allocates a new array and initializes it with a default value (repeated). */
-		new_default: <T extends ExpressionRef>(heapType: HeapType, size: i32): T => (
+		new_default: <T extends ExpressionRef>(heapType: HeapType, size: ExpressionRef.i32): T => (
 			BinaryenObj["_BinaryenArrayNew"](mod[PTR], heapType, size, 0) as T
 		),
 
@@ -139,12 +137,12 @@ export function array(mod: Module) {
 		),
 
 		/** Allocates a new array and initializes it from a data segment. */
-		new_data: <T extends ExpressionRef>(heapType: HeapType, name: string, offset: i32, size: i32): T => (
+		new_data: <T extends ExpressionRef>(heapType: HeapType, name: string, offset: ExpressionRef.i32, size: ExpressionRef.i32): T => (
 			preserveStack(() => BinaryenObj["_BinaryenArrayNewData"](mod[PTR], heapType, strToStack(name), offset, size) as T)
 		),
 
 		/** Allocates a new array and initializes it from an element segment. */
-		new_elem: <T extends ExpressionRef>(heapType: HeapType, name: string, offset: i32, size: i32): T => (
+		new_elem: <T extends ExpressionRef>(heapType: HeapType, name: string, offset: ExpressionRef.i32, size: ExpressionRef.i32): T => (
 			preserveStack(() => BinaryenObj["_BinaryenArrayNewElem"](mod[PTR], heapType, strToStack(name), offset, size) as T)
 		),
 
@@ -154,7 +152,7 @@ export function array(mod: Module) {
 		 * **Warning:** `.get()` no longer takes the boolean `isSigned` argument, and assumes an unpacked type.
 		 * For packed types, use `.get_s()` for signed and `.get_u()` for unsigned.
 		 */
-		get: function <T extends ExpressionRef>(ref: ExpressionRef, index: i32, type: Type, deprecated_isSigned?: boolean): T {
+		get: function <T extends ExpressionRef>(ref: ExpressionRef, index: ExpressionRef.i32, type: Type, deprecated_isSigned?: boolean): T {
 			return deprecated_isSigned === undefined
 				? BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type) as T
 				: deprecated_isSigned
@@ -163,61 +161,61 @@ export function array(mod: Module) {
 		},
 
 		/** Gets an array entry with a signed packed type at an index. */
-		get_s: <T extends ExpressionRef>(ref: ExpressionRef, index: i32, type: Type): T => (
+		get_s: <T extends ExpressionRef>(ref: ExpressionRef, index: ExpressionRef.i32, type: Type): T => (
 			BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type, true) as T
 		),
 
 		/** Gets an array entry with an unsigned packed type at an index. */
-		get_u: <T extends ExpressionRef>(ref: ExpressionRef, index: i32, type: Type): T => (
+		get_u: <T extends ExpressionRef>(ref: ExpressionRef, index: ExpressionRef.i32, type: Type): T => (
 			BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type, false) as T
 		),
 
 		/** Sets an array entry at an index. */
-		set: (ref: ExpressionRef, index: i32, value: ExpressionRef): none => (
-			BinaryenObj["_BinaryenArraySet"](mod[PTR], ref, index, value) as none
+		set: (ref: ExpressionRef, index: ExpressionRef.i32, value: ExpressionRef): ExpressionRef.none => (
+			BinaryenObj["_BinaryenArraySet"](mod[PTR], ref, index, value) as ExpressionRef.none
 		),
 
 		/** Produces the length of an array. */
-		len: (ref: ExpressionRef): i32 => (
-			BinaryenObj["_BinaryenArrayLen"](mod[PTR], ref) as i32
+		len: (ref: ExpressionRef): ExpressionRef.i32 => (
+			BinaryenObj["_BinaryenArrayLen"](mod[PTR], ref) as ExpressionRef.i32
 		),
 
 		/** Fills a specified slice of an array with the given value. */
-		fill: (ref: ExpressionRef, index: i32, value: ExpressionRef, size: i32): none => (
-			BinaryenObj["_BinaryenArrayFill"](mod[PTR], ref, index, value, size) as none
+		fill: (ref: ExpressionRef, index: ExpressionRef.i32, value: ExpressionRef, size: ExpressionRef.i32): ExpressionRef.none => (
+			BinaryenObj["_BinaryenArrayFill"](mod[PTR], ref, index, value, size) as ExpressionRef.none
 		),
 
 		/** Copies elements to a specified slice of an array from a given array. */
 		copy: (
 			destRef: ExpressionRef,
-			destIndex: i32,
+			destIndex: ExpressionRef.i32,
 			srcRef: ExpressionRef,
-			srcIndex: i32,
-			length: i32,
-		): none => (
-			BinaryenObj["_BinaryenArrayCopy"](mod[PTR], destRef, destIndex, srcRef, srcIndex, length) as none
+			srcIndex: ExpressionRef.i32,
+			length: ExpressionRef.i32,
+		): ExpressionRef.none => (
+			BinaryenObj["_BinaryenArrayCopy"](mod[PTR], destRef, destIndex, srcRef, srcIndex, length) as ExpressionRef.none
 		),
 
 		/** Copies elements to a specified slice of an array from a given data segment. */
 		init_data: (
 			name: string,
 			ref: ExpressionRef,
-			index: i32,
-			offset: i32,
-			size: i32,
-		): none => (
-			preserveStack(() => BinaryenObj["_BinaryenArrayInitData"](mod[PTR], strToStack(name), ref, index, offset, size) as none)
+			index: ExpressionRef.i32,
+			offset: ExpressionRef.i32,
+			size: ExpressionRef.i32,
+		): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenArrayInitData"](mod[PTR], strToStack(name), ref, index, offset, size) as ExpressionRef.none)
 		),
 
 		/** Copies elements to a specified slice of an array from a given element segment. */
 		init_elem: (
 			name: string,
 			ref: ExpressionRef,
-			index: i32,
-			offset: i32,
-			size: i32,
-		): none => (
-			preserveStack(() => BinaryenObj["_BinaryenArrayInitElem"](mod[PTR], strToStack(name), ref, index, offset, size) as none)
+			index: ExpressionRef.i32,
+			offset: ExpressionRef.i32,
+			size: ExpressionRef.i32,
+		): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenArrayInitElem"](mod[PTR], strToStack(name), ref, index, offset, size) as ExpressionRef.none)
 		),
 	} as const;
 }

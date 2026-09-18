@@ -12,7 +12,6 @@ import type {
 import type {
 	ExpressionRef,
 	Type,
-	none,
 } from "../../constants.ts";
 
 
@@ -29,8 +28,8 @@ export function local(mod: Module) {
 		),
 
 		/** Creates a `(local.set)` for the local at the specified index. */
-		set: (index: number, value: ExpressionRef): none => (
-			BinaryenObj["_BinaryenLocalSet"](mod[PTR], index, value) as none
+		set: (index: number, value: ExpressionRef): ExpressionRef.none => (
+			BinaryenObj["_BinaryenLocalSet"](mod[PTR], index, value) as ExpressionRef.none
 		),
 
 		/**
@@ -57,8 +56,8 @@ export function global(mod: Module) {
 		),
 
 		/** Creates a `(global.set)` for the global with the specified name. */
-		set: (name: string, value: ExpressionRef): none => (
-			preserveStack(() => BinaryenObj["_BinaryenGlobalSet"](mod[PTR], strToStack(name), value) as none)
+		set: (name: string, value: ExpressionRef): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenGlobalSet"](mod[PTR], strToStack(name), value) as ExpressionRef.none)
 		),
 	} as const;
 }

@@ -10,7 +10,7 @@ import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import type {
-	stringref,
+	ExpressionRef,
 } from "../../constants.ts";
 
 
@@ -22,6 +22,6 @@ export function string(mod: Module) {
 		 * Creates a new string from the literal string contents.
 		 * This instruction is constant and can be used in global variable initializers.
 		 */
-		const: (value: string): stringref => preserveStack(() => BinaryenObj["_BinaryenStringConst"](mod[PTR], strToStack(value)) as stringref),
+		const: (value: string): ExpressionRef.stringref => preserveStack(() => BinaryenObj["_BinaryenStringConst"](mod[PTR], strToStack(value)) as ExpressionRef.stringref),
 	} as const;
 }

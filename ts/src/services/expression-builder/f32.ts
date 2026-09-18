@@ -5,12 +5,9 @@ import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
+	type ExpressionRef,
 	Operation,
 	Type,
-	type f32 as f32_t,
-	type f64,
-	type i32,
-	type i64,
 } from "../../constants.ts";
 import {
 	binop,
@@ -30,48 +27,48 @@ import {
  */
 export function f32(mod: Module) {
 	return {
-		load: loadFn<f32_t>(mod, Type.f32, 4, true),
-		store: storeFn<f32_t>(mod, Type.f32, 4),
+		load: loadFn<ExpressionRef.f32>(mod, Type.f32, 4, true),
+		store: storeFn<ExpressionRef.f32>(mod, Type.f32, 4),
 
 		/** Return a static constant f32. */
-		const: (value: number): f32_t => (
+		const: (value: number): ExpressionRef.f32 => (
 			constant(mod, "_BinaryenLiteralFloat32", value)
 		),
 
-		const_bits: (value: number): f32_t => (
+		const_bits: (value: number): ExpressionRef.f32 => (
 			constant(mod, "_BinaryenLiteralFloat32Bits", value)
 		),
 
-		abs: unop<f32_t>(mod, Operation.AbsFloat32),
-		neg: unop<f32_t>(mod, Operation.NegFloat32),
-		sqrt: unop<f32_t>(mod, Operation.SqrtFloat32),
-		ceil: unop<f32_t>(mod, Operation.CeilFloat32),
-		floor: unop<f32_t>(mod, Operation.FloorFloat32),
-		trunc: unop<f32_t>(mod, Operation.TruncFloat32),
-		nearest: unop<f32_t>(mod, Operation.NearestFloat32),
+		abs: unop<ExpressionRef.f32>(mod, Operation.AbsFloat32),
+		neg: unop<ExpressionRef.f32>(mod, Operation.NegFloat32),
+		sqrt: unop<ExpressionRef.f32>(mod, Operation.SqrtFloat32),
+		ceil: unop<ExpressionRef.f32>(mod, Operation.CeilFloat32),
+		floor: unop<ExpressionRef.f32>(mod, Operation.FloorFloat32),
+		trunc: unop<ExpressionRef.f32>(mod, Operation.TruncFloat32),
+		nearest: unop<ExpressionRef.f32>(mod, Operation.NearestFloat32),
 
-		add: binop<f32_t>(mod, Operation.AddFloat32),
-		sub: binop<f32_t>(mod, Operation.SubFloat32),
-		mul: binop<f32_t>(mod, Operation.MulFloat32),
-		div: binop<f32_t>(mod, Operation.DivFloat32),
-		min: binop<f32_t>(mod, Operation.MinFloat32),
-		max: binop<f32_t>(mod, Operation.MaxFloat32),
-		copysign: binop<f32_t>(mod, Operation.CopySignFloat32),
+		add: binop<ExpressionRef.f32>(mod, Operation.AddFloat32),
+		sub: binop<ExpressionRef.f32>(mod, Operation.SubFloat32),
+		mul: binop<ExpressionRef.f32>(mod, Operation.MulFloat32),
+		div: binop<ExpressionRef.f32>(mod, Operation.DivFloat32),
+		min: binop<ExpressionRef.f32>(mod, Operation.MinFloat32),
+		max: binop<ExpressionRef.f32>(mod, Operation.MaxFloat32),
+		copysign: binop<ExpressionRef.f32>(mod, Operation.CopySignFloat32),
 
-		eq: relop<f32_t>(mod, Operation.EqFloat32),
-		ne: relop<f32_t>(mod, Operation.NeFloat32),
-		lt: relop<f32_t>(mod, Operation.LtFloat32),
-		gt: relop<f32_t>(mod, Operation.GtFloat32),
-		le: relop<f32_t>(mod, Operation.LeFloat32),
-		ge: relop<f32_t>(mod, Operation.GeFloat32),
+		eq: relop<ExpressionRef.f32>(mod, Operation.EqFloat32),
+		ne: relop<ExpressionRef.f32>(mod, Operation.NeFloat32),
+		lt: relop<ExpressionRef.f32>(mod, Operation.LtFloat32),
+		gt: relop<ExpressionRef.f32>(mod, Operation.GtFloat32),
+		le: relop<ExpressionRef.f32>(mod, Operation.LeFloat32),
+		ge: relop<ExpressionRef.f32>(mod, Operation.GeFloat32),
 
-		convert_i32_s: unaryFn<i32, f32_t>(mod, Operation.ConvertSInt32ToFloat32),
-		convert_i32_u: unaryFn<i32, f32_t>(mod, Operation.ConvertUInt32ToFloat32),
-		convert_i64_s: unaryFn<i64, f32_t>(mod, Operation.ConvertSInt64ToFloat32),
-		convert_i64_u: unaryFn<i64, f32_t>(mod, Operation.ConvertUInt64ToFloat32),
-		reinterpret_i32: unaryFn<i32, f32_t>(mod, Operation.ReinterpretInt32),
+		convert_i32_s: unaryFn<ExpressionRef.i32, ExpressionRef.f32>(mod, Operation.ConvertSInt32ToFloat32),
+		convert_i32_u: unaryFn<ExpressionRef.i32, ExpressionRef.f32>(mod, Operation.ConvertUInt32ToFloat32),
+		convert_i64_s: unaryFn<ExpressionRef.i64, ExpressionRef.f32>(mod, Operation.ConvertSInt64ToFloat32),
+		convert_i64_u: unaryFn<ExpressionRef.i64, ExpressionRef.f32>(mod, Operation.ConvertUInt64ToFloat32),
+		reinterpret_i32: unaryFn<ExpressionRef.i32, ExpressionRef.f32>(mod, Operation.ReinterpretInt32),
 
-		demote_f64: unaryFn<f64, f32_t>(mod, Operation.DemoteFloat64),
+		demote_f64: unaryFn<ExpressionRef.f64, ExpressionRef.f32>(mod, Operation.DemoteFloat64),
 
 		/** @deprecated */
 		convert_s: {

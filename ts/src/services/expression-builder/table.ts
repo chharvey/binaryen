@@ -12,7 +12,6 @@ import type {
 import type {
 	ExpressionRef,
 	Type,
-	none,
 } from "../../constants.ts";
 
 
@@ -26,8 +25,8 @@ export function table(mod: Module) {
 		),
 
 		/** Store an element in a table. */
-		set: (name: string, index: number, value: ExpressionRef): none => (
-			preserveStack(() => BinaryenObj["_BinaryenTableSet"](mod[PTR], strToStack(name), index, value) as none)
+		set: (name: string, index: number, value: ExpressionRef): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenTableSet"](mod[PTR], strToStack(name), index, value) as ExpressionRef.none)
 		),
 
 		/** Returns the current size of a table. */
@@ -40,8 +39,8 @@ export function table(mod: Module) {
 			preserveStack(() => BinaryenObj["_BinaryenTableGrow"](mod[PTR], strToStack(name), value, delta) as T)
 		),
 
-		// TODO: fill // (T, ExpressionRef, T) => none
-		// TODO: copy // (ExpressionRef, ExpressionRef, ExpressionRef) => none
-		// TODO: init // (ExpressionRef, i32, i32) => none
+		// TODO: fill // (T, ExpressionRef, T) => ExpressionRef.none
+		// TODO: copy // (ExpressionRef, ExpressionRef, ExpressionRef) => ExpressionRef.none
+		// TODO: init // (ExpressionRef, ExpressionRef.i32, ExpressionRef.i32) => ExpressionRef.none
 	} as const;
 }

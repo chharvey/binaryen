@@ -53,6 +53,29 @@ declare const __type: unique symbol;
  * @typeParam T the string or symbol name of the WASM type
  */
 export type ExpressionRef<T extends string | symbol = string | symbol> = number & {readonly [__type]: unique symbol, readonly type: T};
+export namespace ExpressionRef {
+	export type unreachable = ExpressionRef<never>; // `never` is assignable to every string, allowing `unreachable` to be assigned to every `ExpressionRef`
+	export type none = ExpressionRef<"none">;
+	export type auto = ExpressionRef<"auto">;
+	export type i32 = ExpressionRef<"i32">;
+	export type i64 = ExpressionRef<"i64">;
+	export type f32 = ExpressionRef<"f32">;
+	export type f64 = ExpressionRef<"f64">;
+	export type v128 = ExpressionRef<"v128">;
+	export type anyref = ExpressionRef<"anyref">;
+	export type eqref = ExpressionRef<"eqref">;
+	export type i31ref = ExpressionRef<"i31ref">;
+	export type structref = ExpressionRef<"structref">;
+	export type arrayref = ExpressionRef<"arrayref">;
+	export type stringref = ExpressionRef<"stringref">;
+	export type nullref = ExpressionRef<"nullref">;
+	export type funcref = ExpressionRef<"funcref">;
+	export type nullfuncref = ExpressionRef<"nullfuncref">;
+	export type exnref = ExpressionRef<"exnref">;
+	export type nullexnref = ExpressionRef<"nullexnref">;
+	export type externref = ExpressionRef<"externref">;
+	export type nullexternref = ExpressionRef<"nullexternref">;
+}
 
 // ### Module Components ### //
 /** Reference to a {@link Module}. */
@@ -74,32 +97,6 @@ export type ElementSegmentRef = number & {readonly [__type]: unique symbol};
 // no `ImportRef`
 /** Reference to an {@link Module.Export}. */
 export type ExportRef = number & {readonly [__type]: unique symbol};
-
-
-
-// ## Expression Types ## //
-// TODO: Move these to a namespace
-export type unreachable = ExpressionRef<never>; // `never` is assignable to every string, allowing `unreachable` to be assigned to every `ExpressionRef`
-export type none = ExpressionRef<"none">;
-export type auto = ExpressionRef<"auto">;
-export type i32 = ExpressionRef<"i32">;
-export type i64 = ExpressionRef<"i64">;
-export type f32 = ExpressionRef<"f32">;
-export type f64 = ExpressionRef<"f64">;
-export type v128 = ExpressionRef<"v128">;
-export type anyref = ExpressionRef<"anyref">;
-export type eqref = ExpressionRef<"eqref">;
-export type i31ref = ExpressionRef<"i31ref">;
-export type structref = ExpressionRef<"structref">;
-export type arrayref = ExpressionRef<"arrayref">;
-export type stringref = ExpressionRef<"stringref">;
-export type nullref = ExpressionRef<"nullref">;
-export type funcref = ExpressionRef<"funcref">;
-export type nullfuncref = ExpressionRef<"nullfuncref">;
-export type exnref = ExpressionRef<"exnref">;
-export type nullexnref = ExpressionRef<"nullexnref">;
-export type externref = ExpressionRef<"externref">;
-export type nullexternref = ExpressionRef<"nullexternref">;
 
 
 

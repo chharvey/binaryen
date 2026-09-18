@@ -15,9 +15,6 @@ import {
 	MemoryOrder,
 	Operation,
 	type Type,
-	type i32,
-	type none,
-	type v128,
 } from "../../constants.ts";
 
 
@@ -70,9 +67,9 @@ export function unaryFn<A extends ExpressionRef, R extends ExpressionRef>(mod: M
 
 // shorthands of `unaryFn`, with default generic params
 export function unop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, T>> { return unaryFn<T, T>(mod, op); }
-export function testop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, i32>> { return unaryFn<T, i32>(mod, op); }
-export function bitmask(mod: Module, op: Operation): ReturnType<typeof unaryFn<v128, i32>> { return unaryFn<v128, i32>(mod, op); }
-export function splat<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, v128>> { return unaryFn<T, v128>(mod, op); }
+export function testop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, ExpressionRef.i32>> { return unaryFn<T, ExpressionRef.i32>(mod, op); }
+export function bitmask(mod: Module, op: Operation): ReturnType<typeof unaryFn<ExpressionRef.v128, ExpressionRef.i32>> { return unaryFn<ExpressionRef.v128, ExpressionRef.i32>(mod, op); }
+export function splat<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof unaryFn<T, ExpressionRef.v128>> { return unaryFn<T, ExpressionRef.v128>(mod, op); }
 
 export function binaryFn<A extends ExpressionRef, B extends ExpressionRef, R extends ExpressionRef>(mod: Module, op: Operation): (left: A, right: B) => R {
 	return (left, right) => BinaryenObj["_BinaryenBinary"](mod[PTR], op, left, right) as R;
@@ -80,8 +77,8 @@ export function binaryFn<A extends ExpressionRef, B extends ExpressionRef, R ext
 
 // shorthands of `binaryFn`, with default generic params
 export function binop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof binaryFn<T, T, T>> { return binaryFn<T, T, T>(mod, op); }
-export function relop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof binaryFn<T, T, i32>> { return binaryFn<T, T, i32>(mod, op); }
-export function narrow(mod: Module, op: Operation): ReturnType<typeof binaryFn<v128, v128, v128>> { return binaryFn<v128, v128, v128>(mod, op); }
+export function relop<T extends ExpressionRef>(mod: Module, op: Operation): ReturnType<typeof binaryFn<T, T, ExpressionRef.i32>> { return binaryFn<T, T, ExpressionRef.i32>(mod, op); }
+export function narrow(mod: Module, op: Operation): ReturnType<typeof binaryFn<ExpressionRef.v128, ExpressionRef.v128, ExpressionRef.v128>> { return binaryFn<ExpressionRef.v128, ExpressionRef.v128, ExpressionRef.v128>(mod, op); }
 
 export function loadFn<T extends ExpressionRef>(mod: Module, typ: Type, bytes: number, isSigned: boolean): (offset: number, align: number, ptr: ExpressionRef, name?: string) => T {
 	return (offset, align, ptr, name) => (
@@ -89,34 +86,34 @@ export function loadFn<T extends ExpressionRef>(mod: Module, typ: Type, bytes: n
 	);
 }
 
-export function storeFn<T extends ExpressionRef>(mod: Module, typ: Type, bytes: number): (offset: number, align: number, ptr: ExpressionRef, value: T, name?: string) => none {
+export function storeFn<T extends ExpressionRef>(mod: Module, typ: Type, bytes: number): (offset: number, align: number, ptr: ExpressionRef, value: T, name?: string) => ExpressionRef.none {
 	return (offset, align, ptr, value, name) => (
-		preserveStack(() => BinaryenObj["_BinaryenStore"](mod[PTR], bytes, offset, align, ptr, value, typ, strToStack(name)) as none)
+		preserveStack(() => BinaryenObj["_BinaryenStore"](mod[PTR], bytes, offset, align, ptr, value, typ, strToStack(name)) as ExpressionRef.none)
 	);
 }
 
-export function simdLoadFn(mod: Module, op: Operation): (offset: number, align: number, ptr: ExpressionRef, name?: string) => v128 {
+export function simdLoadFn(mod: Module, op: Operation): (offset: number, align: number, ptr: ExpressionRef, name?: string) => ExpressionRef.v128 {
 	return (offset, align, ptr, name) => (
-		preserveStack(() => BinaryenObj["_BinaryenSIMDLoad"](mod[PTR], op, offset, align, ptr, strToStack(name)) as v128)
+		preserveStack(() => BinaryenObj["_BinaryenSIMDLoad"](mod[PTR], op, offset, align, ptr, strToStack(name)) as ExpressionRef.v128)
 	);
 }
 
-export function simdLoadStoreLaneFn<T extends ExpressionRef>(mod: Module, op: Operation): (offset: number, align: number, index: number, ptr: ExpressionRef, vec: v128, name?: string) => T {
+export function simdLoadStoreLaneFn<T extends ExpressionRef>(mod: Module, op: Operation): (offset: number, align: number, index: number, ptr: ExpressionRef, vec: ExpressionRef.v128, name?: string) => T {
 	return (offset, align, index, ptr, vec, name) => (
 		preserveStack(() => BinaryenObj["_BinaryenSIMDLoadStoreLane"](mod[PTR], op, offset, align, index, ptr, vec, strToStack(name)) as T)
 	);
 }
 
-export function simdShiftFn(mod: Module, op: Operation): (vec: v128, shift: i32) => v128 {
-	return (vec, shift) => BinaryenObj["_BinaryenSIMDShift"](mod[PTR], op, vec, shift) as v128;
+export function simdShiftFn(mod: Module, op: Operation): (vec: ExpressionRef.v128, shift: ExpressionRef.i32) => ExpressionRef.v128 {
+	return (vec, shift) => BinaryenObj["_BinaryenSIMDShift"](mod[PTR], op, vec, shift) as ExpressionRef.v128;
 }
 
-export function simdExtractFn<T extends ExpressionRef>(mod: Module, op: Operation): (vec: v128, index: number) => T {
+export function simdExtractFn<T extends ExpressionRef>(mod: Module, op: Operation): (vec: ExpressionRef.v128, index: number) => T {
 	return (vec, index) => BinaryenObj["_BinaryenSIMDExtract"](mod[PTR], op, vec, index) as T;
 }
 
-export function simdReplaceFn<T extends ExpressionRef>(mod: Module, op: Operation): (vec: v128, index: number, value: T) => v128 {
-	return (vec, index, value) => BinaryenObj["_BinaryenSIMDReplace"](mod[PTR], op, vec, index, value) as v128;
+export function simdReplaceFn<T extends ExpressionRef>(mod: Module, op: Operation): (vec: ExpressionRef.v128, index: number, value: T) => ExpressionRef.v128 {
+	return (vec, index, value) => BinaryenObj["_BinaryenSIMDReplace"](mod[PTR], op, vec, index, value) as ExpressionRef.v128;
 }
 
 export function atomicLoadFn(mod: Module, typ: Type, bytes: number): (offset: number, ptr: ExpressionRef, name?: string, order?: MemoryOrder) => ExpressionRef {

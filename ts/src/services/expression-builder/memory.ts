@@ -12,8 +12,6 @@ import type {
 import {
 	type ExpressionRef,
 	Type,
-	type i32,
-	type none,
 } from "../../constants.ts";
 
 
@@ -57,21 +55,21 @@ export function memory(mod: Module) {
 		),
 
 		/** Sets all values in a region of memory to a given byte. */
-		fill: <T extends ExpressionRef>(dest: T, value: i32, size: T, name: string): none => (
-			preserveStack(() => BinaryenObj["_BinaryenMemoryFill"](mod[PTR], dest, value, size, strToStack(name)) as none)
+		fill: <T extends ExpressionRef>(dest: T, value: ExpressionRef.i32, size: T, name: string): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenMemoryFill"](mod[PTR], dest, value, size, strToStack(name)) as ExpressionRef.none)
 		),
 
 		/**
 		 * Copies data from a source memory region to a possibly overlapping destination region in another or the same memory.
 		 * The first index denotes the destination.
 		 */
-		copy: (dest: ExpressionRef, source: ExpressionRef, size: ExpressionRef, destMemory: string, sourceMemory: string): none => (
-			preserveStack(() => BinaryenObj["_BinaryenMemoryCopy"](mod[PTR], dest, source, size, strToStack(destMemory), strToStack(sourceMemory)) as none)
+		copy: (dest: ExpressionRef, source: ExpressionRef, size: ExpressionRef, destMemory: string, sourceMemory: string): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenMemoryCopy"](mod[PTR], dest, source, size, strToStack(destMemory), strToStack(sourceMemory)) as ExpressionRef.none)
 		),
 
 		/** Copies data from a passive data segment into a memory. */
-		init: (segment: string, dest: ExpressionRef, offset: i32, size: i32, name: string): none => (
-			preserveStack(() => BinaryenObj["_BinaryenMemoryInit"](mod[PTR], strToStack(segment), dest, offset, size, strToStack(name)) as none)
+		init: (segment: string, dest: ExpressionRef, offset: ExpressionRef.i32, size: ExpressionRef.i32, name: string): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenMemoryInit"](mod[PTR], strToStack(segment), dest, offset, size, strToStack(name)) as ExpressionRef.none)
 		),
 
 		/** @experimental */
@@ -85,8 +83,8 @@ export function memory(mod: Module) {
 export function data(mod: Module) {
 	return {
 		/** Prevents further use of a passive data segment. */
-		drop: (segment: string): none => (
-			preserveStack(() => BinaryenObj["_BinaryenDataDrop"](mod[PTR], strToStack(segment)) as none)
+		drop: (segment: string): ExpressionRef.none => (
+			preserveStack(() => BinaryenObj["_BinaryenDataDrop"](mod[PTR], strToStack(segment)) as ExpressionRef.none)
 		),
 	} as const;
 }

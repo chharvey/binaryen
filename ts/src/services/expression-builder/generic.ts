@@ -13,10 +13,10 @@ import type {
 import {
 	type ExpressionRef,
 	Operation,
-	type Type,
+	Type,
 	type i32,
-	none,
-	unreachable,
+	type none,
+	type unreachable,
 } from "../../constants.ts";
 
 
@@ -52,7 +52,7 @@ export function parametrics(mod: Module) {
 export function blocks(mod: Module) {
 	return {
 		/** Creates a `(block)`. */
-		block: <T extends ExpressionRef>(name: string | null, children: readonly ExpressionRef[], resultType: Type = none): T => (
+		block: <T extends ExpressionRef>(name: string | null, children: readonly ExpressionRef[], resultType: Type = Type.none): T => (
 			preserveStack(() => BinaryenObj["_BinaryenBlock"](
 				mod[PTR],
 				name ? strToStack(name) : 0,
@@ -111,12 +111,12 @@ export function breaks(mod: Module) {
 
 		/** Branches if the reference operand is null. */
 		br_on_null: (label: string, value: ExpressionRef): none => (
-			brOn(Operation.BrOnNull, label, value, unreachable)
+			brOn(Operation.BrOnNull, label, value, Type.unreachable)
 		),
 
 		/** Branches if the reference operand is not null. */
 		br_on_non_null: (label: string, value: ExpressionRef): none => (
-			brOn(Operation.BrOnNonNull, label, value, unreachable)
+			brOn(Operation.BrOnNonNull, label, value, Type.unreachable)
 		),
 
 		/** Branches if the reference operand is successfully downcast to the given type. */

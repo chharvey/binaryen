@@ -6,9 +6,10 @@ import type {
 } from "../../classes/module/Module.ts";
 import {
 	Operation,
+	Type,
 	type f32,
 	type f64,
-	i32 as i32_t,
+	type i32 as i32_t,
 	type i64,
 } from "../../constants.ts";
 import {
@@ -29,17 +30,17 @@ import {
 
 function atomic(mod: Module) {
 	return {
-		load: atomicLoadFn(mod, i32_t, 4),
-		load8_u: atomicLoadFn(mod, i32_t, 1),
-		load16_u: atomicLoadFn(mod, i32_t, 2),
+		load: atomicLoadFn(mod, Type.i32, 4),
+		load8_u: atomicLoadFn(mod, Type.i32, 1),
+		load16_u: atomicLoadFn(mod, Type.i32, 2),
 
-		store: atomicStoreFn(mod, i32_t, 4),
-		store8: atomicStoreFn(mod, i32_t, 1),
-		store16: atomicStoreFn(mod, i32_t, 2),
+		store: atomicStoreFn(mod, Type.i32, 4),
+		store8: atomicStoreFn(mod, Type.i32, 1),
+		store16: atomicStoreFn(mod, Type.i32, 2),
 
-		rmw: atomicRmwOps(mod, i32_t, 4),
-		rmw8_u: atomicRmwOps(mod, i32_t, 1),
-		rmw16_u: atomicRmwOps(mod, i32_t, 2),
+		rmw: atomicRmwOps(mod, Type.i32, 4),
+		rmw8_u: atomicRmwOps(mod, Type.i32, 1),
+		rmw16_u: atomicRmwOps(mod, Type.i32, 2),
 	} as const;
 }
 
@@ -51,15 +52,15 @@ function atomic(mod: Module) {
  */
 export function i32(mod: Module) {
 	return {
-		load: loadFn<i32_t>(mod, i32_t, 4, true),
-		load8_s: loadFn<i32_t>(mod, i32_t, 1, true),
-		load8_u: loadFn<i32_t>(mod, i32_t, 1, false),
-		load16_s: loadFn<i32_t>(mod, i32_t, 2, true),
-		load16_u: loadFn<i32_t>(mod, i32_t, 2, false),
+		load: loadFn<i32_t>(mod, Type.i32, 4, true),
+		load8_s: loadFn<i32_t>(mod, Type.i32, 1, true),
+		load8_u: loadFn<i32_t>(mod, Type.i32, 1, false),
+		load16_s: loadFn<i32_t>(mod, Type.i32, 2, true),
+		load16_u: loadFn<i32_t>(mod, Type.i32, 2, false),
 
-		store: storeFn<i32_t>(mod, i32_t, 4),
-		store8: storeFn<i32_t>(mod, i32_t, 1),
-		store16: storeFn<i32_t>(mod, i32_t, 2),
+		store: storeFn<i32_t>(mod, Type.i32, 4),
+		store8: storeFn<i32_t>(mod, Type.i32, 1),
+		store16: storeFn<i32_t>(mod, Type.i32, 2),
 
 		/** Return a static constant i32. */
 		const: (value: number): i32_t => (
@@ -149,5 +150,11 @@ export function i32(mod: Module) {
 		},
 		// @ts-expect-error
 		/** @deprecated Use `.reinterpret_f32()` instead. */ reinterpret(...args) { BinaryenObj.printWarn("`.reinterpret()` is deprecated; use `.reinterpret_f32()` instead."); return this.reinterpret_f32(...args); },
+
+		/** @deprecated Use {@link Module#pop} instead. */
+		pop() {
+			BinaryenObj.printWarn("`.i32.pop()` is deprecated; use `.pop(Type.i32)` instead.");
+			return mod.pop(Type.i32);
+		},
 	} as const;
 }

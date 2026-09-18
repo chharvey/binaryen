@@ -33,6 +33,8 @@
 
 namespace wasm {
 
+static const Name STACK_POINTER("__stack_pointer");
+
 void addExportedFunction(Module& wasm, Function* function) {
   wasm.addFunction(function);
   wasm.addExport(
@@ -140,7 +142,7 @@ private:
     }
     for (unsigned i = 0; i < wasm.dataSegments.size(); ++i) {
       auto& segment = wasm.dataSegments[i];
-      if (segment->isPassive) {
+      if (segment->isPassive()) {
         auto it = passiveOffsets.find(segment->name);
         if (it != passiveOffsets.end()) {
           segmentOffsets.push_back(it->second);

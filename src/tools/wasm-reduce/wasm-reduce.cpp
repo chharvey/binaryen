@@ -28,6 +28,7 @@
 #include <memory>
 
 #include "ir/branch-utils.h"
+#include "ir/eh-utils.h"
 #include "ir/iteration.h"
 #include "ir/localize.h"
 #include "ir/properties.h"
@@ -414,7 +415,7 @@ struct Reducer
     ModuleWriter writer(toolOptions.passOptions);
     writer.setBinary(binary);
     writer.setDebugInfo(debugInfo);
-    writer.write(*getModule(), test);
+    toolOptions.write(writer, *getModule(), test);
     // note that it is ok for the destructively-reduced module to be bigger
     // than the previous - each destructive reduction removes logical code,
     // and so is strictly better, even if the wasm binary format happens to
@@ -1089,10 +1090,13 @@ struct Reducer
       struct FunctionReplacer
         : public WalkerPass<PostWalker<FunctionReplacer>> {
         bool isFunctionParallel() override { return true; }
-        bool requiresNonNullableLocalFixups() override { return false; }
+
         std::unique_ptr<Pass> create() override {
           return std::make_unique<FunctionReplacer>();
         };
+
+        bool needEHFixups = false;
+
         void visitCall(Call* curr) {
           // Replace calls to functions we have removed.
           if (getModule()->getFunctionOrNull(curr->target)) {
@@ -1102,6 +1106,7 @@ struct Reducer
           auto* block =
             ChildLocalizer(curr, getFunction(), *getModule(), getPassOptions())
               .getChildrenReplacement();
+          auto originalType = curr->type;
           auto* replacement = builder.replaceWithIdenticalType(curr);
           // We may have failed to come up with a replacement (e.g. for
           // non-nullable references), so manually add an `unreachable` in that
@@ -1110,8 +1115,11 @@ struct Reducer
             replacement = builder.makeUnreachable();
           }
           block->list.push_back(replacement);
-          block->type = curr->type;
+          block->type = originalType;
           replaceCurrent(block);
+          // We added a block around content here, possibly causing us to need
+          // EH fixups later.
+          needEHFixups = true;
         }
         void visitRefFunc(RefFunc* curr) {
           // Replace references to functions we have removed.
@@ -1121,6 +1129,11 @@ struct Reducer
           Builder builder(*getModule());
           replaceCurrent(
             builder.makeBlock({builder.makeUnreachable()}, curr->type));
+        }
+        void visitFunction(Function* curr) {
+          if (needEHFixups) {
+            EHUtils::handleBlockNestedPops(curr, *getModule());
+          }
         }
       };
       PassRunner runner(module.get());
@@ -1383,7 +1396,7 @@ Comparison to creduce:
 More documentation can be found at
 
   https://github.com/WebAssembly/binaryen/wiki/Fuzzing#reducing
-                      )");
+)");
   options
     .add("--command",
          "-cmd",
@@ -1488,6 +1501,9 @@ More documentation can be found at
   if (debugInfo) {
     extraFlags += " -g ";
   }
+  if (options.emitModuleNames) {
+    extraFlags += " --emit-module-names ";
+  }
 
   if (test.size() == 0) {
     Fatal() << "test file not provided\n";
@@ -1545,7 +1561,7 @@ More documentation can be found at
       Module emptyModule;
       ModuleWriter writer(options.passOptions);
       writer.setBinary(true);
-      writer.write(emptyModule, test);
+      options.write(writer, emptyModule, test);
       ProgramResult resultOnValid(command);
       if (resultOnValid == expected) {
         Fatal()

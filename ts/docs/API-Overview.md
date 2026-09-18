@@ -31,9 +31,8 @@ import {type Type, type ExpressionRef, i32} from "binaryen.ts";
 
 
 ### TypeScript Types
-- `Type`: a WASM type; the type of the constants named `i32`, `i64`, etc.
-- `HeapType`: a WASM heap type created in a `TypeBuilder`
-- `PackedType`: an allowed type of a struct or array field; one of three constants: `notPacked`, `i8`, `i16`
+- `Type`: any WASM type, either built-in or custom (e.g., `(ref $YourHeapType)`)
+- `HeapType`: a WASM built-in heap type, or one created in a `TypeBuilder`
 - `ExpressionRef`: an expression, e.g. the type of `i32.const()`
 - module component ref types:
 	- `TagRef`
@@ -47,37 +46,10 @@ import {type Type, type ExpressionRef, i32} from "binaryen.ts";
 	- `ExportRef`
 
 
-### Constants
-- `unreachable`: type of an unreachable instruction (stack effect *[t\*] -> [t\*]*)
-- `none`: void type (stack effect *[t\*] -> []*); not to be confused with WASM’s heap type called *none*
-- `auto`: special type used in [`ExpressionBuilder#block()`](#expression-building) exclusively; automatically detects a block’s result type based on its contents
->
-- `i32`: 32-bit integer
-- `i64`: 64-bit integer
-- `f32`: 32-bit float
-- `f64`: 64-bit float
-- `v128`: 128-bit vector (SIMD)
->
-- `anyref`:         *(ref null any)*
-- `eqref`:          *(ref null eq)*
-- `i31ref`:         *(ref null i31)*
-- `structref`:      *(ref null struct)*
-- `arrayref`:       *(ref null array)*
-- `funcref`:        *(ref null func)*
-- ~~`exnref`~~:     ⛔️ reserved for *(ref null exn)*
-- `externref`:      *(ref null extern)*
-- `nullref`:        *(ref null none)*
-- `nullfuncref`:    *(ref null nofunc)*
-- ~~`nullexnref`~~: ⛔️ reserved for *(ref null noexn)*
-- `nullexternref`:  *(ref null noextern)*
-- `stringref`:      🌱 planned for *(ref null string)*
->
-- `notPacked` (`PackedType`): unaltered type in the struct/array field
-- `i8` (`PackedType`): 8-bit integer
-- `i16` (`PackedType`): 16-bit integer
-
-
 ### Enums
+- `Type`: an enumeration of built-in WASM types (`i32`, `v128`, etc.)
+- `HeapType`: an enumeration of built-in WASM heap types (`array`, `func`, etc.)
+- `PackedType`: an allowed type of a struct or array field; one of three constants: `notPacked`, `i8`, `i16`
 - `ExpressionId`: an enumeration of values returned by `getExpressionId()`
 	- a slight misnomer, as these are not unique IDs per expression, but different IDs for the “kinds” of expression
 - `SideEffect`: an enumeration of values returend by `getSideEffects()`
@@ -97,9 +69,8 @@ Classes (see generated docs for descriptions):
 
 Functions (see generated docs for descriptions):
 - `emitText(expr: ExpressionRef): string`
-- `readBinary(data: Uint8Array): Module`
-- `readBinaryWithFeatures(data: Uint8Array, features: Feature): Module`
-- `parseText(text: string): Module`
+- `readBinary(data: Uint8Array, features?: Feature): Module`
+- `parseText(text: string, features?: Feature): Module`
 - `exit(status: number): void`
 - `createType(types: readonly Type[]): Type`
 - `expandType(typ: Type): Type[]`
@@ -215,6 +186,10 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.struct.new()`, `.struct.new_default()`
 	- `.struct.get()`, `.struct.get_{s,u}()`
 	- `.struct.set()`
+	- `.struct.wait()`
+	- `.waitqueue.new()`
+	- `.waitqueue.notify()`
+	- `.publish()`
 	- `.array.new()`, `.array.new_default()`, `.array.new_fixed()`, `.array.new_data()`, `.array.new_elem()`
 	- `.array.get()`, `.array.get_{s,u}()`
 	- `.array.set()`
@@ -313,6 +288,8 @@ Note: For brevity, glob-like syntax `_{s,u}` is used to mean “`_s` and `_u`”
 	- `.{i8x16,i16x8,i32x4,i64x2,f32x4,f64x2}.splat()`
 	- `.{i8x16,i16x8}.extract_lane_{s,u}()`, `.{i32x4,i64x2,f32x4,f64x2}.extract_lane()`
 	- `.{i8x16,i16x8,i32x4,i64x2,f32x4,f64x2}.replace_lane()`
+- 🌱 StringRef proposal
+	- `string.const()`
 
 
 
@@ -375,6 +352,10 @@ See generated docs for fields, methods, and descriptions of each.
 	- `expressions.StructNew`
 	- `expressions.StructGet`
 	- `expressions.StructSet`
+	- `expressions.StructWait`
+	- `expressions.WaitqueueNew`
+	- `expressions.WaitqueueNotify`
+	- `expressions.Publish`
 	- `expressions.ArrayNew`
 	- `expressions.ArrayNewFixed`
 	- `expressions.ArrayNewData`
@@ -447,6 +428,7 @@ Enum names have been singularized.
 - `MemoryInfo`         &rarr; `Module.Memory`
 - `TableInfo`          &rarr; `Module.Table`
 - `FunctionInfo`       &rarr; `Module.Function`
+- `MemorySegmentInfo`  &rarr; `Module.DataSegment`
 - `ElementSegmentInfo` &rarr; `Module.ElementSegment`
 - `ExportInfo`         &rarr; `Module.Export`
 
@@ -456,8 +438,6 @@ Enum names have been singularized.
 - `LoopInfo`       &rarr; `expressions.Loop`
 - `IfInfo`         &rarr; `expressions.If`
 - etc.
-
-~~`MemorySegmentInfo`~~ ❌ has been removed.
 
 
 ### Modules
@@ -470,13 +450,13 @@ Most `get*Info()` functions have been replaced by their corresponding class cons
 - `getGlobalInfo(global)`          &rarr; `new Module.Global(global)`
 - `getTableInfo(table)`            &rarr; `new Module.Table(table)`
 - `getFunctionInfo(func)`          &rarr; `new Module.Function(func)`
+- `getMemorySegmentInfo(segment)`  &rarr; `new Module.DataSegment(segment)`
 - `getElementSegmentInfo(segment)` &rarr; `new Module.ElementSegment(segment)`
 - `getExportInfo(xport)`           &rarr; `new Module.Export(xport)`
 >
 - `Module#getMemoryInfo(name)` has not changed.
 - `Module#getDataSegmentInfo(name)` has not changed.
 - global `getExpressionInfo(expr)` has not changed.
-- global ~~`getMemorySegmentInfo()`~~ ❌ has been removed.
 
 Most of the `Module` class’s instance methods relating to module component manipulation have been moved.
 - `Module#addTag()`      &rarr; `Module#tags.add()`
@@ -498,6 +478,8 @@ Some of `Module`’s instance methods have been converted into getters/setters:
 - `Module#setFeatures()`        &rarr; `Module#features`
 
 Global `getSideEffects(expr, mod)` has been moved to `Module#getSideEffects()` where it lives alongside `Module#copyExpression()`.
+
+`Module#emitAsmjs` logs asm.js code to stdout instead of returning a string. (Until C++ API supports an asm.js-string-returning function.)
 
 All expression creation methods (`.nop()`, `.drop()`, `.block()`, `.call()`, etc.) directly on `Module`
 were functions for building expressions, and have migrated to `Module#wasm`, an [Expression Builder](#expression-building).

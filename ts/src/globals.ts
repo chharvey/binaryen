@@ -92,6 +92,10 @@ const EXPRESSION_TYPE_REGISTRY: ReadonlyMap<ExpressionId, new (expr: ExpressionR
 	[ExpressionId.StructNew, expressions.StructNew],
 	[ExpressionId.StructGet, expressions.StructGet],
 	[ExpressionId.StructSet, expressions.StructSet],
+	[ExpressionId.StructWait, expressions.StructWait],
+	[ExpressionId.WaitqueueNew, expressions.WaitqueueNew],
+	[ExpressionId.WaitqueueNotify, expressions.WaitqueueNotify],
+	[ExpressionId.Publish, expressions.Publish],
 	[ExpressionId.ArrayNew, expressions.ArrayNew],
 	[ExpressionId.ArrayNewFixed, expressions.ArrayNewFixed],
 	[ExpressionId.ArrayNewData, expressions.ArrayNewData],
@@ -187,35 +191,33 @@ function handleFatalError<T>(func: () => T): T {
 /** Emits the expression in Binaryen’s s-expression text format (not official stack-style text format). */
 export function emitText(expr: ExpressionRef): string {
 	const textPtr = BinaryenObj["_BinaryenExpressionAllocateAndWriteText"](expr);
-	const text = UTF8ToString(textPtr);
-	if (textPtr) {
-		_free(textPtr);
+	try {
+		return `${ UTF8ToString(textPtr) }\n`;
+	} finally {
+		if (textPtr) {
+			_free(textPtr);
+		}
 	}
-	return text;
 }
 
-/** Creates a module from binary data. */
-export function readBinary(data: Uint8Array): Module {
+/** Parses a binary to a module with the given feature set enabled. `features` defaults to MVP. */
+export function readBinary(data: Uint8Array, features?: Feature): Module {
 	const buffer = _malloc(data.length);
 	BinaryenObj.HEAP8.set(data, buffer);
-	const ptr = handleFatalError(() => BinaryenObj["_BinaryenModuleRead"](buffer, data.length));
+	const ptr = features === undefined
+		? handleFatalError(() => BinaryenObj["_BinaryenModuleRead"](buffer, data.length))
+		: handleFatalError(() => BinaryenObj["_BinaryenModuleReadWithFeatures"](buffer, data.length, features));
 	_free(buffer);
 	return wrapModule(ptr);
 }
 
-export function readBinaryWithFeatures(data: Uint8Array, features: Feature): Module {
-	const buffer = _malloc(data.length);
-	BinaryenObj.HEAP8.set(data, buffer);
-	const ptr = handleFatalError(() => BinaryenObj["_BinaryenModuleReadWithFeatures"](buffer, data.length, features));
-	_free(buffer);
-	return wrapModule(ptr);
-}
-
-/** Creates a module from Binaryen’s s-expression text format (not official stack-style text format). */
-export function parseText(text: string): Module {
+/** Parses text format to a module with the given feature set enabled. `features` defaults to MVP. */
+export function parseText(text: string, features?: Feature): Module {
 	const buffer = _malloc(text.length + 1);
 	stringToAscii(text, buffer);
-	const ptr = handleFatalError(() => BinaryenObj["_BinaryenModuleParse"](buffer));
+	const ptr = features === undefined
+		? handleFatalError(() => BinaryenObj["_BinaryenModuleParse"](buffer))
+		: handleFatalError(() => BinaryenObj["_BinaryenModuleParseWithFeatures"](buffer, features));
 	_free(buffer);
 	return wrapModule(ptr);
 }
@@ -287,12 +289,25 @@ export function getExpressionType(expr: ExpressionRef): Type {
 }
 
 /**
- * Obtains information about an expression.
- * Additional properties depend on the expression’s ID
- * and are usually equivalent to the respective parameters when creating such an expression.
+ * Creates a new Expression object given an ExpressionRef argument.
+ *
+ * This function is called without `new`.
+ * You may also use the constructor `new expressions.Expression()`,
+ * or a specific subclass of it.
+ * @see {@link expressions.Expression}
  */
-export function getExpressionInfo(expr: ExpressionRef): expressions.Expression {
+export function Expression(expr: ExpressionRef): expressions.Expression {
 	const id = getExpressionId(expr);
 	const specificExpression = EXPRESSION_TYPE_REGISTRY.get(id);
 	return specificExpression ? new specificExpression(expr) : new expressions.Expression(id, expr);
+}
+
+/**
+ * Obtains information about an expression.
+ *
+ * Additional properties depend on the expression’s ID
+ * and are usually equivalent to the respective parameters when creating such an expression.
+ */
+export function getExpressionInfo(expr: ExpressionRef): Record<string, number | string> {
+	return Expression(expr).toJson();
 }

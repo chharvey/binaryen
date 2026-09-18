@@ -55,7 +55,8 @@ Result<> ParseDefsCtx::addGlobal(Name,
                                  ImportNames*,
                                  GlobalTypeT,
                                  std::optional<ExprT> exp,
-                                 Index) {
+                                 Index,
+                                 DefKind) {
   if (exp) {
     wasm.globals[index]->init = *exp;
   }
@@ -67,7 +68,8 @@ Result<> ParseDefsCtx::addTable(Name,
                                 ImportNames*,
                                 TableTypeT,
                                 std::optional<ExprT> init,
-                                Index) {
+                                Index,
+                                DefKind) {
   if (init) {
     wasm.tables[index]->init = *init;
   }
@@ -108,7 +110,6 @@ Result<> ParseDefsCtx::addData(
   Name, Name* mem, std::optional<ExprT> offset, DataStringT, Index pos) {
   auto& d = wasm.dataSegments[index];
   if (offset) {
-    d->isPassive = false;
     d->offset = *offset;
     if (mem) {
       d->memory = *mem;
@@ -118,7 +119,7 @@ Result<> ParseDefsCtx::addData(
       return in.err(pos, "active data segment with no memory");
     }
   } else {
-    d->isPassive = true;
+    d->memory = Name();
   }
   return Ok{};
 }

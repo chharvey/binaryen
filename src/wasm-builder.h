@@ -151,15 +151,13 @@ public:
 
   static std::unique_ptr<DataSegment>
   makeDataSegment(Name name = "",
-                  Name memory = "",
-                  bool isPassive = false,
+                  Name memory = Name(),
                   Expression* offset = nullptr,
                   const char* init = "",
                   Address size = 0) {
     auto seg = std::make_unique<DataSegment>();
     seg->name = name;
     seg->memory = memory;
-    seg->isPassive = isPassive;
     seg->offset = offset;
     seg->data.resize(size);
     std::copy_n(init, size, seg->data.begin());
@@ -430,7 +428,11 @@ public:
     notify->memory = memory;
     return notify;
   }
-  AtomicFence* makeAtomicFence() { return wasm.allocator.alloc<AtomicFence>(); }
+  AtomicFence* makeAtomicFence(MemoryOrder order) {
+    auto* ret = wasm.allocator.alloc<AtomicFence>();
+    ret->order = order;
+    return ret;
+  }
   Pause* makePause() { return wasm.allocator.alloc<Pause>(); }
   Store* makeStore(unsigned bytes,
                    Address offset,
@@ -1160,12 +1162,16 @@ public:
   }
   ArrayLoad* makeArrayLoad(unsigned bytes,
                            bool signed_,
+                           Address offset,
+                           Address align,
                            Expression* ref,
                            Expression* index,
                            Type type) {
     auto* ret = wasm.allocator.alloc<ArrayLoad>();
     ret->bytes = bytes;
     ret->signed_ = signed_;
+    ret->offset = offset;
+    ret->align = align ? align : Address(bytes);
     ret->ref = ref;
     ret->index = index;
     ret->type = type;
@@ -1174,11 +1180,15 @@ public:
   }
 
   ArrayStore* makeArrayStore(unsigned bytes,
+                             Address offset,
+                             Address align,
                              Expression* ref,
                              Expression* index,
                              Expression* value) {
     auto* ret = wasm.allocator.alloc<ArrayStore>();
     ret->bytes = bytes;
+    ret->offset = offset;
+    ret->align = align ? align : Address(bytes);
     ret->ref = ref;
     ret->index = index;
     ret->value = value;
@@ -1436,23 +1446,37 @@ public:
 
   StructWait* makeStructWait(Index index,
                              Expression* ref,
+                             Expression* waitqueue,
                              Expression* expected,
                              Expression* timeout) {
     auto* ret = wasm.allocator.alloc<StructWait>();
     ret->index = index;
     ret->ref = ref;
+    ret->waitqueue = waitqueue;
     ret->expected = expected;
     ret->timeout = timeout;
     ret->finalize();
     return ret;
   }
 
-  StructNotify*
-  makeStructNotify(Index index, Expression* ref, Expression* count) {
-    auto* ret = wasm.allocator.alloc<StructNotify>();
-    ret->index = index;
-    ret->ref = ref;
+  WaitqueueNew* makeWaitqueueNew() {
+    auto* ret = wasm.allocator.alloc<WaitqueueNew>();
+    ret->finalize();
+    return ret;
+  }
+
+  WaitqueueNotify* makeWaitqueueNotify(Expression* waitqueue,
+                                       Expression* count) {
+    auto* ret = wasm.allocator.alloc<WaitqueueNotify>();
+    ret->waitqueue = waitqueue;
     ret->count = count;
+    ret->finalize();
+    return ret;
+  }
+
+  Publish* makePublish(Expression* ref) {
+    auto* ret = wasm.allocator.alloc<Publish>();
+    ret->ref = ref;
     ret->finalize();
     return ret;
   }
@@ -1487,7 +1511,7 @@ public:
       // The string is already WTF-16, but we need to convert from `Literals` to
       // actual string.
       std::stringstream wtf16;
-      for (auto c : value.getGCData()->values) {
+      for (auto c : value.getGCData()->getLiterals()) {
         auto u = c.getInteger();
         assert(u < 0x10000);
         wtf16 << uint8_t(u & 0xFF);

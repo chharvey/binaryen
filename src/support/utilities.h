@@ -88,11 +88,30 @@ public:
 // undefined.
 #ifndef NDEBUG
 #define WASM_UNREACHABLE(msg) wasm::handle_unreachable(msg, __FILE__, __LINE__)
-#elif defined(WASM_BUILTIN_UNREACHABLE)
-#define WASM_UNREACHABLE(msg) WASM_BUILTIN_UNREACHABLE
 #else
-#define WASM_UNREACHABLE(msg) wasm::handle_unreachable()
+#define WASM_UNREACHABLE(msg) WASM_BUILTIN_UNREACHABLE
 #endif
+
+// Helper to create an invocable with an overloaded operator(), for use with
+// std::visit e.g.
+// std::visit(
+//   overloaded{
+//     [](const A& a) { ... },
+//     [](const B& b) { ... }},
+//   variant)
+template<typename... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+
+template<typename... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+// Lookup a value from `map` and return a pointer to the underlying value
+// or nullptr if not present. Returns a const pointer if `map` is const and
+// non-const otherwise
+auto* find_or_null(auto& map, const auto& key) {
+  auto it = map.find(key);
+  return it != map.end() ? &it->second : nullptr;
+}
 
 } // namespace wasm
 

@@ -23,7 +23,6 @@
 #include "ir/localize.h"
 #include "ir/module-utils.h"
 #include "ir/names.h"
-#include "ir/struct-utils.h"
 #include "ir/subtype-exprs.h"
 #include "ir/type-updating.h"
 #include "ir/utils.h"
@@ -130,10 +129,9 @@
 //
 // If any three of these types exist in these relations with the others, then
 // the validation rules require that the fourth type also exist and be in these
-// relations. The only exception is that A.desc is allowed to be missing. This
-// complex and recursive relationship between subtyping and descriptor relations
-// is why we optimize out unneeded descriptors in this pass rather than e.g.
-// GlobalTypeOptimization.
+// relations. This recursive relationship between subtyping and descriptor
+// relations is why we optimize out unneeded descriptors in this pass rather
+// than e.g. GlobalTypeOptimization.
 //
 // Starting with the initial subtype and descriptor relations determined by
 // walking the IR, repeatedly search for new subtypings and descriptors by
@@ -568,10 +566,6 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
       return;
     }
 
-    if (!getPassOptions().closedWorld) {
-      Fatal() << "Unsubtyping requires --closed-world";
-    }
-
     // Initialize the subtype relation based on what is immediately required to
     // keep the code and public types valid.
     analyzePublicTypes(*wasm);
@@ -635,7 +629,8 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
 
   void analyzePublicTypes(Module& wasm) {
     // We cannot change supertypes for anything public.
-    for (auto type : ModuleUtils::getPublicHeapTypes(wasm)) {
+    for (auto type :
+         ModuleUtils::getPublicHeapTypes(wasm, getPassOptions().worldMode)) {
       if (auto super = type.getDeclaredSuperType()) {
         noteSubtype(type, *super);
       }
@@ -929,8 +924,16 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
     types.setDescriptor(described, descriptor);
 
     // Complete the descriptor squares above and below the new descriptor edge.
-    completeDescriptorSquare(
-      std::nullopt, types.getSupertype(descriptor), described, descriptor);
+    // The four cases here correspond to the four potentially missing corners of
+    // the square.
+    if (auto super = types.getSupertype(described)) {
+      completeDescriptorSquare(
+        super, types.getDescriptor(*super), described, descriptor);
+    }
+    if (auto superDesc = types.getSupertype(descriptor)) {
+      completeDescriptorSquare(
+        types.getDescribed(*superDesc), superDesc, described, descriptor);
+    }
     for (auto sub : types.immediateSubtypes(described)) {
       completeDescriptorSquare(
         described, descriptor, sub, types.getDescriptor(sub));
@@ -1022,9 +1025,9 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
     } else if (!subDesc) {
       subDesc = sub->getDescriptorType();
     } else if (!superDesc) {
-      // This is the only type that is allowed to be missing.
-      return;
+      superDesc = super->getDescriptorType();
     }
+    assert(super && superDesc && sub && subDesc);
     // Add all the edges. Don't worry about duplicating existing edges because
     // checking whether they're necessary now would be about as expensive as
     // discarding them later.
@@ -1038,7 +1041,8 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
     struct Rewriter : GlobalTypeRewriter {
       Unsubtyping& parent;
       Rewriter(Unsubtyping& parent, Module& wasm)
-        : GlobalTypeRewriter(wasm), parent(parent) {}
+        : GlobalTypeRewriter(wasm, parent.getPassOptions().worldMode),
+          parent(parent) {}
       std::optional<HeapType> getDeclaredSuperType(HeapType type) override {
         if (auto super = parent.types.getSupertype(type);
             super && !super->isBasic()) {

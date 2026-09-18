@@ -10,10 +10,11 @@ import type {
 import {
 	type ExpressionRef,
 	Operation,
+	Type,
 	type f32,
 	type f64,
 	type i32,
-	i64 as i64_t,
+	type i64 as i64_t,
 } from "../../constants.ts";
 import {
 	atomicLoadFn,
@@ -33,20 +34,20 @@ import {
 
 function atomic(mod: Module) {
 	return {
-		load: atomicLoadFn(mod, i64_t, 8),
-		load8_u: atomicLoadFn(mod, i64_t, 1),
-		load16_u: atomicLoadFn(mod, i64_t, 2),
-		load32_u: atomicLoadFn(mod, i64_t, 4),
+		load: atomicLoadFn(mod, Type.i64, 8),
+		load8_u: atomicLoadFn(mod, Type.i64, 1),
+		load16_u: atomicLoadFn(mod, Type.i64, 2),
+		load32_u: atomicLoadFn(mod, Type.i64, 4),
 
-		store: atomicStoreFn(mod, i64_t, 8),
-		store8: atomicStoreFn(mod, i64_t, 1),
-		store16: atomicStoreFn(mod, i64_t, 2),
-		store32: atomicStoreFn(mod, i64_t, 4),
+		store: atomicStoreFn(mod, Type.i64, 8),
+		store8: atomicStoreFn(mod, Type.i64, 1),
+		store16: atomicStoreFn(mod, Type.i64, 2),
+		store32: atomicStoreFn(mod, Type.i64, 4),
 
-		rmw: atomicRmwOps(mod, i64_t, 8),
-		rmw8_u: atomicRmwOps(mod, i64_t, 1),
-		rmw16_u: atomicRmwOps(mod, i64_t, 2),
-		rmw32_u: atomicRmwOps(mod, i64_t, 4),
+		rmw: atomicRmwOps(mod, Type.i64, 8),
+		rmw8_u: atomicRmwOps(mod, Type.i64, 1),
+		rmw16_u: atomicRmwOps(mod, Type.i64, 2),
+		rmw32_u: atomicRmwOps(mod, Type.i64, 4),
 	} as const;
 }
 
@@ -58,18 +59,18 @@ function atomic(mod: Module) {
  */
 export function i64(mod: Module) {
 	return {
-		load: loadFn<i64_t>(mod, i64_t, 8, true),
-		load8_s: loadFn<i64_t>(mod, i64_t, 1, true),
-		load8_u: loadFn<i64_t>(mod, i64_t, 1, false),
-		load16_s: loadFn<i64_t>(mod, i64_t, 2, true),
-		load16_u: loadFn<i64_t>(mod, i64_t, 2, false),
-		load32_s: loadFn<i64_t>(mod, i64_t, 4, true),
-		load32_u: loadFn<i64_t>(mod, i64_t, 4, false),
+		load: loadFn<i64_t>(mod, Type.i64, 8, true),
+		load8_s: loadFn<i64_t>(mod, Type.i64, 1, true),
+		load8_u: loadFn<i64_t>(mod, Type.i64, 1, false),
+		load16_s: loadFn<i64_t>(mod, Type.i64, 2, true),
+		load16_u: loadFn<i64_t>(mod, Type.i64, 2, false),
+		load32_s: loadFn<i64_t>(mod, Type.i64, 4, true),
+		load32_u: loadFn<i64_t>(mod, Type.i64, 4, false),
 
-		store: storeFn<i64_t>(mod, i64_t, 8),
-		store8: storeFn<i64_t>(mod, i64_t, 1),
-		store16: storeFn<i64_t>(mod, i64_t, 2),
-		store32: storeFn<i64_t>(mod, i64_t, 4),
+		store: storeFn<i64_t>(mod, Type.i64, 8),
+		store8: storeFn<i64_t>(mod, Type.i64, 1),
+		store16: storeFn<i64_t>(mod, Type.i64, 2),
+		store32: storeFn<i64_t>(mod, Type.i64, 4),
 
 		/** Return a static constant i64. */
 		const: (value: number | bigint): i64_t => (
@@ -179,5 +180,11 @@ export function i64(mod: Module) {
 		},
 		// @ts-expect-error
 		/** @deprecated Use `.reinterpret_f64()` instead. */ reinterpret(...args) { BinaryenObj.printWarn("`.reinterpret()` is deprecated; use `.reinterpret_f64()` instead."); return this.reinterpret_f64(...args); },
+
+		/** @deprecated Use {@link Module#pop} instead. */
+		pop() {
+			BinaryenObj.printWarn("`.i64.pop()` is deprecated; use `.pop(Type.i64)` instead.");
+			return mod.pop(Type.i64);
+		},
 	} as const;
 }

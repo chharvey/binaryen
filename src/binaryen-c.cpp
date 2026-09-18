@@ -93,11 +93,14 @@ BinaryenLiteral toBinaryenLiteral(Literal x) {
         WASM_UNREACHABLE("invalid type");
       case HeapType::string:
         WASM_UNREACHABLE("TODO: string literals");
+      case HeapType::waitqueue:
+        WASM_UNREACHABLE("TODO: waitqueue");
       case HeapType::none:
       case HeapType::noext:
       case HeapType::nofunc:
       case HeapType::nocont:
       case HeapType::noexn:
+      case HeapType::nowaitqueue:
         // Null.
         return ret;
     }
@@ -147,11 +150,14 @@ Literal fromBinaryenLiteral(BinaryenLiteral x) {
         WASM_UNREACHABLE("invalid type");
       case HeapType::string:
         WASM_UNREACHABLE("TODO: string literals");
+      case HeapType::waitqueue:
+        WASM_UNREACHABLE("TODO: waitqueue");
       case HeapType::none:
       case HeapType::noext:
       case HeapType::nofunc:
       case HeapType::nocont:
       case HeapType::noexn:
+      case HeapType::nowaitqueue:
         assert(type.isNullable());
         return Literal::makeNull(heapType);
     }
@@ -424,6 +430,9 @@ BinaryenExternalKind BinaryenExternalTag(void) {
 BINARYEN_API BinaryenMemoryOrder BinaryenMemoryOrderUnordered(void) {
   return static_cast<BinaryenMemoryOrder>(MemoryOrder::Unordered);
 }
+BINARYEN_API BinaryenMemoryOrder BinaryenMemoryOrderRelaxed(void) {
+  return static_cast<BinaryenMemoryOrder>(MemoryOrder::Relaxed);
+}
 BINARYEN_API BinaryenMemoryOrder BinaryenMemoryOrderAcqRel(void) {
   return static_cast<BinaryenMemoryOrder>(MemoryOrder::AcqRel);
 }
@@ -499,8 +508,8 @@ BinaryenFeatures BinaryenFeatureBulkMemoryOpt(void) {
 BinaryenFeatures BinaryenFeatureCallIndirectOverlong(void) {
   return static_cast<BinaryenFeatures>(FeatureSet::CallIndirectOverlong);
 }
-BinaryenFeatures BinaryenFeatureRelaxedAtomics(void) {
-  return static_cast<BinaryenFeatures>(FeatureSet::RelaxedAtomics);
+BinaryenFeatures BinaryenFeatureAcquireReleaseAtomics(void) {
+  return static_cast<BinaryenFeatures>(FeatureSet::AcquireReleaseAtomics);
 }
 BinaryenFeatures BinaryenFeatureMultibyte(void) {
   return static_cast<BinaryenFeatures>(FeatureSet::Multibyte);
@@ -510,6 +519,12 @@ BinaryenFeatures BinaryenFeatureCustomPageSizes(void) {
 }
 BinaryenFeatures BinaryenFeatureWideArithmetic(void) {
   return static_cast<BinaryenFeatures>(FeatureSet::WideArithmetic);
+}
+BinaryenFeatures BinaryenFeatureCompactImports(void) {
+  return static_cast<BinaryenFeatures>(FeatureSet::CompactImports);
+}
+BinaryenFeatures BinaryenFeatureRelaxedAtomics(void) {
+  return static_cast<BinaryenFeatures>(FeatureSet::RelaxedAtomics);
 }
 BinaryenFeatures BinaryenFeatureAll(void) {
   return static_cast<BinaryenFeatures>(FeatureSet::All);
@@ -1497,8 +1512,10 @@ BinaryenExpressionRef BinaryenAtomicNotify(BinaryenModuleRef module,
                         0,
                         getMemoryName(module, memoryName)));
 }
-BinaryenExpressionRef BinaryenAtomicFence(BinaryenModuleRef module) {
-  return static_cast<Expression*>(Builder(*(Module*)module).makeAtomicFence());
+BinaryenExpressionRef BinaryenAtomicFence(BinaryenModuleRef module,
+                                          BinaryenMemoryOrder order) {
+  return Builder(*(Module*)module)
+    .makeAtomicFence(static_cast<MemoryOrder>(order));
 }
 BinaryenExpressionRef BinaryenSIMDExtract(BinaryenModuleRef module,
                                           BinaryenOp op,
@@ -1652,11 +1669,10 @@ BinaryenExpressionRef BinaryenPop(BinaryenModuleRef module, BinaryenType type) {
 }
 
 BinaryenExpressionRef BinaryenRefNull(BinaryenModuleRef module,
-                                      BinaryenType type) {
-  Type type_(type);
-  assert(type_.isNullable());
+                                      BinaryenHeapType heaptype) {
+  HeapType heaptype_(heaptype);
   return static_cast<Expression*>(
-    Builder(*(Module*)module).makeRefNull(type_.getHeapType()));
+    Builder(*(Module*)module).makeRefNull(heaptype_));
 }
 
 BinaryenExpressionRef BinaryenRefIsNull(BinaryenModuleRef module,
@@ -1730,7 +1746,8 @@ BinaryenExpressionRef BinaryenTableGrow(BinaryenModuleRef module,
                                         BinaryenExpressionRef delta) {
   if (value == nullptr) {
     auto tableType = (*(Module*)module).getTableOrNull(name)->type;
-    value = BinaryenRefNull(module, (BinaryenType)tableType.getID());
+    value = BinaryenRefNull(module,
+                            (BinaryenHeapType)tableType.getHeapType().getID());
   }
   return static_cast<Expression*>(
     Builder(*(Module*)module)
@@ -1869,6 +1886,32 @@ BinaryenExpressionRef BinaryenStructSet(BinaryenModuleRef module,
     Builder(*(Module*)module)
       .makeStructSet(
         index, (Expression*)ref, (Expression*)value, MemoryOrder::Unordered));
+}
+BinaryenExpressionRef BinaryenStructWait(BinaryenModuleRef module,
+                                         BinaryenExpressionRef ref,
+                                         BinaryenIndex index,
+                                         BinaryenExpressionRef expected,
+                                         BinaryenExpressionRef timeout,
+                                         BinaryenExpressionRef waitqueue) {
+  return Builder(*(Module*)module)
+    .makeStructWait(index,
+                    (Expression*)ref,
+                    (Expression*)waitqueue,
+                    (Expression*)expected,
+                    (Expression*)timeout);
+}
+BinaryenExpressionRef BinaryenWaitqueueNew(BinaryenModuleRef module) {
+  return Builder(*(Module*)module).makeWaitqueueNew();
+}
+BinaryenExpressionRef BinaryenWaitqueueNotify(BinaryenModuleRef module,
+                                              BinaryenExpressionRef waitqueue,
+                                              BinaryenExpressionRef count) {
+  return Builder(*(Module*)module)
+    .makeWaitqueueNotify((Expression*)waitqueue, (Expression*)count);
+}
+BinaryenExpressionRef BinaryenPublish(BinaryenModuleRef module,
+                                      BinaryenExpressionRef ref) {
+  return Builder(*(Module*)module).makePublish((Expression*)ref);
 }
 BinaryenExpressionRef BinaryenArrayNew(BinaryenModuleRef module,
                                        BinaryenHeapType type,
@@ -3378,15 +3421,18 @@ void BinaryenAtomicNotifySetNotifyCount(BinaryenExpressionRef expr,
     (Expression*)notifyCountExpr;
 }
 // AtomicFence
-uint8_t BinaryenAtomicFenceGetOrder(BinaryenExpressionRef expr) {
+BinaryenMemoryOrder BinaryenAtomicFenceGetOrder(BinaryenExpressionRef expr) {
   auto* expression = (Expression*)expr;
   assert(expression->is<AtomicFence>());
-  return static_cast<AtomicFence*>(expression)->order;
+  return static_cast<BinaryenMemoryOrder>(
+    static_cast<AtomicFence*>(expression)->order);
 }
-void BinaryenAtomicFenceSetOrder(BinaryenExpressionRef expr, uint8_t order) {
+void BinaryenAtomicFenceSetOrder(BinaryenExpressionRef expr,
+                                 BinaryenMemoryOrder order) {
   auto* expression = (Expression*)expr;
   assert(expression->is<AtomicFence>());
-  static_cast<AtomicFence*>(expression)->order = order;
+  static_cast<AtomicFence*>(expression)->order =
+    static_cast<MemoryOrder>(order);
 }
 // SIMDExtract
 BinaryenOp BinaryenSIMDExtractGetOp(BinaryenExpressionRef expr) {
@@ -4492,6 +4538,115 @@ void BinaryenStructSetSetValue(BinaryenExpressionRef expr,
   assert(valueExpr);
   static_cast<StructSet*>(expression)->value = (Expression*)valueExpr;
 }
+
+// StructWait
+
+BinaryenExpressionRef BinaryenStructWaitGetRef(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  return static_cast<StructWait*>(expression)->ref;
+}
+void BinaryenStructWaitSetRef(BinaryenExpressionRef expr,
+                              BinaryenExpressionRef refExpr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  assert(refExpr);
+  static_cast<StructWait*>(expression)->ref = (Expression*)refExpr;
+}
+BinaryenIndex BinaryenStructWaitGetIndex(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  return static_cast<StructWait*>(expression)->index;
+}
+void BinaryenStructWaitSetIndex(BinaryenExpressionRef expr,
+                                BinaryenIndex index) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  static_cast<StructWait*>(expression)->index = index;
+}
+BinaryenExpressionRef
+BinaryenStructWaitGetExpected(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  return static_cast<StructWait*>(expression)->expected;
+}
+void BinaryenStructWaitSetExpected(BinaryenExpressionRef expr,
+                                   BinaryenExpressionRef expectedExpr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  assert(expectedExpr);
+  static_cast<StructWait*>(expression)->expected = (Expression*)expectedExpr;
+}
+BinaryenExpressionRef BinaryenStructWaitGetTimeout(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  return static_cast<StructWait*>(expression)->timeout;
+}
+void BinaryenStructWaitSetTimeout(BinaryenExpressionRef expr,
+                                  BinaryenExpressionRef timeoutExpr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  assert(timeoutExpr);
+  static_cast<StructWait*>(expression)->timeout = (Expression*)timeoutExpr;
+}
+BinaryenExpressionRef
+BinaryenStructWaitGetWaitqueue(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  return static_cast<StructWait*>(expression)->waitqueue;
+}
+void BinaryenStructWaitSetWaitqueue(BinaryenExpressionRef expr,
+                                    BinaryenExpressionRef waitqueueExpr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<StructWait>());
+  assert(waitqueueExpr);
+  static_cast<StructWait*>(expression)->waitqueue = (Expression*)waitqueueExpr;
+}
+
+// WaitqueueNotify
+
+BinaryenExpressionRef
+BinaryenWaitqueueNotifyGetWaitqueue(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<WaitqueueNotify>());
+  return static_cast<WaitqueueNotify*>(expression)->waitqueue;
+}
+void BinaryenWaitqueueNotifySetWaitqueue(BinaryenExpressionRef expr,
+                                         BinaryenExpressionRef waitqueueExpr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<WaitqueueNotify>());
+  assert(waitqueueExpr);
+  static_cast<WaitqueueNotify*>(expression)->waitqueue =
+    (Expression*)waitqueueExpr;
+}
+BinaryenExpressionRef
+BinaryenWaitqueueNotifyGetCount(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<WaitqueueNotify>());
+  return static_cast<WaitqueueNotify*>(expression)->count;
+}
+void BinaryenWaitqueueNotifySetCount(BinaryenExpressionRef expr,
+                                     BinaryenExpressionRef countExpr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<WaitqueueNotify>());
+  assert(countExpr);
+  static_cast<WaitqueueNotify*>(expression)->count = (Expression*)countExpr;
+}
+
+// Publish
+BinaryenExpressionRef BinaryenPublishGetRef(BinaryenExpressionRef expr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<Publish>());
+  return static_cast<Publish*>(expression)->ref;
+}
+void BinaryenPublishSetRef(BinaryenExpressionRef expr,
+                           BinaryenExpressionRef refExpr) {
+  auto* expression = (Expression*)expr;
+  assert(expression->is<Publish>());
+  assert(refExpr);
+  static_cast<Publish*>(expression)->ref = (Expression*)refExpr;
+}
+
 // ArrayNew
 BinaryenExpressionRef BinaryenArrayNewGetInit(BinaryenExpressionRef expr) {
   auto* expression = (Expression*)expr;
@@ -5571,7 +5726,7 @@ BinaryenIndex BinaryenGetNumElementSegments(BinaryenModuleRef module) {
 }
 BinaryenExpressionRef
 BinaryenElementSegmentGetOffset(BinaryenElementSegmentRef elem) {
-  if (((ElementSegment*)elem)->table.isNull()) {
+  if (((ElementSegment*)elem)->isPassive()) {
     Fatal() << "elem segment is passive.";
   }
   return ((ElementSegment*)elem)->offset;
@@ -5625,12 +5780,12 @@ void BinaryenSetMemory(BinaryenModuleRef module,
   for (BinaryenIndex i = 0; i < numSegments; i++) {
     auto explicitName = segmentNames && segmentNames[i];
     auto name = explicitName ? Name(segmentNames[i]) : Name::fromInt(i);
-    auto curr = Builder::makeDataSegment(name,
-                                         memory->name,
-                                         segmentPassives[i],
-                                         (Expression*)segmentOffsets[i],
-                                         segmentDatas[i],
-                                         segmentSizes[i]);
+    auto curr =
+      Builder::makeDataSegment(name,
+                               segmentPassives[i] ? Name() : memory->name,
+                               (Expression*)segmentOffsets[i],
+                               segmentDatas[i],
+                               segmentSizes[i]);
     curr->hasExplicitName = explicitName;
     ((Module*)module)->addDataSegment(std::move(curr));
   }
@@ -5780,7 +5935,7 @@ size_t BinaryenGetDataSegmentByteLength(BinaryenDataSegmentRef segment) {
   return ((DataSegment*)segment)->data.size();
 }
 bool BinaryenGetDataSegmentPassive(BinaryenDataSegmentRef segment) {
-  return ((DataSegment*)segment)->isPassive;
+  return ((DataSegment*)segment)->isPassive();
 }
 void BinaryenCopyDataSegmentData(BinaryenDataSegmentRef segment, char* buffer) {
   std::copy(((DataSegment*)segment)->data.cbegin(),
@@ -5797,12 +5952,12 @@ void BinaryenAddDataSegment(BinaryenModuleRef module,
   auto* wasm = (Module*)module;
   auto name =
     segmentName ? Name(segmentName) : Name::fromInt(wasm->dataSegments.size());
-  auto curr = Builder::makeDataSegment(name,
-                                       memoryName ? memoryName : "0",
-                                       segmentPassive,
-                                       (Expression*)segmentOffset,
-                                       segmentData,
-                                       segmentSize);
+  auto curr = Builder::makeDataSegment(
+    name,
+    segmentPassive ? Name() : (memoryName ? memoryName : "0"),
+    (Expression*)segmentOffset,
+    segmentData,
+    segmentSize);
   curr->hasExplicitName = segmentName ? true : false;
   wasm->addDataSegment(std::move(curr));
 }
@@ -5833,7 +5988,13 @@ void BinaryenModuleSetFeatures(BinaryenModuleRef module,
 //
 
 BinaryenModuleRef BinaryenModuleParse(const char* text) {
+  return BinaryenModuleParseWithFeatures(text, BinaryenFeatureMVP());
+}
+
+BinaryenModuleRef BinaryenModuleParseWithFeatures(const char* text,
+                                                  BinaryenFeatures features) {
   auto* wasm = new Module;
+  wasm->features.features = features;
   auto parsed = WATParser::parseModule(*wasm, text);
   if (auto* err = parsed.getErr()) {
     Fatal() << err->msg << "\n";
@@ -5902,9 +6063,13 @@ void BinaryenSetTrapsNeverHappen(bool on) {
   globalPassOptions.trapsNeverHappen = on;
 }
 
-bool BinaryenGetClosedWorld(void) { return globalPassOptions.closedWorld; }
+bool BinaryenGetClosedWorld(void) {
+  return globalPassOptions.worldMode == WorldMode::Closed;
+}
 
-void BinaryenSetClosedWorld(bool on) { globalPassOptions.closedWorld = on; }
+void BinaryenSetClosedWorld(bool on) {
+  globalPassOptions.worldMode = on ? WorldMode::Closed : WorldMode::Open;
+}
 
 bool BinaryenGetLowMemoryUnused(void) {
   return globalPassOptions.lowMemoryUnused;
@@ -6343,7 +6508,7 @@ void BinaryenElementSegmentSetTable(BinaryenElementSegmentRef elem,
   ((ElementSegment*)elem)->table = table;
 }
 bool BinaryenElementSegmentIsPassive(BinaryenElementSegmentRef elem) {
-  return ((ElementSegment*)elem)->table.isNull();
+  return ((ElementSegment*)elem)->isPassive();
 }
 
 //
@@ -6539,6 +6704,10 @@ BinaryenSideEffects BinaryenSideEffectThrows(void) {
 BinaryenSideEffects BinaryenSideEffectDanglingPop(void) {
   return static_cast<BinaryenSideEffects>(
     EffectAnalyzer::SideEffects::DanglingPop);
+}
+BinaryenSideEffects BinaryenSideEffectSuspends(void) {
+  return static_cast<BinaryenSideEffects>(
+    EffectAnalyzer::SideEffects::Suspends);
 }
 BinaryenSideEffects BinaryenSideEffectAny(void) {
   return static_cast<BinaryenSideEffects>(EffectAnalyzer::SideEffects::Any);

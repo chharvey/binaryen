@@ -11,6 +11,7 @@ import type {
 } from "../../classes/module/Module.ts";
 import {
 	type ExpressionRef,
+	type HeapType,
 	Operation,
 	type Type,
 	type eqref,
@@ -28,8 +29,8 @@ export function ref(mod: Module) {
 		),
 
 		/** Produces a null reference. */
-		null: <T extends ExpressionRef>(typ: Type): T => (
-			BinaryenObj["_BinaryenRefNull"](mod[PTR], typ) as T
+		null: <T extends ExpressionRef>(ht: HeapType): T => (
+			BinaryenObj["_BinaryenRefNull"](mod[PTR], ht) as T
 		),
 
 		/** Checks for null. */

@@ -9,11 +9,7 @@ import {
 	ExpressionId,
 	type ExpressionRef,
 	type Operation,
-	i32,
-	i64,
-	f32,
-	f64,
-	v128,
+	Type,
 } from "../../constants.ts";
 import {
 	Expression,
@@ -26,31 +22,31 @@ export class Const extends Expression {
 		super(ExpressionId.Const, expr);
 	}
 
-	get value(): number | number[] {
+	get value(): number | bigint | number[] {
 		const this_type = this.type;
 		switch (this_type) {
-			case i32: { return this.valueI32; }
-			case i64: { return this.valueI64; }
-			case f32: { return this.valueF32; }
-			case f64: { return this.valueF64; }
-			case v128: { return this.valueV128; }
+			case Type.i32: { return this.#valueI32; }
+			case Type.i64: { return this.#valueI64; }
+			case Type.f32: { return this.#valueF32; }
+			case Type.f64: { return this.#valueF64; }
+			case Type.v128: { return this.#valueV128; }
 		}
 		throw new Error(`Unexpected type: ${ this_type }.`);
 	}
 
-	get valueI32(): number { return BinaryenObj["_BinaryenConstGetValueI32"](this._ptr); }
-	set valueI32(value: number) { BinaryenObj["_BinaryenConstSetValueI32"](this._ptr, value); }
+	get #valueI32(): number { return BinaryenObj["_BinaryenConstGetValueI32"](this._ptr); }
+	set #valueI32(value: number) { BinaryenObj["_BinaryenConstSetValueI32"](this._ptr, value); }
 
-	get valueI64(): number { return BinaryenObj["_BinaryenConstGetValueI64"](this._ptr); }
-	set valueI64(value: number) { BinaryenObj["_BinaryenConstSetValueI64"](this._ptr, BigInt(value)); }
+	get #valueI64(): bigint { return BinaryenObj["_BinaryenConstGetValueI64"](this._ptr) as unknown as bigint; }
+	set #valueI64(value: bigint) { BinaryenObj["_BinaryenConstSetValueI64"](this._ptr, value); }
 
-	get valueF32(): number { return BinaryenObj["_BinaryenConstGetValueF32"](this._ptr); }
-	set valueF32(value: number) { BinaryenObj["_BinaryenConstSetValueF32"](this._ptr, value); }
+	get #valueF32(): number { return BinaryenObj["_BinaryenConstGetValueF32"](this._ptr); }
+	set #valueF32(value: number) { BinaryenObj["_BinaryenConstSetValueF32"](this._ptr, value); }
 
-	get valueF64(): number { return BinaryenObj["_BinaryenConstGetValueF64"](this._ptr); }
-	set valueF64(value: number) { BinaryenObj["_BinaryenConstSetValueF64"](this._ptr, value); }
+	get #valueF64(): number { return BinaryenObj["_BinaryenConstGetValueF64"](this._ptr); }
+	set #valueF64(value: number) { BinaryenObj["_BinaryenConstSetValueF64"](this._ptr, value); }
 
-	get valueV128(): number[] {
+	get #valueV128(): number[] {
 		const value: number[] = [];
 		preserveStack(() => {
 			const tempBuffer = stackAlloc(16);
@@ -62,7 +58,7 @@ export class Const extends Expression {
 		return value;
 	}
 
-	set valueV128(value: readonly number[]) {
+	set #valueV128(value: readonly number[]) {
 		preserveStack(() => {
 			const tempBuffer = stackAlloc(16);
 			for (let i = 0; i < 16; ++i) {

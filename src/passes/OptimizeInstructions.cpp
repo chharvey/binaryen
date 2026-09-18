@@ -49,6 +49,7 @@
 
 #include "call-utils.h"
 #include "support/utilities.h"
+#include "wasm-type.h"
 
 // TODO: Use the new sign-extension opcodes where appropriate. This needs to be
 // conditionalized on the availability of atomics.
@@ -1461,6 +1462,65 @@ struct OptimizeInstructions
     }
   }
 
+  void visitResume(Resume* curr) {
+    skipNonNullCast(curr->cont, curr);
+    if (trapOnNull(curr, curr->cont)) {
+      return;
+    }
+    if (curr->type == Type::unreachable) {
+      return;
+    }
+
+    // If this resume operates on a freshly-created continuation of an exact
+    // function that is known never to suspend, we can turn the resumption into
+    // a direct call, avoiding the continuation allocation and handler overhead.
+
+    // Continuations are single-shot, so resuming a continuation that has
+    // already been consumed will trap. If traps are assumed never to happen, we
+    // can assume this continuation will not be consumed on another path and
+    // look through tees and conditional branches. Otherwise, avoid looking
+    // through them to ensure the continuation cannot be consumed elsewhere.
+    auto behavior = getPassOptions().trapsNeverHappen
+                      ? Properties::FallthroughBehavior::AllowTeeBrIf
+                      : Properties::FallthroughBehavior::NoTeeBrIf;
+
+    auto* contExpr = Properties::getFallthrough(
+      curr->cont, getPassOptions(), *getModule(), behavior);
+    auto* contNew = contExpr->dynCast<ContNew>();
+    if (!contNew) {
+      return;
+    }
+    if (contNew->func->type == Type::unreachable) {
+      return;
+    }
+
+    auto* funcExpr =
+      Properties::getFallthrough(contNew->func, getPassOptions(), *getModule());
+    auto* refFunc = funcExpr->dynCast<RefFunc>();
+    if (!refFunc) {
+      return;
+    }
+
+    auto* target = getModule()->getFunctionOrNull(refFunc->func);
+    if (!target || target->imported()) {
+      return;
+    }
+
+    if (!target->effects || target->effects->suspends) {
+      return;
+    }
+
+    auto* block =
+      ChildLocalizer(curr, getFunction(), *getModule(), getPassOptions())
+        .getChildrenReplacement();
+    Builder builder(*getModule());
+    Type results = target->getResults();
+    block->list.push_back(
+      builder.makeCall(target->name, curr->operands, results));
+    block->type = results;
+    replaceCurrent(block);
+  }
+
   // Note on removing casts (which the following utilities, skipNonNullCast and
   // skipCast do): removing a cast is potentially dangerous, as it removes
   // information from the IR. For example:
@@ -1551,6 +1611,17 @@ struct OptimizeInstructions
   // ref.as_non_null then the struct.set will still trap, of course, but that
   // will only happen *after* the call, which is wrong.
   void skipNonNullCast(Expression*& input, Expression* parent) {
+    // If we must never reorder code, then we cannot remove a non-null cast.
+    // Such removals are valid because we move the trap later (see the
+    // struct.set in the example above: we can remove the ref.as_non_null
+    // because the set will trap anyhow, so we are pushing the trap onward; in
+    // the example above we have a call we can't move past, and in neverReorder
+    // mode we need to care about things like branch hints, which do not have
+    // effects, hence the need for the special neverReorder flag).
+    if (neverReorder) {
+      return;
+    }
+
     // Check the other children for the ordering problem only if we find a
     // possible optimization, to avoid wasted work.
     bool checkedSiblings = false;
@@ -1581,7 +1652,7 @@ struct OptimizeInstructions
             // trap we want to move. (We use a shallow effect analyzer since we
             // will only move the ref.as_non_null itself.)
             ShallowEffectAnalyzer movingEffects(options, *getModule(), input);
-            if (crossedEffects.invalidates(movingEffects)) {
+            if (movingEffects.orderedBefore(crossedEffects)) {
               return;
             }
 
@@ -1717,7 +1788,7 @@ struct OptimizeInstructions
 
       if (auto* select = ref->dynCast<Select>()) {
         // We must check for unreachability explicitly here because a full
-        // refinalize only happens at the end. That is, the select may stil be
+        // refinalize only happens at the end. That is, the select may still be
         // reachable after we turned one child into an unreachable, and we are
         // calling getResultOfFirst which will error on unreachability.
         if (flowsOutNull(select->ifTrue) &&
@@ -1796,6 +1867,8 @@ struct OptimizeInstructions
   }
 
   void visitRefEq(RefEq* curr) {
+    Builder builder(*getModule());
+
     // Check for unreachability. Note we must check both the children and the
     // ref.eq itself, as in e.g. optimizeTernary, as we only refinalize at the
     // end, so unreachable children may not update the parent yet.
@@ -1832,12 +1905,16 @@ struct OptimizeInstructions
     skipCast(curr->left, nullableEq);
     skipCast(curr->right, nullableEq);
 
-    // Identical references compare equal.
-    // (Technically we do not need to check if the inputs are also foldable into
-    // a single one, but we do not have utility code to handle non-foldable
-    // cases yet; the foldable case we do handle is the common one of the first
-    // child being a tee and the second a get of that tee. TODO)
+    // Identical references compare equal. If the inputs are foldable, we need
+    // only keep one of them.
     if (areConsecutiveInputsEqualAndFoldable(curr->left, curr->right)) {
+      replaceCurrent(
+        builder.makeSequence(builder.makeDrop(curr->left),
+                             builder.makeConst(Literal::makeOne(Type::i32))));
+      return;
+    }
+
+    if (areConsecutiveInputsEqual(curr->left, curr->right)) {
       replaceCurrent(
         getDroppedChildrenAndAppend(curr, Literal::makeOne(Type::i32)));
       return;
@@ -1907,6 +1984,7 @@ struct OptimizeInstructions
     trapOnNull(curr, curr->ref);
     // Relax acquire loads of unshared fields to unordered because they cannot
     // synchronize with other threads.
+    // TODO: Relax all other memory orderings as well.
     if (curr->order == MemoryOrder::AcqRel && curr->ref->type.isRef() &&
         !curr->ref->type.getHeapType().isShared()) {
       curr->order = MemoryOrder::Unordered;
@@ -1930,6 +2008,7 @@ struct OptimizeInstructions
 
     // Relax release stores of unshared fields to unordered because they cannot
     // synchronize with other threads.
+    // TODO: Relax all other memory orderings as well.
     if (curr->order == MemoryOrder::AcqRel && curr->ref->type.isRef() &&
         !curr->ref->type.getHeapType().isShared()) {
       curr->order = MemoryOrder::Unordered;
@@ -2542,13 +2621,41 @@ struct OptimizeInstructions
       // traps are allowed, then we cannot remove the potentially-trapping
       // child, though.
       bool notWeaker = Type::isSubType(curr->type, child->type);
-      bool safe = !child->desc || getPassOptions().trapsNeverHappen;
-      if (notWeaker && safe) {
+      auto& options = getPassOptions();
+      auto canTrap = !options.trapsNeverHappen;
+      bool safe = !child->desc || !canTrap;
+      bool canOptimize = notWeaker && safe;
+      if (canOptimize && curr->desc && canTrap) {
+        // There is another child here, which might trap, and we need to
+        // consider that in this situation:
+        //
+        //  (outer.cast
+        //    (inner.cast (inner.ref))
+        //    (descriptor with effects)
+        //  )
+        //
+        //  =>
+        //
+        //  (outer.cast
+        //    (inner.ref)                ;; inner cast was removed
+        //    (descriptor with effects)
+        //  )
+        //
+        // It is safe to remove the inner cast, as if it trapped, the outer one
+        // would still trap. But if there is a descriptor, then we are moving
+        // the trap across the descriptor, and shouldn't cross effects there.
+        EffectAnalyzer descEffects(options, *getModule(), curr->desc);
+        ShallowEffectAnalyzer movingEffects(options, *getModule(), curr->ref);
+        if (movingEffects.orderedBefore(descEffects)) {
+          canOptimize = false;
+        }
+      }
+      if (canOptimize) {
         if (child->desc) {
           // Reorder the child's reference past its dropped descriptor if
           // necessary.
           auto* block =
-            ChildLocalizer(child, getFunction(), *getModule(), getPassOptions())
+            ChildLocalizer(child, getFunction(), *getModule(), options)
               .getChildrenReplacement();
           block->list.push_back(child->ref);
           block->type = child->ref->type;
@@ -2574,7 +2681,7 @@ struct OptimizeInstructions
         auto& options = getPassRunner()->options;
         EffectAnalyzer descEffects(options, *getModule(), curr->desc);
         ShallowEffectAnalyzer movingEffects(options, *getModule(), curr->ref);
-        if (descEffects.invalidates(movingEffects)) {
+        if (movingEffects.orderedBefore(descEffects)) {
           return;
         }
       }
@@ -2734,6 +2841,51 @@ struct OptimizeInstructions
     trapOnNull(curr, curr->ref);
   }
 
+  void visitPublish(Publish* curr) {
+    if (curr->type == Type::unreachable) {
+      return;
+    }
+
+    // Publish of a reference that cannot be a shared array or struct can be
+    // removed.
+    auto canBeSharedArrayOrStruct = [](Type type) {
+      if (!type.isRef()) {
+        return false;
+      }
+      auto ht = type.getHeapType();
+      if (ht.isBottom() || ht.isMaybeShared(HeapType::i31)) {
+        return false;
+      }
+      return HeapType::isSubType(ht, HeapTypes::any.getBasic(Shared));
+    };
+
+    if (!canBeSharedArrayOrStruct(getFallthroughType(curr->ref))) {
+      replaceCurrent(curr->ref);
+      return;
+    }
+
+    auto isAllocation = [](Expression* expr) {
+      return expr->is<StructNew>() || expr->is<ArrayNew>() ||
+             expr->is<ArrayNewData>() || expr->is<ArrayNewElem>() ||
+             expr->is<ArrayNewFixed>();
+    };
+
+    // Publish of publish or of a struct/array allocation can be removed.
+    Expression* fallthrough = curr->ref;
+    while (true) {
+      if (fallthrough->is<Publish>() || isAllocation(fallthrough)) {
+        replaceCurrent(curr->ref);
+        return;
+      }
+      auto* next = Properties::getImmediateFallthrough(
+        fallthrough, getPassOptions(), *getModule());
+      if (next == fallthrough) {
+        break;
+      }
+      fallthrough = next;
+    }
+  }
+
   void visitTupleExtract(TupleExtract* curr) {
     if (curr->type == Type::unreachable) {
       return;
@@ -2788,69 +2940,120 @@ private:
   // simple peephole optimizations - all we care about is a single instruction
   // at a time, and its inputs).
   bool areConsecutiveInputsEqual(Expression* left, Expression* right) {
-    // When we look for a tee/get pair, we can consider the fallthrough values
-    // for the first, as the fallthrough happens last (however, we must use
-    // NoTeeBrIf as we do not want to look through the tee). We cannot do this
-    // on the second, however, as there could be effects in the middle.
-    // TODO: Use effects here perhaps.
-    left =
-      Properties::getFallthrough(left,
-                                 getPassOptions(),
-                                 *getModule(),
-                                 Properties::FallthroughBehavior::NoTeeBrIf);
-    if (areMatchingTeeAndGet(left, right)) {
-      return true;
+    // The fallthrough expression of `left` produces its value. That value may
+    // depend on effects from other non-fallthrough expressions in `left`, but
+    // those expressions are generally executed before the fallthrough value and
+    // will affect the values of `left` and `right` equally, so we can ignore
+    // them. The exceptions are `local.tee` instructions and br_if conditions,
+    // which execute after the fallthrough and might affect only the value of
+    // `right`.
+    // TODO: We should use a custom getFallthrough that ignores whether br_if
+    // conditions and values can be reordered, since we can handle that more
+    // precisely here.
+    // TODO: When the fallthrough is an If (meaning the other branch must never
+    // return), we should ignore effects in that non-returning branch.
+    EffectAnalyzer interferingEffects(getPassOptions(), *getModule());
+    bool matchingTeeAndGet = false;
+    while (true) {
+      left =
+        Properties::getFallthrough(left,
+                                   getPassOptions(),
+                                   *getModule(),
+                                   Properties::FallthroughBehavior::NoTeeBrIf);
+      if (auto* tee = left->dynCast<LocalSet>()) {
+        assert(tee->isTee());
+        // If `right` reads directly from this local.tee, then we know their
+        // values are the same. We know no children of this tee will be executed
+        // after it, so we need not look for further effects. But there might be
+        // interfering sets in previous br_if conditions, so we cannot just
+        // return here.
+        // TODO: Calculate `right`'s fallthrough first in case the fallthrough
+        // is the matching get.
+        if (areMatchingTeeAndGet(left, right)) {
+          matchingTeeAndGet = true;
+          left = getFallthrough(left);
+          break;
+        }
+        interferingEffects.visit(tee);
+        left = tee->value;
+        continue;
+      }
+      if (auto* br = left->dynCast<Break>(); br && br->condition) {
+        assert(br->value);
+        // NB: We don't need to worry about the branch effect because any branch
+        // at runtime must skip past the parent expression, so it would not
+        // matter how that parent expression gets optimized.
+        interferingEffects.walk(br->condition);
+        left = br->value;
+        continue;
+      }
+      if (auto* cast = left->dynCast<RefCast>(); cast && cast->desc) {
+        interferingEffects.walk(cast->desc);
+        left = cast->ref;
+        continue;
+      }
+      if (auto* br = left->dynCast<BrOn>(); br && br->desc) {
+        interferingEffects.walk(br->desc);
+        left = br->ref;
+        continue;
+      }
+      // We have found the real fallthrough expression.
+      break;
     }
 
-    // Ignore extraneous things and compare them syntactically. We can also
-    // look at the full fallthrough for both sides now.
-    auto* originalLeft = left;
-    left = getFallthrough(left);
-    auto* originalRight = right;
-    right = getFallthrough(right);
-    if (!ExpressionAnalyzer::equal(left, right)) {
+    // We similarly want to find the fallthrough expression of `right`. But this
+    // time, it is the expressions that execute before, not after, the
+    // fallthrough that can affect its value.
+    while (true) {
+      auto* next = Properties::getImmediateFallthrough(
+        right, getPassOptions(), *getModule());
+      if (next == right) {
+        // We have found the fallthrough expression.
+        break;
+      }
+      // Gather the effects of all the non-fallthrough children of the
+      // container.
+      for (auto* child : ChildIterator(right)) {
+        if (child == next) {
+          // Skip children that execute after the fallthrough value, such as
+          // br_if conditions.
+          break;
+        }
+        interferingEffects.walk(child);
+      }
+      right = next;
+    }
+
+    // We have both fallthrough expressions. See if they look the same.
+    if (!matchingTeeAndGet && !ExpressionAnalyzer::equal(left, right)) {
       return false;
     }
 
-    // We must also not have non-fallthrough effects that invalidate us, such as
-    // this situation:
-    //
-    //  (local.get $x)
-    //  (block
-    //    (local.set $x ..)
-    //    (local.get $x)
-    //  )
-    //
-    // The fallthroughs are identical, but the set may cause us to read a
-    // different value.
-    if (originalRight != right) {
-      // TODO: We could be more precise here and ignore right itself in
-      //       originalRightEffects.
-      auto originalRightEffects = effects(originalRight);
-      auto rightEffects = effects(right);
-      if (originalRightEffects.invalidates(rightEffects)) {
-        return false;
-      }
+    // They do look the same! Determine whether there are side effects that
+    // could make the values different. Note that we use the same
+    // EffectAnalyzers for effects from the left and right sides because they
+    // are the same.
+    EffectAnalyzer fallthroughChildEffects(getPassOptions(), *getModule());
+    for (auto* child : ChildIterator(right)) {
+      fallthroughChildEffects.walk(child);
+    }
+    EffectAnalyzer fallthroughEffects = fallthroughChildEffects;
+    fallthroughEffects.visit(right);
+
+    // Does the left-hand parent expression or side effects in the right-hand
+    // children affect the values flowing into the right-hand parent expression?
+    // Do not consider the right-hand parent expression because it could be an
+    // idempotent call and we don't want to mistakenly conclude that the
+    // left-hand side could interfere with it. (Non-idempotent functions will
+    // be rejected by the `isGenerative` check below.)
+    if (fallthroughEffects.orderedBefore(fallthroughChildEffects)) {
+      return false;
     }
 
-    // The same, with left, as we can have this situation:
-    //
-    //  (local.tee $x ..)
-    //    (something using $x)
-    //  )
-    //  (something using $x)
-    //
-    // The fallthroughs are identical, but the tee may cause us to read a
-    // different value.
-    if (originalLeft != left) {
-      auto originalLeftEffects = effects(originalLeft);
-      // |left == right| here (we would have exited early, otherwise, above), so
-      // we could compute either. Compute |left| as it might have better cache
-      // locality.
-      auto leftEffects = effects(left);
-      if (originalLeftEffects.invalidates(leftEffects)) {
-        return false;
-      }
+    // Do any effects executed between the expressions affect the right-hand
+    // expression?
+    if (interferingEffects.orderedBefore(fallthroughEffects)) {
+      return false;
     }
 
     // To be equal, they must also be known to return the same result
@@ -2876,7 +3079,8 @@ private:
       return true;
     }
 
-    // To fold the right side into the left, it must have no effects.
+    // To fold the right side into the left, it must have no unremovable
+    // effects.
     auto rightMightHaveEffects = true;
     if (auto* call = right->dynCast<Call>()) {
       // If these are a pair of idempotent calls, then the second has no
@@ -2909,7 +3113,9 @@ private:
         }
         ShallowEffectAnalyzer parentEffects(
           getPassOptions(), *getModule(), call);
-        if (parentEffects.invalidates(childEffects)) {
+        // Check if the first parent is ordered before the second child (in the
+        // example above, the first call vs the second global.get).
+        if (parentEffects.orderedBefore(childEffects)) {
           return false;
         }
         // No effects are possible.
@@ -3355,28 +3561,35 @@ private:
       // execute anyhow, and things like branch hints were already being run.
       // After optimization, we will only run fewer things, and run no risk of
       // running new bad things.
-      if (matches(curr, select(any(&ifTrue), any(&ifFalse), any(&c))) &&
-          ExpressionAnalyzer::equal(ifTrue, ifFalse)) {
-        auto value = effects(ifTrue);
-        if (value.hasSideEffects()) {
-          // At best we don't need the condition, but need to execute the
-          // value twice. a block is larger than a select by 2 bytes, and we
-          // must drop one value, so 3, while we save the condition, so it's
-          // not clear this is worth it, TODO
-        } else {
-          // The value has no side effects, so we can replace ourselves with one
-          // of the two identical values in the arms.
-          auto condition = effects(c);
-          if (!condition.hasSideEffects()) {
-            return ifTrue;
-          } else {
-            // The condition is last, so we need a new local, and it may be a
-            // bad idea to use a block like we do for an if. Do it only if we
-            // can reorder
-            if (!condition.invalidates(value)) {
-              return builder.makeSequence(builder.makeDrop(c), ifTrue);
-            }
+      if (matches(curr, select(any(&ifTrue), any(&ifFalse), any(&c)))) {
+        // Check if the values are identical and we can keep just the first one.
+        if (areConsecutiveInputsEqualAndFoldable(ifTrue, ifFalse)) {
+          // We can keep just the ifTrue branch, but we need to move its value
+          // past the condition. If there are side effects that force us to use
+          // a scratch local, then it is probably worth the extra local to
+          // execute the value expression once instead of twice.
+          if (canReorder(ifTrue, c)) {
+            return builder.makeSequence(builder.makeDrop(c), ifTrue);
           }
+          // We generally skip optimizing unreachable selects, but an
+          // optimization on the children might have made them newly
+          // unreachable. We cannot create a scratch local in that case.
+          if (!ifTrue->type.isConcrete()) {
+            return nullptr;
+          }
+          auto scratch = builder.addVar(getFunction(), ifTrue->type);
+          return builder.makeBlock(
+            {builder.makeLocalSet(scratch, ifTrue),
+             builder.makeDrop(c),
+             builder.makeLocalGet(scratch, ifTrue->type)});
+        }
+        // Otherwise, check if the values are identical, but we would have to
+        // keep both. In this case the benefit is less, so we only optimize if
+        // we can avoid the scratch local.
+        if (areConsecutiveInputsEqual(ifTrue, ifFalse) &&
+            canReorder(ifFalse, c)) {
+          return builder.makeBlock(
+            {builder.makeDrop(ifTrue), builder.makeDrop(c), ifFalse});
         }
       }
     }
@@ -4645,7 +4858,7 @@ private:
       }
     }
     {
-      // TODO: Add cancelation for some large constants when shrinkLevel > 0
+      // TODO: Add cancellation for some large constants when shrinkLevel > 0
       // in FinalOptimizer.
 
       // (x >> C)  << C   =>   x & -(1 << C)
@@ -4670,7 +4883,7 @@ private:
       }
     }
     {
-      // TODO: Add cancelation for some large constants when shrinkLevel > 0
+      // TODO: Add cancellation for some large constants when shrinkLevel > 0
       // in FinalOptimizer.
 
       // (x << C) >>> C   =>   x & (-1 >>> C)
@@ -5761,7 +5974,7 @@ private:
       }
     }
 
-    if (!neverFold) {
+    if (!neverFold && curr->condition->type != Type::unreachable) {
       // Identical code on both arms can be folded out, e.g.
       //
       //  (select

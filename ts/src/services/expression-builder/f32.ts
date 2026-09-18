@@ -6,7 +6,8 @@ import type {
 } from "../../classes/module/Module.ts";
 import {
 	Operation,
-	f32 as f32_t,
+	Type,
+	type f32 as f32_t,
 	type f64,
 	type i32,
 	type i64,
@@ -29,8 +30,8 @@ import {
  */
 export function f32(mod: Module) {
 	return {
-		load: loadFn<f32_t>(mod, f32_t, 4, true),
-		store: storeFn<f32_t>(mod, f32_t, 4),
+		load: loadFn<f32_t>(mod, Type.f32, 4, true),
+		store: storeFn<f32_t>(mod, Type.f32, 4),
 
 		/** Return a static constant f32. */
 		const: (value: number): f32_t => (
@@ -90,5 +91,11 @@ export function f32(mod: Module) {
 		/** @deprecated Use `.reinterpret_i32()` instead. */ reinterpret(...args) { BinaryenObj.printWarn("`.reinterpret()` is deprecated; use `.reinterpret_i32()` instead."); return this.reinterpret_i32(...args); },
 		// @ts-expect-error
 		/** @deprecated Use `.demote_f64()` instead. */ demote(...args) { BinaryenObj.printWarn("`.demote()` is deprecated; use `.demote_f64()` instead."); return this.demote_f64(...args); },
+
+		/** @deprecated Use {@link Module#pop} instead. */
+		pop() {
+			BinaryenObj.printWarn("`.f32.pop()` is deprecated; use `.pop(Type.f32)` instead.");
+			return mod.pop(Type.f32);
+		},
 	} as const;
 }

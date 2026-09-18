@@ -165,8 +165,8 @@ struct HeapStoreOptimization
   bool trySwap(ExpressionList& list, Index i, Index j) {
     if (j == list.size() - 1) {
       // There is no reason to swap with the last element of the list as it
-      // won't match the pattern because there wont be anything after. This also
-      // avoids swapping an instruction that does not leave anything in the
+      // won't match the pattern because there won't be anything after. This
+      // also avoids swapping an instruction that does not leave anything in the
       // stack by one that could leave something, and that which would be
       // incorrect.
       return false;
@@ -181,7 +181,7 @@ struct HeapStoreOptimization
     // effects.
     auto firstEffects = effects(list[i]);
     auto secondEffects = effects(list[j]);
-    if (secondEffects.invalidates(firstEffects)) {
+    if (firstEffects.orderedBefore(secondEffects)) {
       return false;
     }
 
@@ -241,7 +241,7 @@ struct HeapStoreOptimization
     if (!new_->isWithDefault()) {
       for (Index i = index + 1; i < operands.size(); i++) {
         auto operandEffects = effects(operands[i]);
-        if (operandEffects.invalidates(setValueEffects)) {
+        if (operandEffects.orderedBefore(setValueEffects)) {
           // TODO: we could use locals to reorder everything
           return false;
         }
@@ -252,7 +252,7 @@ struct HeapStoreOptimization
     // if it exists.
     if (new_->desc) {
       auto descEffects = effects(new_->desc);
-      if (descEffects.invalidates(setValueEffects)) {
+      if (descEffects.orderedBefore(setValueEffects)) {
         // TODO: we could use locals to reorder everything
         return false;
       }
@@ -264,7 +264,7 @@ struct HeapStoreOptimization
     // the optimization X' would happen first.
     ShallowEffectAnalyzer structNewEffects(
       getPassOptions(), *getModule(), new_);
-    if (structNewEffects.invalidates(setValueEffects)) {
+    if (structNewEffects.orderedBefore(setValueEffects)) {
       return false;
     }
 

@@ -226,6 +226,16 @@ public:
     throw FailToEvalException("TODO: table.get");
   }
 
+  Flow visitTableSet(TableSet* curr) {
+    // When changes occur to the table, give up.
+    throw FailToEvalException("TODO: table.set");
+  }
+
+  Flow visitTableGrow(TableGrow* curr) {
+    // When changes occur to the table, give up.
+    throw FailToEvalException("TODO: table.grow");
+  }
+
   bool allowContNew = true;
 
   Flow visitContNew(ContNew* curr) {
@@ -288,6 +298,9 @@ std::unique_ptr<Module> buildEnvModule(Module& wasm) {
 // that there are not arguments passed to main, etc.
 static bool ignoreExternalInput = false;
 
+// Whether to emit informative logging to stdout about the eval process.
+static bool quiet = false;
+
 struct CtorEvalExternalInterface : EvallingModuleRunner::ExternalInterface {
   Module* wasm;
   EvallingModuleRunner* instance;
@@ -312,10 +325,21 @@ struct CtorEvalExternalInterface : EvallingModuleRunner::ExternalInterface {
     linkedInstances.swap(linkedInstances_);
   }
 
+  bool firstApplication = true;
+
   // Called when we want to apply the current state of execution to the Module.
   // Until this is called the Module is never changed.
   void applyToModule() {
-    clearApplyState();
+    if (firstApplication) {
+      // The first time we apply things to the module, we can remove the start
+      // function: we evalled it successfully, if we got to here (and we must
+      // not execute it again later, which would mean it runs twice). We do not
+      // do this after the first application because we start to build up a new
+      // start function with the things we need, unrelated to the original one
+      // (see addStartFixup).
+      wasm->start = Name();
+      firstApplication = false;
+    }
 
     // If nothing was ever written to memories then there is nothing to update.
     if (!memories.empty()) {
@@ -516,12 +540,12 @@ private:
     return Bits::readLE<T>(getMemory(address, memoryName, sizeof(T)));
   }
 
+public:
   // Clear the state of the operation of applying the interpreter's runtime
-  // information into the module.
-  //
-  // This happens each time we apply contents to the module, which is basically
-  // once per ctor function, but can be more fine-grained also if we execute a
-  // line at a time.
+  // information into the module. This must be done before we start to serialize
+  // content (as the serialization uses this state - defining globals must be
+  // set and are latter used, etc.). After this, serialization can happen, and
+  // after that, a call to applyToModule() can be done.
   void clearApplyState() {
     // The process of allocating "defining globals" begins here, from scratch
     // each time (things live before may no longer be).
@@ -533,6 +557,7 @@ private:
     clearStartBlock();
   }
 
+private:
   void applyMemoryToModule() {
     // Memory must have already been flattened into the standard form: one
     // segment at offset 0, or none.
@@ -887,7 +912,6 @@ public:
     } else {
       // This is the first usage of this data. Generate a struct.new /
       // array.new for it.
-      auto& values = data->values;
       std::vector<Expression*> args;
 
       // The initial values for this allocation may themselves be GC
@@ -909,8 +933,8 @@ public:
         definingGlobals[data] = DefiningGlobalInfo{definingGlobalName, type};
       }
 
-      for (auto& value : values) {
-        auto* serialized = getSerialization(value);
+      for (size_t i = 0; i < value.getNumElements(); i++) {
+        auto* serialized = getSerialization(value.getElement(i));
         if (!serialized) {
           return nullptr;
         }
@@ -1048,9 +1072,6 @@ public:
     }
   }
 };
-
-// Whether to emit informative logging to stdout about the eval process.
-static bool quiet = false;
 
 // The outcome of evalling a ctor is one of three states:
 //
@@ -1190,28 +1211,35 @@ start_eval:
         break;
       }
 
+      // We are about to serialize content (the code paths below call
+      // getSerialization). Clear the state.
+      interface.clearApplyState();
+
       if (flow.breakTo == RETURN_CALL_FLOW) {
         // The return-called function is stored in the last value.
-        func = wasm.getFunction(flow.values.back().getFunc());
+        auto* nextFunc = wasm.getFunction(flow.values.back().getFunc());
         flow.values.pop_back();
-        params = std::move(flow.values);
+        auto nextParams = std::move(flow.values);
 
         // Serialize the arguments for the new function and save the module
         // state in case we fail to eval the new function.
-        localExprs.clear();
-        for (auto& param : params) {
+        std::vector<Expression*> nextLocalExprs;
+        for (auto& param : nextParams) {
           auto* serialized = interface.getSerialization(param);
           if (!serialized) {
             break;
           }
-          localExprs.push_back(serialized);
+          nextLocalExprs.push_back(serialized);
         }
-        if (localExprs.size() < params.size()) {
+        if (nextLocalExprs.size() < nextParams.size()) {
           if (!quiet) {
             std::cout << "  ...stopping due to non-serializable param\n";
           }
           break;
         }
+        func = nextFunc;
+        params = std::move(nextParams);
+        localExprs = std::move(nextLocalExprs);
         interface.applyToModule();
         goto start_eval;
       }
@@ -1469,10 +1497,15 @@ void evalCtors(Module& wasm,
       }
     }
   } catch (FailToEvalException& fail) {
-    // that's it, we failed to even create the instance
+    // That's it, we failed to even create the instance.
     if (!quiet) {
       std::cout << "  ...stopping since could not create module instance: "
                 << fail.why << "\n";
+    }
+  } catch (NonconstantException& fail) {
+    // We can also fail during start due to a non-constant operation.
+    if (!quiet) {
+      std::cout << "  ...stopping since non-constant in start\n";
     }
   } catch (TopologicalSort::CycleException e) {
     // We use a topological sort for GC globals. If there is a non-breakable
@@ -1509,8 +1542,6 @@ static bool canEval(Module& wasm) {
 //
 
 int main(int argc, const char* argv[]) {
-  Name entry;
-  std::vector<std::string> passes;
   bool emitBinary = true;
   bool debugInfo = false;
   String::Split ctors;
@@ -1643,7 +1674,7 @@ int main(int argc, const char* argv[]) {
     ModuleWriter writer(options.passOptions);
     writer.setBinary(emitBinary);
     writer.setDebugInfo(debugInfo);
-    writer.write(wasm, options.extra["output"]);
+    options.write(writer, wasm, options.extra["output"]);
   }
 
   flush_and_quick_exit(0);

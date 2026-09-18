@@ -6,8 +6,9 @@ import type {
 } from "../../classes/module/Module.ts";
 import {
 	Operation,
+	Type,
 	type f32,
-	f64 as f64_t,
+	type f64 as f64_t,
 	type i32,
 	type i64,
 } from "../../constants.ts";
@@ -29,8 +30,8 @@ import {
  */
 export function f64(mod: Module) {
 	return {
-		load: loadFn<f64_t>(mod, f64_t, 8, true),
-		store: storeFn<f64_t>(mod, f64_t, 8),
+		load: loadFn<f64_t>(mod, Type.f64, 8, true),
+		store: storeFn<f64_t>(mod, Type.f64, 8),
 
 		/** Return a static constant f64. */
 		const: (value: number): f64_t => (
@@ -90,5 +91,11 @@ export function f64(mod: Module) {
 		/** @deprecated Use `.reinterpret_i64()` instead. */ reinterpret(...args) { BinaryenObj.printWarn("`.reinterpret()` is deprecated; use `.reinterpret_i64()` instead."); return this.reinterpret_i64(...args); },
 		// @ts-expect-error
 		/** @deprecated Use `.promote_f32()` instead. */ promote(...args) { BinaryenObj.printWarn("`.promote()` is deprecated; use `.promote_f32()` instead."); return this.promote_f32(...args); },
+
+		/** @deprecated Use {@link Module#pop} instead. */
+		pop() {
+			BinaryenObj.printWarn("`.f64.pop()` is deprecated; use `.pop(Type.f64)` instead.");
+			return mod.pop(Type.f64);
+		},
 	} as const;
 }

@@ -11,21 +11,18 @@ import {
 
 // ## Static Types ## //
 /*
- * Types are nominal. Even though they’re all defined as `number`, they shouldn’t be mixed.
- * Nominal types are implemented as an intersection with an irreproducable object type,
+ * References are nominal. Even though they’re all defined as `number`, they shouldn’t be mixed.
+ * Nominal reference types are implemented as an intersection with an irreproducable object type,
  * which has a secret key and a unique value.
  * (Both happen to be type `unique symbol`, but that’s a happy coincidence.)
  * To assign numbers to a nominal type, casting is required (via `as` keyword):
  * ```ts
- * const t: Type = BinaryenObj["_BinaryenExpressionGetType"](expr) as Type;
+ * const t: ExpressionRef = BinaryenObj["_BinaryenConst"]() as ExpressionRef;
  * ```
  */
 /** “Secret” symbol key for nominal typing. Not a real value. */
 declare const __type: unique symbol;
 // ### Expressions ### //
-export type Type = number & {readonly [__type]: unique symbol};
-export type HeapType = number & {readonly [__type]: unique symbol};
-export type PackedType = number & {readonly [__type]: unique symbol};
 
 /**
  * The type of a WASM expression.
@@ -44,19 +41,6 @@ export type PackedType = number & {readonly [__type]: unique symbol};
  * const b: binaryen.ExpressionRef<"i32"> = wasm.i64.const(2); // TypeError
  * ```
  * `i64.const` returns an `i64` expression, which is not assignable to `ExpressionRef<"i32">`.
- *
- * In addition to being exported constant *values*, the WASM types may be used as TypeScript *types*.
- * E.g., type `i32` is an alias for type `ExpressionRef<"i32">`.
- * ```ts
- * const a: binaryen.i32 = wasm.i32.const(1);
- * const b: binaryen.i64 = wasm.i64.const(2);
- * ```
- *
- * Type `unreachable` is assignable to any other expression type, but not the other way around.
- * ```ts
- * const c: binaryen.i32 = wasm.unreachable(); // ok
- * const u: binaryen.unreachable = wasm.i32.const(3); // TypeError
- * ```
  *
  * You may create your own `ExpressionRef` subtypes by providing custom strings/symbols.
  * If you define a GC reference type `(ref $MyType)` you can use `ExpressionRef<"(ref $MyType)">`,
@@ -94,115 +78,134 @@ export type ExportRef = number & {readonly [__type]: unique symbol};
 
 
 // ## Expression Types ## //
-// see https://webassembly.github.io/spec/core/syntax/types.html
-
-// ### Binaryen-Only Types ### //
-/** Type with stack effect `[t*] -> [t*]`. */
+// TODO: Move these to a namespace
 export type unreachable = ExpressionRef<never>; // `never` is assignable to every string, allowing `unreachable` to be assigned to every `ExpressionRef`
-export const unreachable: Type = BinaryenObj["_BinaryenTypeUnreachable"]() as Type;
-/** Type with stack effect `[t*] -> []`. Not to be confused with the WASM heap type `none`. */
 export type none = ExpressionRef<"none">;
-export const none: Type = BinaryenObj["_BinaryenTypeNone"]() as Type;
-/** Used only for auto-detecting block types. */
 export type auto = ExpressionRef<"auto">;
-export const auto: Type = BinaryenObj["_BinaryenTypeAuto"]() as Type;
-
-// ### Number & Vector Types ### //
-/** 32-bit integer. */
 export type i32 = ExpressionRef<"i32">;
-/** 32-bit integer. */
-export const i32: Type = BinaryenObj["_BinaryenTypeInt32"]() as Type;
-/** 64-bit integer. */
 export type i64 = ExpressionRef<"i64">;
-/** 64-bit integer. */
-export const i64: Type = BinaryenObj["_BinaryenTypeInt64"]() as Type;
-/** 32-bit float. */
 export type f32 = ExpressionRef<"f32">;
-/** 32-bit float. */
-export const f32: Type = BinaryenObj["_BinaryenTypeFloat32"]() as Type;
-/** 64-bit float. */
 export type f64 = ExpressionRef<"f64">;
-/** 64-bit float. */
-export const f64: Type = BinaryenObj["_BinaryenTypeFloat64"]() as Type;
-/** 128-bit vector (SIMD). */
 export type v128 = ExpressionRef<"v128">;
-/** 128-bit vector (SIMD). */
-export const v128: Type = BinaryenObj["_BinaryenTypeVec128"]() as Type;
-
-// ### Reference Types ### //
-/** `(ref null any)` */
 export type anyref = ExpressionRef<"anyref">;
-/** `(ref null any)` */
-export const anyref: Type = BinaryenObj["_BinaryenTypeAnyref"]() as Type;
-/** `(ref null eq)` */
 export type eqref = ExpressionRef<"eqref">;
-/** `(ref null eq)` */
-export const eqref: Type = BinaryenObj["_BinaryenTypeEqref"]() as Type;
-/** `(ref null i31)` */
 export type i31ref = ExpressionRef<"i31ref">;
-/** `(ref null i31)` */
-export const i31ref: Type = BinaryenObj["_BinaryenTypeI31ref"]() as Type;
-/** `(ref null struct)` */
 export type structref = ExpressionRef<"structref">;
-/** `(ref null struct)` */
-export const structref: Type = BinaryenObj["_BinaryenTypeStructref"]() as Type;
-/** `(ref null array)` */
 export type arrayref = ExpressionRef<"arrayref">;
-/** `(ref null array)` */
-export const arrayref: Type = BinaryenObj["_BinaryenTypeArrayref"]() as Type;
-/** `(ref null func)` */
-export type funcref = ExpressionRef<"funcref">;
-/** `(ref null func)` */
-export const funcref: Type = BinaryenObj["_BinaryenTypeFuncref"]() as Type;
-/** `(ref null exn)` */
-export type exnref = ExpressionRef<"exnref">;
-/** `(ref null exn)` */
-// export const exnref: Type = BinaryenObj["_BinaryenTypeExnref"]() as Type; // TODO: uncomment once supported in Binaryen
-/** `(ref null extern)` */
-export type externref = ExpressionRef<"externref">;
-/** `(ref null extern)` */
-export const externref: Type = BinaryenObj["_BinaryenTypeExternref"]() as Type;
-/** `(ref null none)` */
-export type nullref = ExpressionRef<"nullref">;
-/** `(ref null none)` */
-export const nullref: Type = BinaryenObj["_BinaryenTypeNullref"]() as Type;
-/** `(ref null nofunc)` */
-export type nullfuncref = ExpressionRef<"nullfuncref">;
-/** `(ref null nofunc)` */
-export const nullfuncref: Type = BinaryenObj["_BinaryenTypeNullFuncref"]() as Type;
-/** `(ref null noexn)` */
-export type nullexnref = ExpressionRef<"nullexnref">;
-/** `(ref null noexn)` */
-// export const nullexnref: Type = BinaryenObj["_BinaryenTypeNullExnref"]() as Type; // TODO: uncomment once supported in Binaryen
-/** `(ref null noextern)` */
-export type nullexternref = ExpressionRef<"nullexternref">;
-/** `(ref null noextern)` */
-export const nullexternref: Type = BinaryenObj["_BinaryenTypeNullExternref"]() as Type;
-
-// ### Packed Types ### //
-/** [description] */
-export type notPacked = ExpressionRef<"notPacked">;
-/** [description] */
-export const notPacked: PackedType = BinaryenObj["_BinaryenPackedTypeNotPacked"]() as PackedType;
-/** [description] */
-export type i8 = ExpressionRef<"i8">;
-/** [description] */
-export const i8: PackedType = BinaryenObj["_BinaryenPackedTypeInt8"]() as PackedType;
-/** [description] */
-export type i16 = ExpressionRef<"i16">;
-/** [description] */
-export const i16: PackedType = BinaryenObj["_BinaryenPackedTypeInt16"]() as PackedType;
-
-// ### Proposed Types ### //
-// These types are not yet in the WASM spec. Move them to their respective sections once finalized.
-/** `(ref null string)` */
 export type stringref = ExpressionRef<"stringref">;
-/** `(ref null string)` */
-export const stringref: Type = BinaryenObj["_BinaryenTypeStringref"]() as Type;
+export type nullref = ExpressionRef<"nullref">;
+export type funcref = ExpressionRef<"funcref">;
+export type nullfuncref = ExpressionRef<"nullfuncref">;
+export type exnref = ExpressionRef<"exnref">;
+export type nullexnref = ExpressionRef<"nullexnref">;
+export type externref = ExpressionRef<"externref">;
+export type nullexternref = ExpressionRef<"nullexternref">;
 
 
 
 // ## Enumerated Values ## //
+/**
+ * An enumeration of built-in WASM types.
+ * @see https://webassembly.github.io/spec/core/syntax/types.html
+ */
+export enum Type {
+	// ### Binaryen-Only Types ### //
+	/** Type with stack effect `[t*] -> [t*]`. @category Binaryen-Only Types */
+	unreachable = BinaryenObj["_BinaryenTypeUnreachable"](),
+	/** Type with stack effect `[t*] -> []`. Not to be confused with the WASM heap type `none`. @category Binaryen-Only Types */
+	none = BinaryenObj["_BinaryenTypeNone"](),
+	/** Used only for auto-detecting block types. @category Binaryen-Only Types */
+	auto = BinaryenObj["_BinaryenTypeAuto"](),
+
+	// ### Number & Vector Types ### //
+	/** 32-bit integer. @category Number & Vector Types */
+	i32 = BinaryenObj["_BinaryenTypeInt32"](),
+	/** 64-bit integer. @category Number & Vector Types */
+	i64 = BinaryenObj["_BinaryenTypeInt64"](),
+	/** 32-bit float. @category Number & Vector Types */
+	f32 = BinaryenObj["_BinaryenTypeFloat32"](),
+	/** 64-bit float. @category Number & Vector Types */
+	f64 = BinaryenObj["_BinaryenTypeFloat64"](),
+	/** 128-bit vector (SIMD). @category Number & Vector Types */
+	v128 = BinaryenObj["_BinaryenTypeVec128"](),
+
+	// ### Reference Types ### //
+	/** `(ref null any)` @category Reference Types */
+	anyref = BinaryenObj["_BinaryenTypeAnyref"](),
+	/** `(ref null eq)` @category Reference Types */
+	eqref = BinaryenObj["_BinaryenTypeEqref"](),
+	/** `(ref null i31)` @category Reference Types */
+	i31ref = BinaryenObj["_BinaryenTypeI31ref"](),
+	/** `(ref null struct)` @category Reference Types */
+	structref = BinaryenObj["_BinaryenTypeStructref"](),
+	/** `(ref null array)` @category Reference Types */
+	arrayref = BinaryenObj["_BinaryenTypeArrayref"](),
+	/** `(ref null string)` @category Reference Types */
+	stringref = BinaryenObj["_BinaryenTypeStringref"](),
+	/** `(ref null none)` @category Reference Types */
+	nullref = BinaryenObj["_BinaryenTypeNullref"](),
+	/** `(ref null func)` @category Reference Types */
+	funcref = BinaryenObj["_BinaryenTypeFuncref"](),
+	/** `(ref null nofunc)` @category Reference Types */
+	nullfuncref = BinaryenObj["_BinaryenTypeNullFuncref"](),
+	/** `(ref null exn)` @category Reference Types */
+	// exnref = BinaryenObj["_BinaryenTypeExnref"](), // TODO: uncomment once supported in Binaryen
+	/** `(ref null noexn)` @category Reference Types */
+	// nullexnref = BinaryenObj["_BinaryenTypeNullExnref"](), // TODO: uncomment once supported in Binaryen
+	/** `(ref null extern)` @category Reference Types */
+	externref = BinaryenObj["_BinaryenTypeExternref"](),
+	/** `(ref null noextern)` @category Reference Types */
+	nullexternref = BinaryenObj["_BinaryenTypeNullExternref"](),
+}
+
+
+
+/**
+ * An enumeration of built-in WASM heap types.
+ * @see https://webassembly.github.io/spec/core/syntax/types.html#heap-types
+ */
+export enum HeapType {
+	/** Heap type `any`. */
+	any = BinaryenObj["_BinaryenHeapTypeAny"](),
+	/** Heap type `eq`. */
+	eq = BinaryenObj["_BinaryenHeapTypeEq"](),
+	/** Heap type `i31`. */
+	i31 = BinaryenObj["_BinaryenHeapTypeI31"](),
+	/** Heap type `struct`. */
+	struct = BinaryenObj["_BinaryenHeapTypeStruct"](),
+	/** Heap type `array`. */
+	array = BinaryenObj["_BinaryenHeapTypeArray"](),
+	/** Heap type `string`. */
+	string = BinaryenObj["_BinaryenHeapTypeString"](),
+	/** Heap type `none`. */
+	none = BinaryenObj["_BinaryenHeapTypeNone"](),
+	/** Heap type `func`. */
+	func = BinaryenObj["_BinaryenHeapTypeFunc"](),
+	/** Heap type `nofunc`. */
+	nofunc = BinaryenObj["_BinaryenHeapTypeNofunc"](),
+	/** Heap type `exn`. */
+	// exn = BinaryenObj["_BinaryenHeapTypeExn"](), // TODO: uncomment once supported in Binaryen
+	/** Heap type `noexn`. */
+	// noexn = BinaryenObj["_BinaryenHeapTypeNoexn"](), // TODO: uncomment once supported in Binaryen
+	/** Heap type `extern`. */
+	extern = BinaryenObj["_BinaryenHeapTypeExt"](),
+	/** Heap type `noextern`. */
+	noextern = BinaryenObj["_BinaryenHeapTypeNoext"](),
+}
+
+
+
+/**
+ * An allowed type of a struct or array field.
+ */
+export enum PackedType {
+	notPacked = BinaryenObj["_BinaryenPackedTypeNotPacked"](),
+	i8 = BinaryenObj["_BinaryenPackedTypeInt8"](),
+	i16 = BinaryenObj["_BinaryenPackedTypeInt16"](),
+}
+
+
+
 /**
  * An enumeration of all the “kinds” of expressions.
  * @see https://webassembly.github.io/spec/core/syntax/instructions.html
@@ -283,6 +286,10 @@ export enum ExpressionId {
 	StructSet = BinaryenObj["_BinaryenStructSetId"](),
 	// TODO: StructRMW
 	// TODO: StructCmpxchg
+	StructWait = BinaryenObj["_BinaryenStructWaitId"](),
+	WaitqueueNew = BinaryenObj["_BinaryenWaitqueueNewId"](),
+	WaitqueueNotify = BinaryenObj["_BinaryenWaitqueueNotifyId"](),
+	Publish = BinaryenObj["_BinaryenPublishId"](),
 	ArrayNew = BinaryenObj["_BinaryenArrayNewId"](),
 	ArrayNewFixed = BinaryenObj["_BinaryenArrayNewFixedId"](),
 	ArrayNewData = BinaryenObj["_BinaryenArrayNewDataId"](),
@@ -351,6 +358,7 @@ export enum SideEffect {
 	Throws = BinaryenObj["_BinaryenSideEffectThrows"](),
 	DanglingPop = BinaryenObj["_BinaryenSideEffectDanglingPop"](),
 	TrapsNeverHappen = BinaryenObj["_BinaryenSideEffectTrapsNeverHappen"](),
+	Suspends = BinaryenObj["_BinaryenSideEffectSuspends"](),
 	Any = BinaryenObj["_BinaryenSideEffectAny"](),
 }
 
@@ -848,6 +856,7 @@ export enum Operation {
  */
 export enum MemoryOrder {
 	Unordered = BinaryenObj["_BinaryenMemoryOrderUnordered"](),
-	SeqCst = BinaryenObj["_BinaryenMemoryOrderSeqCst"](),
+	Relaxed = BinaryenObj["_BinaryenMemoryOrderRelaxed"](),
 	AcqRel = BinaryenObj["_BinaryenMemoryOrderAcqRel"](),
+	SeqCst = BinaryenObj["_BinaryenMemoryOrderSeqCst"](),
 }

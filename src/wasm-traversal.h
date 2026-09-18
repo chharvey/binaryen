@@ -172,10 +172,10 @@ struct Walker : public VisitorType {
   void doWalkFunction(Function* func) { walk(func->body); }
 
   void walkElementSegment(ElementSegment* segment) {
-    if (segment->table.is()) {
+    if (segment->isActive()) {
       walk(segment->offset);
     }
-    for (auto* expr : segment->data) {
+    for (auto*& expr : segment->data) {
       walk(expr);
     }
     static_cast<SubType*>(this)->visitElementSegment(segment);
@@ -189,7 +189,7 @@ struct Walker : public VisitorType {
   }
 
   void walkDataSegment(DataSegment* segment) {
-    if (!segment->isPassive) {
+    if (segment->isActive()) {
       walk(segment->offset);
     }
     static_cast<SubType*>(this)->visitDataSegment(segment);
@@ -363,6 +363,7 @@ template<> struct IsLeaf<Nop> : std::true_type {};
 template<> struct IsLeaf<Unreachable> : std::true_type {};
 template<> struct IsLeaf<Pop> : std::true_type {};
 template<> struct IsLeaf<StringConst> : std::true_type {};
+template<> struct IsLeaf<WaitqueueNew> : std::true_type {};
 
 // Walks in post-order, i.e., children first. When there isn't an obvious
 // order to operands, we follow them in order of execution.

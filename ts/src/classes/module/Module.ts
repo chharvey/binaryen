@@ -19,20 +19,7 @@ import {
 	type ModuleRef,
 	type SideEffect,
 	type TableRef,
-	type Type,
-	i32,
-	i64,
-	f32,
-	f64,
-	v128,
-	anyref,
-	eqref,
-	i31ref,
-	structref,
-	arrayref,
-	funcref,
-	externref,
-	stringref,
+	Type,
 } from "../../constants.ts";
 import {
 	type ExpressionBuilder,
@@ -101,10 +88,12 @@ export enum Feature {
 	BulkMemoryOpt = BinaryenObj["_BinaryenFeatureBulkMemoryOpt"](),
 	CallIndirectOverlong = BinaryenObj["_BinaryenFeatureCallIndirectOverlong"](),
 	// TODO: CustomDescriptors
-	RelaxedAtomics = BinaryenObj["_BinaryenFeatureRelaxedAtomics"](),
+	AcquireReleaseAtomics = BinaryenObj["_BinaryenFeatureAcquireReleaseAtomics"](),
 	CustomPageSizes = BinaryenObj["_BinaryenFeatureCustomPageSizes"](),
 	// TODO: Multibyte
 	WideArithmetic = BinaryenObj["_BinaryenFeatureWideArithmetic"](),
+	CompactImports = BinaryenObj["_BinaryenFeatureCompactImports"](),
+	RelaxedAtomics = BinaryenObj["_BinaryenFeatureRelaxedAtomics"](),
 	All = BinaryenObj["_BinaryenFeatureAll"](),
 }
 
@@ -211,25 +200,34 @@ export class Module {
 	 */
 	pop(typ: Type): ExpressionRef {
 		if ([
-			i32,
-			i64,
-			f32,
-			f64,
-			v128,
-			anyref,
-			eqref,
-			i31ref,
-			structref,
-			arrayref,
-			funcref,
-			externref,
-			stringref,
+			Type.i32,
+			Type.i64,
+			Type.f32,
+			Type.f64,
+			Type.v128,
+			Type.anyref,
+			Type.eqref,
+			Type.i31ref,
+			Type.structref,
+			Type.arrayref,
+			Type.stringref,
+			Type.funcref,
+			Type.externref,
 		].includes(typ)) {
 			return BinaryenObj["_BinaryenPop"](this[PTR], typ) as ExpressionRef;
 		} else {
-			throw new Error(`Unexpected type ${ typ }.`);
+			throw new Error(`\`Module#pop()\` was called with an unexpected type: \`${ typ }\`.`);
 		}
 	}
+
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly funcref = {pop: () => { BinaryenObj.printWarn("`.funcref.pop()` is deprecated; use `.pop(Type.funcref)` instead."); return this.pop(Type.funcref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly externref = {pop: () => { BinaryenObj.printWarn("`.externref.pop()` is deprecated; use `.pop(Type.externref)` instead."); return this.pop(Type.externref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly anyref = {pop: () => { BinaryenObj.printWarn("`.anyref.pop()` is deprecated; use `.pop(Type.anyref)` instead."); return this.pop(Type.anyref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly eqref = {pop: () => { BinaryenObj.printWarn("`.eqref.pop()` is deprecated; use `.pop(Type.eqref)` instead."); return this.pop(Type.eqref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly i31ref = {pop: () => { BinaryenObj.printWarn("`.i31ref.pop()` is deprecated; use `.pop(Type.i31ref)` instead."); return this.pop(Type.i31ref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly structref = {pop: () => { BinaryenObj.printWarn("`.structref.pop()` is deprecated; use `.pop(Type.structref)` instead."); return this.pop(Type.structref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly arrayref = {pop: () => { BinaryenObj.printWarn("`.arrayref.pop()` is deprecated; use `.pop(Type.arrayref)` instead."); return this.pop(Type.arrayref); }};
+	/** @deprecated Use {@link Module#pop} instead. @category Expression Manipulation */ readonly stringref = {pop: () => { BinaryenObj.printWarn("`.stringref.pop()` is deprecated; use `.pop(Type.stringref)` instead."); return this.pop(Type.stringref); }};
 
 	/**
 	 * Gets the side effects of the specified expression.
@@ -292,7 +290,7 @@ export class Module {
 	/** @deprecated Use {@link Module#memories | `this.memories.set`} instead. */ @replacedBy("`this.memories.set`") setMemory(initial: number, maximum: number, exportName: string, segments?: readonly any[], shared?: boolean, memory64?: boolean, internalName?: string) { return this.memories.set(initial, maximum, exportName, segments, shared, memory64, internalName); }
 	/** @deprecated Use {@link Module#memories | `this.memories.has`} instead. */ @replacedBy("`this.memories.has`") hasMemory() { return this.memories.has(); }
 
-	/** @deprecated Use {@link Module#tables | `this.tables.add`} instead. */ @replacedBy("`this.tables.add`") addTable(name: string, initial: number, maximum: number, type: Type = funcref, init?: ExpressionRef) { return this.tables.add(name, initial, maximum, type, init); }
+	/** @deprecated Use {@link Module#tables | `this.tables.add`} instead. */ @replacedBy("`this.tables.add`") addTable(name: string, initial: number, maximum: number, type: Type = Type.funcref, init?: ExpressionRef) { return this.tables.add(name, initial, maximum, type, init); }
 	/** @deprecated Use {@link Module#tables | `this.tables.get`} instead. */ @replacedBy("`this.tables.get`") getTable(name: string) { return this.tables.get(name); }
 	/** @deprecated Use {@link Module#tables | `this.tables.getByIndex`} instead. */ @replacedBy("`this.tables.getByIndex`") getTableByIndex(index: number) { return this.tables.getByIndex(index); }
 	/** @deprecated Use {@link Module#tables | `this.tables.getSegments`} instead. */ @replacedBy("`this.tables.getSegments`") getTableSegments(table: TableRef) { return this.tables.getSegments(table); }
@@ -350,11 +348,13 @@ export class Module {
 	 */
 	emitText(): string {
 		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteText"](this[PTR]);
-		const text = UTF8ToString(textPtr);
-		if (textPtr) {
-			_free(textPtr);
+		try {
+			return UTF8ToString(textPtr);
+		} finally {
+			if (textPtr) {
+				_free(textPtr);
+			}
 		}
-		return text;
 	}
 
 	/**
@@ -363,36 +363,23 @@ export class Module {
 	 */
 	emitStackIR(): string {
 		const textPtr = BinaryenObj["_BinaryenModuleAllocateAndWriteStackIR"](this[PTR]);
-		const text = UTF8ToString(textPtr);
-		if (textPtr) {
-			_free(textPtr);
+		try {
+			return UTF8ToString(textPtr);
+		} finally {
+			if (textPtr) {
+				_free(textPtr);
+			}
 		}
-		return text;
 	}
 
 	/**
 	 * Returns the [asm.js](http://asmjs.org/) representation of the module.
 	 * @category Emission & Execution
+	 * @deprecated This method no longer returns the asm.js string, but instead logs it to standard output.
 	 */
 	emitAsmjs(): string {
-		/*
-		 * `out` is Emscripten's `stdout` function (an alias of `console.log`),
-		 * called internally by `BinaryenModulePrintAsmjs()` to print its output.
-		 * We have to temporarily swap out the function itself
-		 * so that when `BinaryenModulePrintAsmjs()` calls it,
-		 * it calls our capturing function instead.
-		 *
-		 * We can’t use `import {out} from "../../-pre.ts";` because ES Module imports can’t be reassigned.
-		 * Instead, we reassign directly on `BinaryenObj`.
-		 */
-		let returned = "";
-		const temp_out = BinaryenObj.out;
-		BinaryenObj.out = (x: string): void => {
-			returned += `${ x }\n`;
-		};
 		BinaryenObj["_BinaryenModulePrintAsmjs"](this[PTR]);
-		BinaryenObj.out = temp_out;
-		return returned;
+		return ""; // TODO: if keeping console-logging behavior, change return type to `void` and delete this return statement
 	}
 
 	/**

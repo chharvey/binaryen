@@ -58,7 +58,9 @@
 #if defined(__EMSCRIPTEN__)
 #include <emscripten.h>
 #define BINARYEN_API EMSCRIPTEN_KEEPALIVE
-#elif defined(_MSC_VER) && !defined(BUILD_STATIC_LIBRARY)
+#elif defined(_MSC_VER) && defined(BUILD_SHARED_LIBS)
+// TODO: This is not yet used since we disabled BUILD_SHARED_LIBS under
+// _MSC_VER in CMakeLists.txt
 #define BINARYEN_API __declspec(dllexport)
 #else
 #define BINARYEN_API
@@ -209,6 +211,9 @@ typedef uint8_t BinaryenMemoryOrder;
 
 BINARYEN_API BinaryenMemoryOrder BinaryenMemoryOrderUnordered(void);
 
+// Relaxed atomic memory operation.
+BINARYEN_API BinaryenMemoryOrder BinaryenMemoryOrderRelaxed(void);
+
 // Acquire/Release atomic memory operation; acquire for loads, release for
 // stores.
 BINARYEN_API BinaryenMemoryOrder BinaryenMemoryOrderAcqRel(void);
@@ -243,10 +248,12 @@ BINARYEN_API BinaryenFeatures BinaryenFeatureSharedEverything(void);
 BINARYEN_API BinaryenFeatures BinaryenFeatureFP16(void);
 BINARYEN_API BinaryenFeatures BinaryenFeatureBulkMemoryOpt(void);
 BINARYEN_API BinaryenFeatures BinaryenFeatureCallIndirectOverlong(void);
-BINARYEN_API BinaryenFeatures BinaryenFeatureRelaxedAtomics(void);
+BINARYEN_API BinaryenFeatures BinaryenFeatureAcquireReleaseAtomics(void);
 BINARYEN_API BinaryenFeatures BinaryenFeatureMultibyte(void);
 BINARYEN_API BinaryenFeatures BinaryenFeatureCustomPageSizes(void);
 BINARYEN_API BinaryenFeatures BinaryenFeatureWideArithmetic(void);
+BINARYEN_API BinaryenFeatures BinaryenFeatureCompactImports(void);
+BINARYEN_API BinaryenFeatures BinaryenFeatureRelaxedAtomics(void);
 BINARYEN_API BinaryenFeatures BinaryenFeatureAll(void);
 
 // Modules
@@ -927,7 +934,7 @@ BinaryenAtomicNotify(BinaryenModuleRef module,
                      BinaryenExpressionRef notifyCount,
                      const char* memoryName);
 BINARYEN_API BinaryenExpressionRef
-BinaryenAtomicFence(BinaryenModuleRef module);
+BinaryenAtomicFence(BinaryenModuleRef module, BinaryenMemoryOrder order);
 BINARYEN_API BinaryenExpressionRef
 BinaryenSIMDExtract(BinaryenModuleRef module,
                     BinaryenOp op,
@@ -1090,6 +1097,21 @@ BinaryenStructSet(BinaryenModuleRef module,
                   BinaryenIndex index,
                   BinaryenExpressionRef ref,
                   BinaryenExpressionRef value);
+BINARYEN_API BinaryenExpressionRef
+BinaryenStructWait(BinaryenModuleRef module,
+                   BinaryenExpressionRef ref,
+                   BinaryenIndex index,
+                   BinaryenExpressionRef expected,
+                   BinaryenExpressionRef timeout,
+                   BinaryenExpressionRef waitqueue);
+BINARYEN_API BinaryenExpressionRef
+BinaryenWaitqueueNew(BinaryenModuleRef module);
+BINARYEN_API BinaryenExpressionRef
+BinaryenWaitqueueNotify(BinaryenModuleRef module,
+                        BinaryenExpressionRef waitqueue,
+                        BinaryenExpressionRef count);
+BINARYEN_API BinaryenExpressionRef BinaryenPublish(BinaryenModuleRef module,
+                                                   BinaryenExpressionRef ref);
 BINARYEN_API BinaryenExpressionRef BinaryenArrayNew(BinaryenModuleRef module,
                                                     BinaryenHeapType type,
                                                     BinaryenExpressionRef size,
@@ -1218,10 +1240,11 @@ BINARYEN_API void BinaryenExpressionFinalize(BinaryenExpressionRef expr);
 // Makes a deep copy of the given expression.
 BINARYEN_API BinaryenExpressionRef
 BinaryenExpressionCopy(BinaryenExpressionRef expr, BinaryenModuleRef module);
-// Serialize an expression in s-expression form. Implicitly allocates the returned
-// char* with malloc(), and expects the user to free() them manually
+// Serialize an expression in s-expression form. Implicitly allocates the
+// returned char* with malloc(), and expects the user to free() them manually
 // once not needed anymore.
-BINARYEN_API char* BinaryenExpressionAllocateAndWriteText(BinaryenExpressionRef expr);
+BINARYEN_API char*
+BinaryenExpressionAllocateAndWriteText(BinaryenExpressionRef expr);
 
 // Block
 
@@ -1957,10 +1980,11 @@ BinaryenAtomicNotifySetNotifyCount(BinaryenExpressionRef expr,
 // AtomicFence
 
 // Gets the order of an `atomic.fence` expression.
-BINARYEN_API uint8_t BinaryenAtomicFenceGetOrder(BinaryenExpressionRef expr);
+BINARYEN_API BinaryenMemoryOrder
+BinaryenAtomicFenceGetOrder(BinaryenExpressionRef expr);
 // Sets the order of an `atomic.fence` expression.
 BINARYEN_API void BinaryenAtomicFenceSetOrder(BinaryenExpressionRef expr,
-                                              uint8_t order);
+                                              BinaryenMemoryOrder order);
 
 // SIMDExtract
 
@@ -2557,6 +2581,52 @@ BinaryenStructSetGetValue(BinaryenExpressionRef expr);
 BINARYEN_API void BinaryenStructSetSetValue(BinaryenExpressionRef expr,
                                             BinaryenExpressionRef valueExpr);
 
+// StructWait
+
+BINARYEN_API BinaryenExpressionRef
+BinaryenStructWaitGetRef(BinaryenExpressionRef expr);
+BINARYEN_API void BinaryenStructWaitSetRef(BinaryenExpressionRef expr,
+                                           BinaryenExpressionRef refExpr);
+BINARYEN_API BinaryenIndex
+BinaryenStructWaitGetIndex(BinaryenExpressionRef expr);
+BINARYEN_API void BinaryenStructWaitSetIndex(BinaryenExpressionRef expr,
+                                             BinaryenIndex index);
+BINARYEN_API BinaryenExpressionRef
+BinaryenStructWaitGetExpected(BinaryenExpressionRef expr);
+BINARYEN_API void
+BinaryenStructWaitSetExpected(BinaryenExpressionRef expr,
+                              BinaryenExpressionRef expectedExpr);
+BINARYEN_API BinaryenExpressionRef
+BinaryenStructWaitGetTimeout(BinaryenExpressionRef expr);
+BINARYEN_API void
+BinaryenStructWaitSetTimeout(BinaryenExpressionRef expr,
+                             BinaryenExpressionRef timeoutExpr);
+BINARYEN_API BinaryenExpressionRef
+BinaryenStructWaitGetWaitqueue(BinaryenExpressionRef expr);
+BINARYEN_API void
+BinaryenStructWaitSetWaitqueue(BinaryenExpressionRef expr,
+                               BinaryenExpressionRef waitqueueExpr);
+
+// WaitqueueNotify
+
+BINARYEN_API BinaryenExpressionRef
+BinaryenWaitqueueNotifyGetWaitqueue(BinaryenExpressionRef expr);
+BINARYEN_API void
+BinaryenWaitqueueNotifySetWaitqueue(BinaryenExpressionRef expr,
+                                    BinaryenExpressionRef waitqueueExpr);
+BINARYEN_API BinaryenExpressionRef
+BinaryenWaitqueueNotifyGetCount(BinaryenExpressionRef expr);
+BINARYEN_API void
+BinaryenWaitqueueNotifySetCount(BinaryenExpressionRef expr,
+                                BinaryenExpressionRef countExpr);
+
+// Publish
+
+BINARYEN_API BinaryenExpressionRef
+BinaryenPublishGetRef(BinaryenExpressionRef expr);
+BINARYEN_API void BinaryenPublishSetRef(BinaryenExpressionRef expr,
+                                        BinaryenExpressionRef refExpr);
+
 // ArrayNew
 
 BINARYEN_API BinaryenExpressionRef
@@ -3126,8 +3196,12 @@ BINARYEN_API void BinaryenModuleSetFeatures(BinaryenModuleRef module,
 // ========== Module Operations ==========
 //
 
-// Parse a module in s-expression text format
+// Parse a module in s-expression text format, assuming the MVP feature set.
 BINARYEN_API BinaryenModuleRef BinaryenModuleParse(const char* text);
+
+// Parse a module in s-expression text format, enabling the given feature set.
+BINARYEN_API BinaryenModuleRef
+BinaryenModuleParseWithFeatures(const char* text, BinaryenFeatures features);
 
 // Print a module to stdout in s-expression text format. Useful for debugging.
 BINARYEN_API void BinaryenModulePrint(BinaryenModuleRef module);
@@ -3604,6 +3678,7 @@ BINARYEN_API BinaryenSideEffects BinaryenSideEffectTrapsNeverHappen(void);
 BINARYEN_API BinaryenSideEffects BinaryenSideEffectIsAtomic(void);
 BINARYEN_API BinaryenSideEffects BinaryenSideEffectThrows(void);
 BINARYEN_API BinaryenSideEffects BinaryenSideEffectDanglingPop(void);
+BINARYEN_API BinaryenSideEffects BinaryenSideEffectSuspends(void);
 BINARYEN_API BinaryenSideEffects BinaryenSideEffectAny(void);
 
 BINARYEN_API BinaryenSideEffects BinaryenExpressionGetSideEffects(
@@ -3659,10 +3734,10 @@ BINARYEN_API void RelooperAddBranchForSwitch(RelooperBlockRef from,
                                              BinaryenIndex numIndexes,
                                              BinaryenExpressionRef code);
 
-// Generate structed wasm control flow from the CFG of blocks and branches that
-// were created on this relooper instance. This returns the rendered output, and
-// also disposes of the relooper and its blocks and branches, as they are no
-// longer needed.
+// Generate structured wasm control flow from the CFG of blocks and branches
+// that were created on this relooper instance. This returns the rendered
+// output, and also disposes of the relooper and its blocks and branches, as
+// they are no longer needed.
 // @param labelHelper To render irreducible control flow, we may need a helper
 //        variable to guide us to the right target label. This value should be
 //        an index of an i32 local variable that is free for us to use.

@@ -88,9 +88,11 @@ if len(sys.argv) >= 3:
     # Delete the argument, as importing |shared| scans it.
     sys.argv.pop()
 
-from test import fuzzing # noqa
-from test import shared # noqa
-from test import support # noqa
+from test import (  # ruff: ignore[module-import-not-at-top-of-file]
+    fuzzing,
+    shared,
+    support,
+)
 
 # Pick where to get the builds
 if build_dir:
@@ -110,10 +112,11 @@ features = [
     '--disable-strings',
     '--disable-stack-switching',
     '--disable-multibyte',
-    '--disable-wide-arithmetic',
+    '--disable-relaxed-atomics',
 ]
 
-with tarfile.open(output_file, "w:gz") as tar:
+# Use fast compression (level 1) to speed up bundling with only a modest size increase.
+with tarfile.open(output_file, 'w:gz', compresslevel=1) as tar:
     # run.py
     run = os.path.join(shared.options.binaryen_root, 'scripts', 'clusterfuzz', 'run.py')
     print(f'  .. run:         {run}')
@@ -185,5 +188,5 @@ with tarfile.open(output_file, "w:gz") as tar:
 print('Done.')
 print('To run the tests on this bundle, do:')
 print()
-print(f'BINARYEN_CLUSTER_FUZZ_BUNDLE={output_file} python -m unittest test/unit/test_cluster_fuzz.py')
+print(f'BINARYEN_CLUSTER_FUZZ_BUNDLE={output_file} python3 -m unittest test/unit/test_cluster_fuzz.py')
 print()

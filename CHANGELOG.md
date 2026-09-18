@@ -15,7 +15,45 @@ full changeset diff at the end of each section.
 Current Trunk
 -------------
 
- - Rename relaxed SIMD instructions to prepend the `relaxed_` prefix.
+- Add a new `--constraint-analysis` pass which propagates logical facts along
+  branches. (#9010)
+- Replace the `BINARYEN_ROOT` environment variable (used by developers who are
+  doing out-of-tree builds of binaryen) with `BINARYEN_BIN` (#9023)
+- Reject non-natural alignment for atomic memory operations at parse time (#8962)
+- Note that fast-math mode can ignore the difference between negative zero and
+  zero (like clang and gcc). (#9056)
+- [JS API] **(breaking)** Organize types into enums (#9098)
+
+v132
+----
+
+- Add relaxed-atomics feature flag (#8983)
+- Opportunisticly emit compact imports (#8926)
+- [JS API] support `BinaryenStringConst` (#8951)
+- [JS API] Replace `Module['readBinaryWithFeatures']` with an
+  optional `features` parameter to `Module['readBinary']` (#8954)
+
+v131
+----
+
+- [Intrinsics] Add @binaryen.inline, parallel to @metadata.code.inline (#8820)
+- Add acqrel ordering support for atomic fences (#8845). Breaks the C API;
+  `BinaryenAtomicFence` now takes a memory order param. Use
+  `BinaryenMemoryOrderSeqCst()` to preserve the original behavior.
+- [JS API] Replace `Module['parseTextWithFeatures']` with an
+  optional `features` parameter to `Module['parseText']` (#8901)
+- Add a ConstraintAnalysis pass (#8853)
+
+v130
+----
+
+ - MarkJSCalled pass, to help configureAll users. (#8733)
+ - RemoveExports pass, to allow easy export removal (e.g. after merge) (#8670)
+ - Wide Arithmetic support (#8544)
+ - New fuzzer mode: PreserveImportsExportsJS (#8592)
+ - New fuzzer mode: Fuzz against JavaScript (#8655)
+ - Increase Alpine stack size to 8MB for release builds (#8595)
+ - Rename relaxed SIMD instructions to prepend the `relaxed_` prefix. (#8673)
    - Rename C and JS API operations to prepend the `Relaxed` prefix:
      - `LaneselectI8x16` to `RelaxedLaneselectI8x16`
      - `LaneselectI16x8` to `RelaxedLaneselectI16x8`
@@ -23,7 +61,7 @@ Current Trunk
      - `LaneselectI64x2` to `RelaxedLaneselectI64x2`
      - `DotI8x16I7x16AddSToVecI32x4` to `RelaxedDotI8x16I7x16AddSToVecI32x4`
      - `DotI8x16I7x16SToVecI16x8` to `RelaxedDotI8x16I7x16SToVecI16x8`
- - Rename `MemorySegment` functions to `DataSegment` in the c and js apis
+ - [JS & C API] Rename MemorySegment functions to DataSegment (#8576)
    - Rename `BinaryenGetNumMemorySegments` to `BinaryenGetNumDataSegments` in c api.
    - Rename `BinaryenGetMemorySegmentByteOffset` to `BinaryenGetDataSegmentByteOffset` in c api.
    - Rename `BinaryenGetMemorySegmentByteLength` to `BinaryenGetDataSegmentByteLength` in c api.
@@ -31,7 +69,6 @@ Current Trunk
    - Rename `BinaryenCopyMemorySegmentData` to `BinaryenCopyDataSegmentData` in c api.
    - Rename `module.getNumMemorySegments` to `module.getNumDataSegments` in js api.
    - Rename `module.getMemorySegmentInfo` to `module.getDataSegmentInfo` in js api.
- - Add C and JS APIs for the Wide Arithmetic proposal (#8660).
 
 v129
 ----

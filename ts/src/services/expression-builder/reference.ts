@@ -22,13 +22,13 @@ import {
 export function ref(mod: Module) {
 	return {
 		/** Produces a reference to a given function. */
-		func: <T extends ExpressionRef>(name: string, type: Type): T => (
-			preserveStack(() => BinaryenObj["_BinaryenRefFunc"](mod[PTR], strToStack(name), type) as T)
+		func: <T extends ExpressionRef>(name: string, heaptype: HeapType): T => (
+			preserveStack(() => BinaryenObj["_BinaryenRefFunc"](mod[PTR], strToStack(name), heaptype) as T)
 		),
 
 		/** Produces a null reference. */
-		null: <T extends ExpressionRef>(ht: HeapType): T => (
-			BinaryenObj["_BinaryenRefNull"](mod[PTR], ht) as T
+		null: <T extends ExpressionRef>(heaptype: HeapType): T => (
+			BinaryenObj["_BinaryenRefNull"](mod[PTR], heaptype) as T
 		),
 
 		/** Checks for null. */

@@ -49,6 +49,7 @@
 #include "ir/utils.h"
 #include "pass.h"
 #include "support/insert_ordered.h"
+#include "support/space.h"
 #include "support/stdckdint.h"
 #include "support/utilities.h"
 #include "wasm-builder.h"
@@ -196,7 +197,7 @@ struct Noter : public PostWalker<Noter, UnifiedExpressionVisitor<Noter>> {
   }
 
   void visitStructGet(StructGet* curr) {
-    if (curr->ref->type == Type::unreachable || curr->ref->type.isNull()) {
+    if (curr->ref->type == Type::unreachable || curr->ref->type.isBottomRef()) {
       return;
     }
     auto type = curr->ref->type.getHeapType();
@@ -293,8 +294,27 @@ struct Analyzer {
     std::unordered_map<HeapType, std::unordered_set<Name>> typeFuncs;
     std::unordered_map<HeapType, std::unordered_set<Name>> typeElems;
 
+    // Maps each heap type of an inexact unknown function item (such as an
+    // imported global.get) to its segments. When a subtype of that heap type is
+    // called indirectly, walking the call type's supertypes finds these
+    // segments without eagerly expanding to all subtypes in the module.
+    std::unordered_map<HeapType, std::unordered_set<Name>> inexactTypeElems;
+
     // All elems, regardless of type.
     std::unordered_set<Name> allElems;
+
+    // Whether this table's elems may overlap, i.e., trample each other. In such
+    // a case, we can optimize less: if segment A writes a function, and B
+    // tramples it with a null or with a function of another type, then if we
+    // call that index with the right type for A, the trampling causes a trap -
+    // so we cannot remove the trampling segment, even though it has nothing
+    // that can be called, forcing us to keep it just to preserve the trap.
+    //
+    // We could be more precise here, as currently we "give up" on analyzing
+    // exact overlap, and just stop removing element segments. But such an exact
+    // analysis would be complex, and is rarely needed: when trapsNeverHappen
+    // this is not an issue, and also segment overlap is rare.
+    bool mayHaveOverlappingElems = false;
   };
   std::unordered_map<Name, FlatTableInfo> flatTableInfoMap;
 
@@ -316,14 +336,29 @@ struct Analyzer {
   }
 
   void prepare() {
+    // The spans of element segments for each table. We use this to compute
+    // |mayHaveOverlappingElems|.
+    std::unordered_map<Name, DisjointSpans> tableElemSpans;
+
     auto notePossibleFunc =
       [&](FlatTableInfo& info, Expression* item, Name elem = Name()) {
+        // Trace through module-defined immutable globals to find the
+        // underlying constant expression (which may be a RefFunc, RefNull, or
+        // an imported GlobalGet).
+        while (auto* get = item->dynCast<GlobalGet>()) {
+          auto* global = module->getGlobal(get->name);
+          if (global->imported()) {
+            break;
+          }
+          // Note that infinite recursion is not a danger here since a global
+          // can only refer to previous globals.
+          item = global->init;
+        }
         if (auto* refFunc = item->dynCast<RefFunc>()) {
           auto* func = module->getFunction(refFunc->func);
           std::optional<HeapType> type = func->type.getHeapType();
           // Add this function and element to all relevant types: each function
           // might be called by its type, or a supertype.
-          // TODO: use exactness here
           while (type) {
             info.typeFuncs[*type].insert(func->name);
             if (elem) {
@@ -331,6 +366,11 @@ struct Analyzer {
             }
             type = type->getSuperType();
           }
+        } else if (elem && item->type.isFunction()) {
+          // This might be e.g. a global.get of an imported global. Note that
+          // ref.null always has a bottom heap type, for which isFunction() is
+          // false.
+          propagateUnknownFuncElem(info, item->type, elem);
         }
       };
 
@@ -345,11 +385,57 @@ struct Analyzer {
       info.allElems.insert(elem->name);
     }
 
+    // Compute elem overlap.
+    for (auto& elem : module->elementSegments) {
+      if (elem->isPassive()) {
+        continue;
+      }
+
+      auto& info = flatTableInfoMap[elem->table];
+
+      // There is at least one elem, this one.
+      assert(!info.allElems.empty());
+      if (info.allElems.size() <= 1) {
+        // This table has just this one elem, so no overlap is possible, even
+        // if the single elem has a non-constant offset.
+        continue;
+      }
+
+      if (auto* c = elem->offset->dynCast<Const>()) {
+        auto start = c->value.getUnsigned();
+        auto end = start + elem->data.size();
+        if (tableElemSpans[elem->table].addAndCheckOverlap({start, end})) {
+          info.mayHaveOverlappingElems = true;
+        }
+      } else {
+        // Offset is not constant, so it might overlap with others.
+        info.mayHaveOverlappingElems = true;
+      }
+    }
+
     // If a table has an initial value, it is callable as well.
     for (auto& table : module->tables) {
       if (table->init) {
         notePossibleFunc(flatTableInfoMap[table->name], table->init);
       }
+    }
+  }
+
+  void propagateUnknownFuncElem(FlatTableInfo& info, Type itemType, Name elem) {
+    // We do not know the concrete function (because this might be e.g. a
+    // global.get of an imported global), so this segment might be called by the
+    // item's type, any supertype, or (if inexact) any subtype. Record the
+    // item's type and its supertypes in |typeElems|, and record inexact types
+    // in |inexactTypeElems| so subtype calls find them by walking supertypes.
+    auto type = itemType.getHeapType();
+    for (std::optional<HeapType> super = type; super;
+         super = super->getSuperType()) {
+      if (!info.typeElems[*super].insert(elem).second) {
+        break;
+      }
+    }
+    if (!itemType.isExact()) {
+      info.inexactTypeElems[type].insert(elem);
     }
   }
 
@@ -394,8 +480,15 @@ struct Analyzer {
     return worked;
   }
 
-  // We'll compute SubTypes if we need them.
+  // Lazily compute SubTypes at most once for the module.
   std::optional<SubTypes> subTypes;
+
+  SubTypes& getSubTypes() {
+    if (!subTypes) {
+      subTypes = SubTypes(*module);
+    }
+    return *subTypes;
+  }
 
   void useCallRefType(HeapType type) {
     if (type.isBasic()) {
@@ -404,13 +497,9 @@ struct Analyzer {
       return;
     }
 
-    if (!subTypes) {
-      subTypes = SubTypes(*module);
-    }
-
     // Call all the functions of that signature, and subtypes. We can then
     // forget about them, as those signatures will be marked as called.
-    for (auto subType : subTypes->getSubTypes(type)) {
+    getSubTypes().iterSubTypes(type, [&](HeapType subType, Index depth) {
       auto iter = uncalledRefFuncMap.find(subType);
       if (iter != uncalledRefFuncMap.end()) {
         // We must not have a type in both calledSignatures and
@@ -426,7 +515,8 @@ struct Analyzer {
       }
 
       calledSignatures.insert(subType);
-    }
+      return true;
+    });
   }
 
   std::unordered_set<IndirectCall> usedIndirectCalls;
@@ -449,6 +539,16 @@ struct Analyzer {
     for (auto& elem : info.typeElems[type]) {
       reference({ModuleElementKind::ElementSegment, elem});
     }
+    for (auto super = type.getSuperType(); super;
+         super = super->getSuperType()) {
+      if (auto iter = info.inexactTypeElems.find(*super);
+          iter != info.inexactTypeElems.end()) {
+        for (auto& elem : iter->second) {
+          reference({ModuleElementKind::ElementSegment, elem});
+        }
+        info.inexactTypeElems.erase(iter);
+      }
+    }
 
     // If traps might happen, and the table has an initial value, we must
     // consider more: imagine that we call a function with the wrong type, so we
@@ -461,11 +561,18 @@ struct Analyzer {
     // if it has the right type, we would not trap. (Note that we were using the
     // fact that we do not distinguish types of traps, in the case without an
     // initial value - we turned a trap on the wrong type to one on a null.)
-    if (!options.trapsNeverHappen && module->getTable(table)->init) {
-      // We only need to reference the elem, so it writes its functions - the
-      // functions are not actually called, as we just trap.
-      for (auto& elem : info.allElems) {
-        reference({ModuleElementKind::ElementSegment, elem});
+    //
+    // A related situation is a table with element segments that trample valid
+    // values with nulls or functions of the wrong type for a call: when they
+    // overwrite a valid function, they cause a trap, which we must preserve if
+    // traps can happen.
+    if (!options.trapsNeverHappen) {
+      if (module->getTable(table)->init || info.mayHaveOverlappingElems) {
+        // We only need to reference the elem, so it writes its functions - the
+        // functions are not actually called, as we just trap.
+        for (auto& elem : info.allElems) {
+          reference({ModuleElementKind::ElementSegment, elem});
+        }
       }
     }
 
@@ -521,10 +628,7 @@ struct Analyzer {
       // This is the first time we see a read of this data. Note that it is
       // read, and also all subtypes since we might be reading from them as
       // well.
-      if (!subTypes) {
-        subTypes = SubTypes(*module);
-      }
-      subTypes->iterSubTypes(type, [&](HeapType subType, Index depth) {
+      getSubTypes().iterSubTypes(type, [&](HeapType subType, Index depth) {
         auto subStructField = StructField{subType, index};
         readStructFields.insert(subStructField);
 
@@ -1076,7 +1180,7 @@ struct RemoveUnusedModuleElements : public Pass {
     struct NullDescFinder : PostWalker<NullDescFinder> {
       bool mayTrap = false;
       void visitStructNew(StructNew* curr) {
-        if (curr->desc && curr->desc->type.isNullable()) {
+        if (curr->desc && curr->desc->type.isNullableRef()) {
           mayTrap = true;
         }
       }

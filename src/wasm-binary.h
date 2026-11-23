@@ -44,11 +44,6 @@ enum {
   MaxLEB32Bytes = 5,
 };
 
-enum class BackingType {
-  Memory,
-  Array,
-};
-
 template<typename T, typename MiniT> struct LEB {
   static_assert(sizeof(MiniT) == 1, "MiniT must be a byte");
 
@@ -364,8 +359,8 @@ enum BrOnCastFlag {
 
 constexpr uint32_t ExactImport = 1 << 5;
 
-constexpr uint32_t HasBackingArrayMask = 1 << 4;
-constexpr uint32_t HasMemoryOrderMask = 1 << 5;
+constexpr uint32_t HasMemoryOrderMask = 1 << 4;
+constexpr uint32_t HasBackingArrayMask = 1 << 5;
 constexpr uint32_t HasMemoryIndexMask = 1 << 6;
 
 constexpr uint8_t HasTableInitializer = 0x40;
@@ -383,9 +378,8 @@ enum EncodedType {
   f64 = -0x4,  // 0x7c
   v128 = -0x5, // 0x7b
   // packed types
-  i8 = -0x8,         // 0x78
-  i16 = -0x9,        // 0x77
-  waitQueue = -0x24, // 0x5c
+  i8 = -0x8,  // 0x78
+  i16 = -0x9, // 0x77
   // reference types
   nullfuncref = -0xd,   // 0x73
   nullexternref = -0xe, // 0x72
@@ -425,21 +419,23 @@ enum EncodedType {
 };
 
 enum EncodedHeapType {
-  nofunc = -0xd,   // 0x73
-  noext = -0xe,    // 0x72
-  none = -0xf,     // 0x71
-  func = -0x10,    // 0x70
-  ext = -0x11,     // 0x6f
-  any = -0x12,     // 0x6e
-  eq = -0x13,      // 0x6d
-  exn = -0x17,     // 0x69
-  noexn = -0xc,    // 0x74
-  cont = -0x18,    // 0x68
-  nocont = -0x0b,  // 0x75
-  i31 = -0x14,     // 0x6c
-  struct_ = -0x15, // 0x6b
-  array = -0x16,   // 0x6a
-  string = -0x19,  // 0x67
+  nofunc = -0xd,       // 0x73
+  noext = -0xe,        // 0x72
+  none = -0xf,         // 0x71
+  func = -0x10,        // 0x70
+  ext = -0x11,         // 0x6f
+  any = -0x12,         // 0x6e
+  eq = -0x13,          // 0x6d
+  exn = -0x17,         // 0x69
+  noexn = -0xc,        // 0x74
+  cont = -0x18,        // 0x68
+  nocont = -0x0b,      // 0x75
+  i31 = -0x14,         // 0x6c
+  struct_ = -0x15,     // 0x6b
+  array = -0x16,       // 0x6a
+  string = -0x19,      // 0x67
+  waitqueue = -0x24,   // 0x5c
+  nowaitqueue = -0x25, // 0x5b
 };
 
 namespace CustomSections {
@@ -475,11 +471,12 @@ extern const char* FP16Feature;
 extern const char* BulkMemoryOptFeature;
 extern const char* CallIndirectOverlongFeature;
 extern const char* CustomDescriptorsFeature;
-extern const char* RelaxedAtomicsFeature;
+extern const char* AcquireReleaseAtomicsFeature;
 extern const char* MultibyteFeature;
 extern const char* CustomPageSizesFeature;
 extern const char* WideArithmeticFeature;
 extern const char* CompactImportsFeature;
+extern const char* RelaxedAtomicsFeature;
 
 enum Subsection {
   NameModule = 0,
@@ -721,7 +718,9 @@ enum ASTNodes {
   AtomicFence = 0x03,
   Pause = 0x04,
   StructWait = 0x05,
-  StructNotify = 0x06,
+  WaitqueueNotify = 0x06,
+  WaitqueueNew = 0x07,
+  Publish = 0x0f,
 
   I32AtomicLoad = 0x10,
   I64AtomicLoad = 0x11,
@@ -1232,6 +1231,7 @@ enum ASTNodes {
 
   OrderSeqCst = 0x0,
   OrderAcqRel = 0x1,
+  OrderRelaxed = 0x2,
   StructAtomicGet = 0x5c,
   StructAtomicGetS = 0x5d,
   StructAtomicGetU = 0x5e,
@@ -1309,6 +1309,8 @@ enum FeaturePrefix { FeatureUsed = '+', FeatureDisallowed = '-' };
 // (local index in IR, tuple index) => binary local index
 using MappedLocals = std::unordered_map<std::pair<Index, Index>, size_t>;
 
+class ModuleStackIR;
+
 // Writes out wasm to the binary format
 
 class WasmBinaryWriter {
@@ -1383,10 +1385,8 @@ class WasmBinaryWriter {
 public:
   WasmBinaryWriter(Module* input,
                    BufferWithRandomAccess& o,
-                   const PassOptions& options)
-    : wasm(input), o(o), options(options), indexes(*input) {
-    prepare();
-  }
+                   const PassOptions& options);
+  ~WasmBinaryWriter();
 
   // locations in the output binary for the various parts of the module
   struct TableOfContents {
@@ -1465,7 +1465,7 @@ public:
   void initializeDebugInfo();
   void writeSourceMapProlog();
   void writeSourceMapEpilog();
-  void writeDebugLocation(const Function::DebugLocation& loc);
+  void writeDebugLocation(const Function::DebugLocations& loc);
   void writeNoDebugLocation();
   void writeSourceMapLocation(Expression* curr, Function* func);
 
@@ -1486,6 +1486,7 @@ public:
   std::optional<BufferWithRandomAccess> getJSCalledHintsBuffer();
   std::optional<BufferWithRandomAccess> getIdempotentHintsBuffer();
   std::optional<BufferWithRandomAccess> getToolchainInlineHintsBuffer();
+  std::optional<BufferWithRandomAccess> getNoReturnHintsBuffer();
 
   // helpers
   void writeInlineString(std::string_view name);
@@ -1501,6 +1502,7 @@ public:
   };
 
   Module* getModule() { return wasm; }
+  bool getDebugInfo() const { return debugInfo; }
 
   void writeType(Type type);
 
@@ -1542,14 +1544,16 @@ private:
   // Storage of source map locations until the section is placed at its final
   // location (shrinking LEBs may cause changes there).
   //
-  // A null DebugLocation* indicates we have no debug information for that
+  // A null DebugLocations* indicates we have no debug information for that
   // location.
-  std::vector<std::pair<size_t, const Function::DebugLocation*>>
+  std::vector<std::pair<size_t, const Function::DebugLocations*>>
     sourceMapLocations;
   size_t sourceMapLocationsSizeAtSectionStart;
-  Function::DebugLocation lastDebugLocation;
+  std::vector<size_t> functionEndOffsets;
+  Function::DebugLocations lastDebugLocation;
 
   std::unique_ptr<ImportInfo> importInfo;
+  std::unique_ptr<ModuleStackIR> moduleStackIR;
 
   // General debugging info: track locations as we write.
   BinaryLocations binaryLocations;
@@ -1564,10 +1568,23 @@ private:
   // info here, and then use it when writing the names.
   std::unordered_map<Name, MappedLocals> funcMappedLocals;
 
+  // The explicitly named labels of each function, as (label index, name),
+  // gathered while writing the code section and used to write the name
+  // section afterwards.
+  std::unordered_map<Name, std::vector<std::pair<Index, Name>>> funcLabelNames;
+
   // Indexes in the string literal section of each StringConst in the wasm.
   std::unordered_map<Name, Index> stringIndexes;
 
   void prepare();
+
+  // Internal helper for recording the label names of a function once its code
+  // has been written, so that they can be emitted in the name section later.
+  // `labelNames` holds (label index, name) pairs for the function's explicitly
+  // named labels, as gathered by the function writer; its contents are moved
+  // into `funcLabelNames`, and nothing is recorded if it is empty.
+  void noteLabelNames(Function* func,
+                      std::vector<std::pair<Index, Name>>& labelNames);
 
   // Internal helper for emitting a code annotation section for a hint that is
   // expression offset based. Receives the name of the section and two
@@ -1713,16 +1730,19 @@ public:
   void readFunctionSignatures();
   HeapType getTypeByIndex(Index index);
   HeapType getTypeByFunctionIndex(Index index);
-  Signature getSignatureByTypeIndex(Index index);
+  HeapType getSignatureTypeByIndex(Index index);
   Signature getSignatureByFunctionIndex(Index index);
-
-  Name getNextLabel();
 
   // We read the names section first so we know in advance what names various
   // elements should have. Store the information for use when building
   // expressions.
   std::unordered_map<Index, Name> functionNames;
   std::unordered_map<Index, std::unordered_map<Index, Name>> localNames;
+  // Label names, indexed by function index and then by the index of the label
+  // in the function. Labels are indexed in the order the instructions that
+  // introduce them appear in the function body, including the ones that have
+  // no name in the name section.
+  std::unordered_map<Index, std::unordered_map<Index, Name>> labelNames;
   std::unordered_map<Index, Name> typeNames;
   std::unordered_map<Index, std::unordered_map<Index, Name>> fieldNames;
   std::unordered_map<Index, Name> tableNames;
@@ -1738,6 +1758,11 @@ public:
     usedGlobalNames, usedTagNames;
 
   Function* currFunction = nullptr;
+  // The label names of the function we are currently reading, if it has any,
+  // and the index of the next label in it.
+  const std::unordered_map<Index, Name>* currLabelNames = nullptr;
+  Index nextLabelIndex = 0;
+
   // before we see a function (like global init expressions), there is no end of
   // function to check
   Index endOfFunction = -1;
@@ -1748,6 +1773,10 @@ public:
   void readFunctions();
   void readVars();
   void setLocalNames(Function& func, Index i);
+  void setLabelNames(Index i);
+  // Returns the name the name section gives to the next label of the current
+  // function, or a null name if it has none, and advances the label index.
+  Name getNextLabelName();
 
   Result<> readInst();
 
@@ -1802,12 +1831,13 @@ public:
   void readJSCalledHints(size_t payloadLen);
   void readIdempotentHints(size_t payloadLen);
   void readToolchainInlineHints(size_t payloadLen);
+  void readNoReturnHints(size_t payloadLen);
 
-  std::tuple<Address, Address, Index, MemoryOrder, BackingType>
+  std::tuple<Address, Address, Index, MemoryOrder, std::optional<HeapType>>
   readMemoryAccess(bool isAtomic, bool isRMW);
   std::tuple<Name, Address, Address, MemoryOrder> getAtomicMemarg();
   std::tuple<Name, Address, Address, MemoryOrder> getRMWMemarg();
-  std::tuple<Name, Address, Address, BackingType> getMemarg();
+  std::tuple<Name, Address, Address, std::optional<HeapType>> getMemarg();
   MemoryOrder getMemoryOrder(bool isRMW = false);
 
   [[noreturn]] void throwError(std::string text) {

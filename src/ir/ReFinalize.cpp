@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "ir/eh-utils.h"
 #include "ir/utils.h"
 
 namespace wasm {
@@ -140,10 +139,7 @@ void ReFinalize::visitRethrow(Rethrow* curr) { curr->finalize(); }
 void ReFinalize::visitThrowRef(ThrowRef* curr) { curr->finalize(); }
 void ReFinalize::visitNop(Nop* curr) { curr->finalize(); }
 void ReFinalize::visitUnreachable(Unreachable* curr) { curr->finalize(); }
-void ReFinalize::visitPop(Pop* curr) {
-  curr->finalize();
-  seenPop = true;
-}
+void ReFinalize::visitPop(Pop* curr) { curr->finalize(); }
 void ReFinalize::visitTupleMake(TupleMake* curr) { curr->finalize(); }
 void ReFinalize::visitTupleExtract(TupleExtract* curr) { curr->finalize(); }
 void ReFinalize::visitRefI31(RefI31* curr) { curr->finalize(); }
@@ -166,7 +162,11 @@ void ReFinalize::visitStructSet(StructSet* curr) { curr->finalize(); }
 void ReFinalize::visitStructRMW(StructRMW* curr) { curr->finalize(); }
 void ReFinalize::visitStructCmpxchg(StructCmpxchg* curr) { curr->finalize(); }
 void ReFinalize::visitStructWait(StructWait* curr) { curr->finalize(); }
-void ReFinalize::visitStructNotify(StructNotify* curr) { curr->finalize(); }
+void ReFinalize::visitWaitqueueNew(WaitqueueNew* curr) { curr->finalize(); }
+void ReFinalize::visitWaitqueueNotify(WaitqueueNotify* curr) {
+  curr->finalize();
+}
+void ReFinalize::visitPublish(Publish* curr) { curr->finalize(); }
 void ReFinalize::visitArrayNew(ArrayNew* curr) { curr->finalize(); }
 void ReFinalize::visitArrayNewData(ArrayNewData* curr) { curr->finalize(); }
 void ReFinalize::visitArrayNewElem(ArrayNewElem* curr) { curr->finalize(); }
@@ -220,11 +220,6 @@ void ReFinalize::visitDataSegment(DataSegment* curr) {
   WASM_UNREACHABLE("unimp");
 }
 void ReFinalize::visitTag(Tag* curr) { WASM_UNREACHABLE("unimp"); }
-void ReFinalize::visitFunction(Function* curr) {
-  if (seenPop && addedBlock) {
-    EHUtils::handleBlockNestedPops(curr, *getModule());
-  }
-}
 void ReFinalize::visitModule(Module* curr) { WASM_UNREACHABLE("unimp"); }
 
 void ReFinalize::updateBreakValueType(Name name, Type type) {
@@ -247,7 +242,6 @@ void ReFinalize::replaceUntaken(Expression* value, Expression* otherChild) {
       otherChild = builder.makeDrop(otherChild);
     }
     replaceCurrent(builder.makeBlock({value, otherChild}, Type::unreachable));
-    addedBlock = true;
   } else if (value) {
     replaceCurrent(value);
   } else {

@@ -21,6 +21,7 @@
 #include "ir/branch-utils.h"
 #include "ir/iteration.h"
 #include "ir/local-graph.h"
+#include "ir/properties.h"
 #include "pass.h"
 #include "wasm-stack.h"
 #include "wasm.h"
@@ -124,6 +125,26 @@ void StackIROptimizer::vacuum() {
   }
 }
 
+// Whether the local.get at getIndex is consumed by an operation whose operands
+// can be swapped.
+bool StackIROptimizer::isConsumedBySymmetricOp(Index getIndex) {
+  Index k = getIndex + 1;
+  while (k < insts.size() && !insts[k]) {
+    ++k;
+  }
+  if (k >= insts.size()) {
+    return false;
+  }
+  auto* inst = insts[k];
+  if (inst->op != StackInst::Basic) {
+    return false;
+  }
+  if (auto* binary = inst->origin->dynCast<Binary>()) {
+    return Properties::isSymmetric(binary);
+  }
+  return inst->origin->is<RefEq>();
+}
+
 // If ordered properly, we can avoid a local.set/local.get pair,
 // and use the value directly from the stack, for example
 //    [..produce a value on the stack..]
@@ -195,7 +216,7 @@ void StackIROptimizer::local2Stack() {
     if (isControlFlowBegin(inst)) {
       // Save the stack for when we end this control flow.
       savedValues.push_back(values); // TODO: optimize copies
-      values.clear();
+      values.assign(inst->params.size(), null);
     } else if (isControlFlowEnd(inst)) {
       assert(!savedValues.empty());
       values = savedValues.back();
@@ -219,11 +240,26 @@ void StackIROptimizer::local2Stack() {
         // can reach the set.
         if (values.size() > 0) {
           Index j = values.size() - 1;
+          // If an actual value is in the way then the set's value is not on
+          // top of the stack at the get. That is fine if exactly one value is
+          // in the way and it is consumed together with the get by an
+          // operation with interchangeable operands, as then the order does
+          // not matter.
+          bool intervening = false;
           while (1) {
-            // If there's an actual value in the way, we've failed.
             auto setIndex = values[j];
             if (setIndex == null) {
-              break;
+              if (intervening || !isConsumedBySymmetricOp(getIndex)) {
+                // More than one value is in the way, or the value that is in
+                // the way is not consumed together with the get: give up.
+                break;
+              }
+              intervening = true;
+              if (j == 0) {
+                break;
+              }
+              j--;
+              continue;
             }
             auto* set = insts[setIndex]->origin->cast<LocalSet>();
             if (set->index == get->index) {
@@ -397,18 +433,7 @@ bool StackIROptimizer::isControlFlowBarrier(StackInst* inst) {
 
 // A control flow beginning.
 bool StackIROptimizer::isControlFlowBegin(StackInst* inst) {
-  switch (inst->op) {
-    case StackInst::BlockBegin:
-    case StackInst::IfBegin:
-    case StackInst::LoopBegin:
-    case StackInst::TryBegin:
-    case StackInst::TryTableBegin: {
-      return true;
-    }
-    default: {
-      return false;
-    }
-  }
+  return inst->isControlFlowBegin();
 }
 
 // A control flow ending.
@@ -455,9 +480,12 @@ void StackIROptimizer::removeAt(Index i) {
 
 Index StackIROptimizer::getNumConsumedValues(StackInst* inst) {
   if (isControlFlow(inst)) {
-    // If consumes 1; that's it.
+    // If consumes 1 (condition) plus any input parameters.
     if (inst->op == StackInst::IfBegin) {
-      return 1;
+      return 1 + inst->params.size();
+    }
+    if (isControlFlowBegin(inst)) {
+      return inst->params.size();
     }
     return 0;
   }
@@ -498,7 +526,7 @@ bool StackIROptimizer::canRemoveSetGetPair(Index setIndex, Index getIndex) {
   // anyhow (hence we can check non-nullability instead of non-
   // defaultability).
   assert(localType.isSingle());
-  if (func->isParam(set->index) || !localType.isNonNullable()) {
+  if (func->isParam(set->index) || !localType.isNonNullableRef()) {
     // This local cannot pose a problem for validation (params are always
     // initialized, and it is ok if nullable locals are uninitialized).
     return true;

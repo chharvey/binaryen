@@ -55,7 +55,7 @@ struct Node {
           // in wasm)
     Expr, // a value represented by a Binaryen Expression
     Phi,  // a phi from converging control flow
-    Cond, // a blockpc, representing one of the branchs for a Block
+    Cond, // a blockpc, representing one of the branches for a Block
     Block, // a source of phis
     Zext, // zero-extend an i1 (from an op where Souper returns i1 but wasm does
           // not, and so we need a special way to get back to an i32/i64 if we
@@ -167,7 +167,7 @@ struct Node {
     }
   }
 
-  bool operator==(const Node& other) {
+  bool operator==(const Node& other) const {
     if (type != other.type) {
       return false;
     }
@@ -201,7 +201,7 @@ struct Node {
     return true;
   }
 
-  bool operator!=(const Node& other) { return !(*this == other); }
+  bool operator!=(const Node& other) const { return !(*this == other); }
 
   // As mentioned above, comparisons return i1. This checks
   // if an operation is of that sort.

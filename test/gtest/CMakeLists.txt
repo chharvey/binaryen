@@ -6,6 +6,7 @@ else()
 endif()
 
 set(unittest_SOURCES
+  abstract.cpp
   arena.cpp
   cast-check.cpp
   cfg.cpp
@@ -14,30 +15,38 @@ set(unittest_SOURCES
   delta_debugging.cpp
   dfa_minimization.cpp
   disjoint_sets.cpp
-  graph.cpp
-  int128.cpp
-  leaves.cpp
+  dwarf-ranges.cpp
+  effects.cpp
   glbs.cpp
+  graph.cpp
   inplace_vector.cpp
+  int128.cpp
   interpreter.cpp
   intervals.cpp
   istring.cpp
+  js-embedded-module.cpp
   json.cpp
   lattices.cpp
+  leaves.cpp
   local-graph.cpp
+  module-utils.cpp
   possible-contents.cpp
   principal-type.cpp
   printing.cpp
   public-type-validator.cpp
   scc.cpp
+  sizes.cpp
+  source-map.cpp
+  span.cpp
   stringify.cpp
   subtype-exprs.cpp
   suffix_tree.cpp
   topological-sort.cpp
   type-builder.cpp
-  wat-lexer.cpp
+  type-updating.cpp
   validator.cpp
-  source-map.cpp
+  wat-lexer.cpp
+  wto.cpp
 )
 
 if(BUILD_FUZZTEST)
@@ -57,5 +66,5 @@ if(BUILD_FUZZTEST)
   target_link_libraries(binaryen-unittests PRIVATE gmock)
   gtest_discover_tests(binaryen-unittests)
 else()
-  target_link_libraries(binaryen-unittests PRIVATE gtest gtest_main)
+  target_link_libraries(binaryen-unittests PRIVATE gtest gtest_main gmock)
 endif()

@@ -23,7 +23,6 @@
 #include "ir/localize.h"
 #include "ir/module-utils.h"
 #include "ir/names.h"
-#include "ir/struct-utils.h"
 #include "ir/subtype-exprs.h"
 #include "ir/type-updating.h"
 #include "ir/utils.h"
@@ -130,10 +129,9 @@
 //
 // If any three of these types exist in these relations with the others, then
 // the validation rules require that the fourth type also exist and be in these
-// relations. The only exception is that A.desc is allowed to be missing. This
-// complex and recursive relationship between subtyping and descriptor relations
-// is why we optimize out unneeded descriptors in this pass rather than e.g.
-// GlobalTypeOptimization.
+// relations. This recursive relationship between subtyping and descriptor
+// relations is why we optimize out unneeded descriptors in this pass rather
+// than e.g. GlobalTypeOptimization.
 //
 // Starting with the initial subtype and descriptor relations determined by
 // walking the IR, repeatedly search for new subtypings and descriptors by
@@ -364,10 +362,12 @@ struct TypeTree {
     // DFS stack of (node index, child index) pairs.
     std::vector<std::pair<Index, Index>> stack;
 
-    bool operator==(const SubtypeIterator& other) {
+    bool operator==(const SubtypeIterator& other) const {
       return stack == other.stack;
     }
-    bool operator!=(const SubtypeIterator& other) { return !(*this == other); }
+    bool operator!=(const SubtypeIterator& other) const {
+      return !(*this == other);
+    }
     const HeapType& operator*() const {
       return parent->nodes[stack.back().first].type;
     }
@@ -457,6 +457,7 @@ template<typename Self> struct Noter {
   Self& self() { return *static_cast<Self*>(this); }
 
   void noteSubtype(HeapType sub, HeapType super) {
+    assert(HeapType::isSubType(sub, super));
     // Bottom types are uninteresting, but other basic heap types can be
     // interesting because of their interactions with casts.
     if (sub == super || sub.isBottom()) {
@@ -702,6 +703,7 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
       }
 
       void noteNonFlowSubtype(Expression* sub, Type super) {
+        assert(Type::isSubType(sub->type, super));
         // This expression's type must be a subtype of |super|, but the value
         // does not flow anywhere - this is a static constraint. As the value
         // does not flow, it cannot reach anywhere else, which means we need
@@ -769,7 +771,7 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
         // a trap, then we have no way to preserve that trap without keeping the
         // descriptor around.
         if (trapsNeverHappen || getFunction() ||
-            curr->desc->type.isNonNullable()) {
+            curr->desc->type.isNonNullableRef()) {
           return;
         }
         // We must preserve the potential trap. When we update the instructions
@@ -926,8 +928,16 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
     types.setDescriptor(described, descriptor);
 
     // Complete the descriptor squares above and below the new descriptor edge.
-    completeDescriptorSquare(
-      std::nullopt, types.getSupertype(descriptor), described, descriptor);
+    // The four cases here correspond to the four potentially missing corners of
+    // the square.
+    if (auto super = types.getSupertype(described)) {
+      completeDescriptorSquare(
+        super, types.getDescriptor(*super), described, descriptor);
+    }
+    if (auto superDesc = types.getSupertype(descriptor)) {
+      completeDescriptorSquare(
+        types.getDescribed(*superDesc), superDesc, described, descriptor);
+    }
     for (auto sub : types.immediateSubtypes(described)) {
       completeDescriptorSquare(
         described, descriptor, sub, types.getDescriptor(sub));
@@ -1019,9 +1029,9 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
     } else if (!subDesc) {
       subDesc = sub->getDescriptorType();
     } else if (!superDesc) {
-      // This is the only type that is allowed to be missing.
-      return;
+      superDesc = super->getDescriptorType();
     }
+    assert(super && superDesc && sub && subDesc);
     // Add all the edges. Don't worry about duplicating existing edges because
     // checking whether they're necessary now would be about as expensive as
     // discarding them later.
@@ -1098,7 +1108,7 @@ struct Unsubtyping : Pass, Noter<Unsubtyping> {
         if (auto* func = getFunction()) {
           // Preserve a trap from a null descriptor if necessary.
           if (!getPassOptions().trapsNeverHappen &&
-              curr->desc->type.isNullable()) {
+              curr->desc->type.isNullableRef()) {
             curr->desc =
               Builder(*getModule()).makeRefAs(RefAsNonNull, curr->desc);
           }

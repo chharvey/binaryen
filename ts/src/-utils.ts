@@ -3,6 +3,7 @@
 
 
 
+import * as util from "node:util";
 import {
 	BinaryenObj,
 	stackAlloc,
@@ -10,6 +11,22 @@ import {
 	stackSave,
 	stringToUTF8OnStack,
 } from "./-pre.ts";
+import type {
+	Type,
+} from "./constants.ts";
+
+
+
+/**
+ * An object containing catch info in a try_table.
+ * @inline
+ */
+export type TryTableCatch = {
+	readonly tag: string | undefined,
+	readonly dest: string,
+	readonly ref: boolean,
+	readonly sentType: Type,
+};
 
 
 
@@ -107,21 +124,39 @@ export function setAllNested<T, U>(
 	values: readonly U[],
 	numFn: (ref: T) => number,
 	setFn: (ref: T, i: number, val: U) => void,
-	appendFn: (ef: T, val: U) => void,
-	removeFn: (ef: T, num: number) => void,
+	appendFn: (ref: T, val: U) => void,
+	removeFn: (ref: T, idx: number) => void,
 ): void {
-	const num = values.length;
-	let prevNum = numFn(ref);
-	let index = 0;
-	while (index < num) {
-		if (index < prevNum) {
-			setFn(ref, index, values[index]);
+	let prevNum: number = numFn(ref);
+	values.forEach((value, i) => {
+		if (i < prevNum) {
+			setFn(ref, i, value);
 		} else {
-			appendFn(ref, values[index]);
+			appendFn(ref, value);
 		}
-		++index;
-	}
-	while (prevNum > index) {
+	});
+	while (prevNum > values.length) {
 		removeFn(ref, --prevNum);
 	}
+}
+
+
+
+/**
+ * Mark a function as deprecated by logging a warning in the console.
+ * @example
+ * const obj = {
+ * 	callIndirect: replaceWith(
+ * 		"callIndirect -> call_indirect",
+ * 		function (...args) { return this.call_indirect(...args); },
+ * 	),
+ * }
+ *
+ * @param replacement a description of the format "{old_name} -> {new_name}"
+ * @param fn          the function to replace
+ * @returns           a new function that performs the original function and marks it as deprecated
+ */
+export function replaceWith<T extends Function>(replacement: string, fn: T): T {
+	const [deprecated, replaced] = replacement.split(" -> ");
+	return util.deprecate(fn, `\`.${deprecated}\` is deprecated; use \`.${replaced}\` instead.`);
 }

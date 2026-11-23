@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef wasm_stack_h
-#define wasm_stack_h
+#ifndef wasm_wasm_stack_h
+#define wasm_wasm_stack_h
 
 #include "ir/branch-utils.h"
 #include "ir/find_all.h"
@@ -23,6 +23,7 @@
 #include "ir/properties.h"
 #include "pass.h"
 #include "support/insert_ordered.h"
+#include "support/utilities.h"
 #include "wasm-binary.h"
 #include "wasm-traversal.h"
 #include "wasm.h"
@@ -85,6 +86,24 @@ public:
   // the type - usually identical to the origin type, but e.g. wasm has no
   // unreachable blocks, they must be none
   Type type;
+
+  // For control-flow begin instructions (BlockBegin, IfBegin, LoopBegin,
+  // TryBegin, TryTableBegin), the input parameter types of the control-flow
+  // block signature.
+  Type params = Type::none;
+
+  bool isControlFlowBegin() const {
+    switch (op) {
+      case BlockBegin:
+      case IfBegin:
+      case LoopBegin:
+      case TryBegin:
+      case TryTableBegin:
+        return true;
+      default:
+        return false;
+    }
+  }
 };
 
 using StackIR = std::vector<StackInst*>;
@@ -99,15 +118,19 @@ public:
       numLocalsByType(parent.getModule()->features),
       scratchLocals(parent.getModule()->features) {}
 
-  void visit(Expression* curr) {
+  void visit(Expression* curr, Type params = Type::none) {
     if (func) {
       parent.trackExpressionStart(curr, func);
     }
+    currParams = params;
     OverriddenVisitor<BinaryInstWriter>::visit(curr);
+    currParams = Type::none;
     if (func) {
       parent.trackExpressionEnd(curr, func);
     }
   }
+
+  void visit(StackInst* inst) { visit(inst->origin, inst->params); }
 
 #define DELEGATE(CLASS_TO_VISIT)                                               \
   void visit##CLASS_TO_VISIT(CLASS_TO_VISIT* curr);
@@ -129,14 +152,25 @@ public:
 
   MappedLocals mappedLocals;
 
+  // The explicitly named labels of this function, as (label index, name).
+  std::vector<std::pair<Index, Name>> labelNames;
+
 private:
+  // The index the next scope in this function will take.
+  Index nextLabelIndex = 0;
+
+  // Note the start of a scope: every block, loop, if, try and try_table takes
+  // an index in the function's label index space, in the order they appear in
+  // the function body, whether or not they have a name. Records the explicitly
+  // named ones for the name section.
+  void noteScopeStart(Name name = Name());
+
   void emitMemoryAccess(size_t alignment,
                         size_t bytes,
                         uint64_t offset,
                         Name memory,
                         MemoryOrder order,
-                        bool isRMW,
-                        BackingType backing = BackingType::Memory);
+                        bool isRMW);
   void emitLoadOpcode(unsigned bytes, bool signed_, Type type);
   void emitStoreOpcode(uint8_t bytes, Type valueType);
   int32_t getBreakIndex(Name name);
@@ -145,6 +179,7 @@ private:
   BufferWithRandomAccess& o;
   Function* func = nullptr;
   bool DWARF;
+  Type currParams = Type::none;
 
   std::vector<Name> breakStack;
 
@@ -533,8 +568,8 @@ public:
 
   void emit(Expression* curr) { writer.visit(curr); }
   void emitHeader() {
-    if (func->prologLocation) {
-      parent.writeDebugLocation(*func->prologLocation);
+    if (!func->prologLocation.empty()) {
+      parent.writeDebugLocation(func->prologLocation);
     }
     writer.mapLocalsAndEmitHeader();
   }
@@ -546,8 +581,8 @@ public:
   void emitFunctionEnd() {
     // Indicate the debug location corresponding to the end opcode
     // that terminates the function code.
-    if (func->epilogLocation) {
-      parent.writeDebugLocation(*func->epilogLocation);
+    if (!func->epilogLocation.empty()) {
+      parent.writeDebugLocation(func->epilogLocation);
     } else {
       // The end opcode has no debug location.
       parent.writeNoDebugLocation();
@@ -565,6 +600,9 @@ public:
   }
 
   MappedLocals& getMappedLocals() { return writer.mappedLocals; }
+  std::vector<std::pair<Index, Name>>& getLabelNames() {
+    return writer.labelNames;
+  }
 
 private:
   WasmBinaryWriter& parent;
@@ -584,11 +622,11 @@ public:
   // Get StackIR for a function, if it exists. (This allows some functions to
   // have it and others not, if we add such capability in the future.)
   StackIR* getStackIROrNull(Function* func) {
-    auto iter = analysis.map.find(func);
-    if (iter == analysis.map.end()) {
-      return nullptr;
-    }
-    return &iter->second;
+    return find_or_null(analysis.map, func);
+  }
+
+  const StackIR* getStackIROrNull(Function* func) const {
+    return find_or_null(analysis.map, func);
   }
 };
 
@@ -607,6 +645,9 @@ public:
   void write();
 
   MappedLocals& getMappedLocals() { return writer.mappedLocals; }
+  std::vector<std::pair<Index, Name>>& getLabelNames() {
+    return writer.labelNames;
+  }
 
 private:
   WasmBinaryWriter& parent;
@@ -643,6 +684,7 @@ private:
   void removeAt(Index i);
   Index getNumConsumedValues(StackInst* inst);
   bool canRemoveSetGetPair(Index setIndex, Index getIndex);
+  bool isConsumedBySymmetricOp(Index getIndex);
   std::unordered_set<LocalGet*> findStringViewDeferredGets();
 };
 
@@ -650,10 +692,8 @@ private:
 std::ostream&
 printStackIR(std::ostream& o, Module* module, const PassOptions& options);
 
+std::ostream& operator<<(std::ostream& o, wasm::StackInst& inst);
+
 } // namespace wasm
 
-namespace std {
-std::ostream& operator<<(std::ostream& o, wasm::StackInst& inst);
-} // namespace std
-
-#endif // wasm_stack_h
+#endif // wasm_wasm_stack_h

@@ -51,11 +51,6 @@ ALL_ITEMS = DECL_ITEMS + '|' + IMPORT_ITEM + '|' + EXPORT_ITEM
 # segments included in the output.
 ITEM_NAME = r'\$[^\s()]*|\$"[^"]*"|declare'
 
-# FIXME: This does not handle nested string contents. For example,
-#  (data (i32.const 10) "hello(")
-# will look unterminated, due to the '(' inside the string. As a result, the
-# code below will consider more elements after the |data| to be part of it,
-# until it sees enough closing ')' symbols.
 ITEM_RE = re.compile(r'(?:^\s*\(rec\s*)?(^\s*)\((' + ALL_ITEMS + r')\s+(' + ITEM_NAME + ').*$',
                      re.MULTILINE)
 
@@ -140,14 +135,25 @@ def find_end(module, start):
     # open parenthesis at `start`.
     assert module[start] == '('
     depth = 1
+    in_string = False
+    escaped = False
     for end in range(start + 1, len(module)):
-        if depth == 0:
-            break
+        if in_string:
+            if escaped:
+                escaped = False
+            elif module[end] == '\\':
+                escaped = True
+            elif module[end] == '"':
+                in_string = False
+        elif module[end] == '"':
+            in_string = True
         elif module[end] == '(':
             depth += 1
         elif module[end] == ')':
             depth -= 1
-    return end
+            if depth == 0:
+                return end + 1
+    return len(module)
 
 
 def find_annotations(module, start):
@@ -167,7 +173,7 @@ def find_annotations(module, start):
                 else:
                     # Found something that isn't an annotation.
                     break
-    # Look for the start of the line containin the first annoation.
+    # Look for the start of the line containing the first annotation.
     for i in range(annotation - 1, -1, -1):
         if module[i] == '\n':
             return i + 1
@@ -331,7 +337,7 @@ def update_test(args, test, lines, tmp):
 
     prefixes = {prefix for module_output in command_output for prefix in module_output.keys()}
     check_line_re = re.compile(r'^\s*;;\s*(' + '|'.join(prefixes) +
-                               r')(?:-NEXT|-LABEL|-NOT)?:.*$')
+                               r')(?:-[A-Z0-9]+)?:.*$')
 
     # Filter out whitespace between check blocks
     if lines:
@@ -353,8 +359,14 @@ def update_test(args, test, lines, tmp):
     def emit_checks(indent, prefix, lines):
         def pad(line):
             return line if not line or line.startswith(' ') else ' ' + line
-        output_lines.append(f'{indent};; {prefix}:     {pad(lines[0])}')
-        output_lines.extend(f'{indent};; {prefix}-NEXT:{pad(line)}' for line in lines[1:])
+
+        for i, line in enumerate(lines):
+            if not line.strip():
+                output_lines.append(f'{indent};; {prefix}-EMPTY:')
+            elif i == 0:
+                output_lines.append(f'{indent};; {prefix}:     {pad(line)}')
+            else:
+                output_lines.append(f'{indent};; {prefix}-NEXT:{pad(line)}')
 
     input_modules = [m.split('\n') for m in split_modules('\n'.join(lines))]
     if len(input_modules) > len(command_output):

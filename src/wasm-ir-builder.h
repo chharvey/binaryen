@@ -73,7 +73,7 @@ public:
 
   // Set the debug location to be attached to the next visited, created, or
   // pushed instruction.
-  void setDebugLocation(const std::optional<Function::DebugLocation>&);
+  void setDebugLocation(const Function::DebugLocations&);
 
   // Give the builder a pointer to the counter tracking the current location in
   // the binary. If this pointer is non-null, the builder will record the binary
@@ -85,7 +85,12 @@ public:
   }
 
   // The current function, used to create scratch locals, add annotations, etc.
-  void setFunction(Function* func) { this->func = func; }
+  void setFunction(Function* func) {
+    this->func = func;
+    this->numDeclaredLocals = func ? func->getNumLocals() : 0;
+  }
+  Function* getFunction() const { return func; }
+  Index getNumDeclaredLocals() const { return numDeclaredLocals; }
 
   // Handle the boundaries of control flow structures. Users may choose to use
   // the corresponding `makeXYZ` function below instead of `visitXYZStart`, but
@@ -104,6 +109,13 @@ public:
                               Name label = {},
                               Type inputType = Type::none);
   Result<> visitEnd();
+
+  // Set the name to use for the label of the scope we are currently building,
+  // if that scope ends up needing a label. This is for `if` and `try_table`,
+  // which cannot hold a name in the IR: a name from the binary name section
+  // should not cause us to introduce a wrapper block that would not otherwise
+  // exist just to hold it.
+  void setScopeNameHint(Name name);
 
   // Used to visit break nodes when traversing a single block without its
   // context. The type indicates how many values the break carries to its
@@ -155,20 +167,33 @@ public:
                     Name mem);
   Result<> makeStore(
     unsigned bytes, Address offset, unsigned align, Type type, Name mem);
-  Result<> makeAtomicLoad(
-    unsigned bytes, Address offset, Type type, Name mem, MemoryOrder order);
-  Result<> makeAtomicStore(
-    unsigned bytes, Address offset, Type type, Name mem, MemoryOrder order);
+  Result<> makeAtomicLoad(unsigned bytes,
+                          Address offset,
+                          Address align,
+                          Type type,
+                          Name mem,
+                          MemoryOrder order);
+  Result<> makeAtomicStore(unsigned bytes,
+                           Address offset,
+                           Address align,
+                           Type type,
+                           Name mem,
+                           MemoryOrder order);
   Result<> makeAtomicRMW(AtomicRMWOp op,
                          unsigned bytes,
                          Address offset,
+                         Address align,
                          Type type,
                          Name mem,
                          MemoryOrder order);
-  Result<> makeAtomicCmpxchg(
-    unsigned bytes, Address offset, Type type, Name mem, MemoryOrder order);
-  Result<> makeAtomicWait(Type type, Address offset, Name mem);
-  Result<> makeAtomicNotify(Address offset, Name mem);
+  Result<> makeAtomicCmpxchg(unsigned bytes,
+                             Address offset,
+                             Address align,
+                             Type type,
+                             Name mem,
+                             MemoryOrder order);
+  Result<> makeAtomicWait(Type type, Address offset, Address align, Name mem);
+  Result<> makeAtomicNotify(Address offset, Address align, Name mem);
   Result<> makeAtomicFence(MemoryOrder order);
   Result<> makePause();
   Result<> makeSIMDExtract(SIMDExtractOp op, uint8_t lane);
@@ -233,8 +258,8 @@ public:
   Result<> makeRefGetDesc(HeapType type);
   Result<> makeBrOn(Index label,
                     BrOnOp op,
-                    Type in = Type::none,
-                    Type out = Type::none,
+                    std::optional<Type> in = std::nullopt,
+                    std::optional<Type> out = std::nullopt,
                     const CodeAnnotation& annotations = {});
   Result<> makeStructNew(HeapType type, bool isDesc);
   Result<> makeStructNewDefault(HeapType type, bool isDesc);
@@ -245,7 +270,9 @@ public:
   makeStructRMW(AtomicRMWOp op, HeapType type, Index field, MemoryOrder order);
   Result<> makeStructCmpxchg(HeapType type, Index field, MemoryOrder order);
   Result<> makeStructWait(HeapType type, Index index);
-  Result<> makeStructNotify(HeapType type, Index index);
+  Result<> makeWaitqueueNew();
+  Result<> makeWaitqueueNotify();
+  Result<> makePublish();
   Result<> makeArrayNew(HeapType type);
   Result<> makeArrayNewDefault(HeapType type);
   Result<> makeArrayNewData(HeapType type, Name data);
@@ -253,9 +280,17 @@ public:
   Result<> makeArrayNewFixed(HeapType type, uint32_t arity);
   Result<> makeArrayGet(HeapType type, bool signed_, MemoryOrder order);
   Result<> makeArraySet(HeapType type, MemoryOrder order);
-  Result<>
-  makeArrayLoad(HeapType arrayType, unsigned bytes, bool signed_, Type type);
-  Result<> makeArrayStore(HeapType arrayType, unsigned bytes, Type type);
+  Result<> makeArrayLoad(HeapType arrayType,
+                         unsigned bytes,
+                         bool signed_,
+                         Address offset,
+                         Address align,
+                         Type type);
+  Result<> makeArrayStore(HeapType arrayType,
+                          unsigned bytes,
+                          Address offset,
+                          Address align,
+                          Type type);
   Result<> makeArrayLen();
   Result<> makeArrayCopy(HeapType destType, HeapType srcType);
   Result<> makeArrayFill(HeapType type);
@@ -303,6 +338,9 @@ public:
 private:
   Module& wasm;
   Function* func = nullptr;
+  // The number of user-declared locals in the current function, excluding
+  // scratch locals added by IRBuilder.
+  Index numDeclaredLocals = 0;
   Builder builder;
 
   // Used for setting DWARF expression locations.
@@ -317,7 +355,7 @@ private:
   // (if it has one).
   struct CanReceiveDebug : public std::monostate {};
   using DebugVariant =
-    std::variant<NoDebug, CanReceiveDebug, Function::DebugLocation>;
+    std::variant<NoDebug, CanReceiveDebug, Function::DebugLocations>;
 
   DebugVariant debugLoc;
 
@@ -391,12 +429,22 @@ private:
     // for branches, since the normal label is only used for delegates.
     Name branchLabel;
 
+    // The name to use if we end up needing a label for this scope. Unlike
+    // `label`, this does not itself cause the scope to be labeled. See
+    // `setScopeNameHint`.
+    Name nameHint;
+
     bool labelUsed = false;
 
-    // If the control flow scope has an input type, we need to lower it using a
-    // scratch local because we cannot represent control flow input in the IR.
+    // Whether this scope's label was given explicitly (in the text format or in
+    // the binary name section) rather than generated by us. Recorded in the
+    // function's `explicitLabelNames`.
+    bool labelExplicit = false;
+
+    // If the control flow scope has an input type, we need to lower it using
+    // scratch locals because we cannot represent control flow input in the IR.
     Type inputType;
-    Index inputLocal = -1;
+    std::vector<Index> inputLocals;
 
     // If there are br_on_*, try_table, or resume branches that target this
     // scope and carry additional values, we need to use a scratch local to
@@ -421,13 +469,6 @@ private:
     ScopeCtx() : scope(NoScope{}) {}
     ScopeCtx(Scope scope, Type inputType)
       : scope(scope), inputType(inputType) {}
-    ScopeCtx(
-      Scope scope, Name label, bool labelUsed, Type inputType, Index inputLocal)
-      : scope(scope), label(label), labelUsed(labelUsed), inputType(inputType),
-        inputLocal(inputLocal) {}
-    ScopeCtx(Scope scope, Name label, bool labelUsed, Name branchLabel)
-      : scope(scope), label(label), branchLabel(branchLabel),
-        labelUsed(labelUsed) {}
 
     static ScopeCtx makeFunc(Function* func) {
       return ScopeCtx(FuncScope{func}, Type::none);
@@ -474,10 +515,14 @@ private:
       unreachable = false;
       if (!keepInput) {
         inputType = Type::none;
-        inputLocal = -1;
+        inputLocals.clear();
       }
     }
     bool isNone() { return std::get_if<NoScope>(&scope); }
+    bool isInputLocal(Index local) const {
+      return std::find(inputLocals.begin(), inputLocals.end(), local) !=
+             inputLocals.end();
+    }
     Function* getFunction() {
       if (auto* funcScope = std::get_if<FuncScope>(&scope)) {
         return funcScope->func;
@@ -640,6 +685,28 @@ private:
   // its stack.
   std::unordered_map<Name, std::vector<Index>> labelDepths;
 
+  // Wrap the `visitXYZStart` call of a `makeXYZ` function, noting that the
+  // label, if any, was given to us rather than generated by us: only `makeXYZ`
+  // receives labels from outside, that is, from the text format or from the
+  // name section. `visitXYZStart` can also be called directly on an expression
+  // that already exists, as Outlining does when it rebuilds a function, and
+  // the name such an expression carries may be one we generated ourselves.
+  Result<> markLabelExplicit(Name label, Result<> started) {
+    CHECK_ERR(started);
+    if (label && !scopeStack.empty()) {
+      scopeStack.back().labelExplicit = true;
+    }
+    return Ok{};
+  }
+
+  // Note that a label was given to us rather than generated by us, so that we
+  // know it is worth writing out to the name section.
+  void noteExplicitLabel(Name label) {
+    if (func && label) {
+      func->explicitLabelNames.insert(label);
+    }
+  }
+
   Name makeFresh(Name label, Index hint = 0) {
     return Names::getValidName(
       label,
@@ -653,35 +720,7 @@ private:
   Index blockHint = 0;
   Index labelHint = 0;
 
-  Result<> pushScope(ScopeCtx&& scope) {
-    if (auto label = scope.getOriginalLabel()) {
-      // Assign a fresh label to the scope, if necessary.
-      if (!scope.label) {
-        scope.label = makeFresh(label);
-      }
-      // Record the original label to handle references to it correctly.
-      labelDepths[label].push_back(scopeStack.size() + 1);
-    }
-    if (binaryPos) {
-      scope.startPos = lastBinaryPos;
-      lastBinaryPos = *binaryPos;
-    }
-    bool hasInput = scope.inputType != Type::none;
-    Index inputLocal = scope.inputLocal;
-    if (hasInput && !scope.isDelimiter()) {
-      if (inputLocal == Index(-1)) {
-        auto scratch = addScratchLocal(scope.inputType);
-        CHECK_ERR(scratch);
-        inputLocal = scope.inputLocal = *scratch;
-      }
-      CHECK_ERR(makeLocalSet(inputLocal));
-    }
-    scopeStack.emplace_back(std::move(scope));
-    if (hasInput) {
-      CHECK_ERR(makeLocalGet(inputLocal));
-    }
-    return Ok{};
-  }
+  Result<> pushScope(ScopeCtx&& scope);
 
   ScopeCtx& getScope() {
     if (scopeStack.empty()) {
@@ -713,21 +752,24 @@ private:
     return getLabelName(label, true);
   }
   Result<Index> addScratchLocal(Type);
+  Result<> makeScratchLocalGet(Index local);
+  Result<> makeScratchLocalSet(Index local);
 
   struct HoistedVal {
     // The index in the stack of the deepest expression to be popped. This can
-    // be the original value-producing expression, or if we are popping
-    // greedily, it might be the deepest none-typed expression under the
-    // value-producing expression.
+    // be the original value-producing expression, a moved input local.get on
+    // top of the stack, or if we are popping greedily, the deepest none-typed
+    // expression under the value-producing expression.
     Index hoistIndex;
-    // The local.get placed on the stack, if any.
+    // The local.get of a newly allocated scratch local placed on the stack, if
+    // any.
     LocalGet* get;
   };
 
   // Find the last value-producing expression, if any, and hoist its value to
   // the top of the stack using a scratch local if necessary. If `greedy`, then
-  // also include none-typed expressions and the value-producing expression in
-  // the hoisted range of expressions.
+  // also include preceding none-typed expressions in the hoisted range of
+  // expressions.
   MaybeResult<HoistedVal> hoistLastValue(bool greedy = false);
   // Transform the stack as necessary such that the original producer of the
   // hoisted value will be popped along with the final expression that produces
@@ -744,7 +786,9 @@ private:
   Result<std::pair<Index, Name>> getExtraOutputLocalAndLabel(Index label,
                                                              size_t extraArity);
   Expression* fixExtraOutput(ScopeCtx& scope, Name label, Expression* expr);
-  void fixLoopWithInput(Loop* loop, Type inputType, Index scratch);
+  void fixLoopWithInput(Loop* loop,
+                        Type inputType,
+                        const std::vector<Index>& scratch);
 
   void applyAnnotations(Expression* expr, const CodeAnnotation& annotation);
 

@@ -30,7 +30,20 @@
 #ifndef cfg_traversal_h
 #define cfg_traversal_h
 
+#include <cassert>
+#include <cstddef>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
 #include "ir/branch-utils.h"
+#include "ir/properties.h"
+#include "shared-constants.h"
+#include "support/name.h"
+#include "support/utilities.h"
 #include "wasm-traversal.h"
 #include "wasm.h"
 
@@ -292,11 +305,12 @@ struct CFGWalker : public PostWalker<SubType, VisitorType> {
           // and the target try.
           [[maybe_unused]] bool found = false;
           for (int j = i - 1; j >= 0; j--) {
-            if (self->tryStack[j]->template cast<Try>()->name ==
-                tryy->delegateTarget) {
-              i = j;
-              found = true;
-              break;
+            if (auto* outerTry = self->tryStack[j]->template dynCast<Try>()) {
+              if (outerTry->name == tryy->delegateTarget) {
+                i = j;
+                found = true;
+                break;
+              }
             }
           }
           assert(found);
@@ -452,11 +466,13 @@ struct CFGWalker : public PostWalker<SubType, VisitorType> {
     }
     auto handlerBlocks = BranchUtils::getUniqueTargets(*currp);
     // Add branches to the targets.
+    auto* last = self->currBasicBlock;
     for (auto target : handlerBlocks) {
       if (target) {
-        self->branches[target].push_back(self->currBasicBlock);
+        self->branches[target].push_back(last);
       }
     }
+    self->link(last, self->startBasicBlock()); // we might fall through
   }
 
   static bool isReturnCall(Expression* curr) {
@@ -577,6 +593,7 @@ struct CFGWalker : public PostWalker<SubType, VisitorType> {
 
   void doWalkFunction(Function* func) {
     basicBlocks.clear();
+    loopTops.clear();
     debugIds.clear();
     exit = nullptr;
     hasSyntheticExit = false;

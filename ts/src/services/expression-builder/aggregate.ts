@@ -54,19 +54,10 @@ export function struct(mod: Module) {
 			BinaryenObj["_BinaryenStructNew"](mod[PTR], 0, 0, heapType)
 		),
 
-		/**
-		 * Gets a struct entry with an unpacked type at an index.
-		 *
-		 * **Warning:** `.get()` no longer takes the boolean `isSigned` argument, and assumes an unpacked type.
-		 * For packed types, use `.get_s()` for signed and `.get_u()` for unsigned.
-		 */
-		get: function (index: number, ref: ExpressionRef, type: Type, deprecated_isSigned?: boolean): ExpressionRef {
-			return deprecated_isSigned === undefined
-				? BinaryenObj["_BinaryenStructGet"](mod[PTR], index, ref, type)
-				: deprecated_isSigned
-					? this.get_s(index, ref, type)
-					: this.get_u(index, ref, type);
-		},
+		/** Gets a struct entry with an unpacked type at an index. */
+		get: (index: number, ref: ExpressionRef, type: Type): ExpressionRef => (
+			BinaryenObj["_BinaryenStructGet"](mod[PTR], index, ref, type)
+		),
 
 		/** Gets a struct entry with a signed packed type at an index. */
 		get_s: (index: number, ref: ExpressionRef, type: Type): ExpressionRef => (
@@ -81,6 +72,37 @@ export function struct(mod: Module) {
 		/** Sets a struct entry at an index. */
 		set: (index: number, ref: ExpressionRef, value: ExpressionRef): ExpressionRef => (
 			BinaryenObj["_BinaryenStructSet"](mod[PTR], index, ref, value)
+		),
+
+		/** [description] */
+		wait: (ref: ExpressionRef, index: number, expected: ExpressionRef, timeout: ExpressionRef, queue: ExpressionRef): ExpressionRef => (
+			BinaryenObj["_BinaryenStructWait"](mod[PTR], ref, index, expected, timeout, queue)
+		),
+	} as const;
+}
+
+
+
+export function waitqueue(mod: Module) {
+	return {
+		/** [description] */
+		new: (): ExpressionRef => (
+			BinaryenObj["_BinaryenWaitqueueNew"](mod[PTR])
+		),
+		/** [description] */
+		notify: (queue: ExpressionRef, count: ExpressionRef): ExpressionRef => (
+			BinaryenObj["_BinaryenWaitqueueNew"](mod[PTR], queue, count)
+		),
+	} as const;
+}
+
+
+
+export function publish(mod: Module) {
+	return {
+		/** [description] */
+		publish: (ref: ExpressionRef): ExpressionRef => (
+			BinaryenObj["_BinaryenPublish"](mod[PTR], ref)
 		),
 	} as const;
 }
@@ -115,19 +137,10 @@ export function array(mod: Module) {
 			preserveStack(() => BinaryenObj["_BinaryenArrayNewElem"](mod[PTR], heapType, strToStack(name), offset, size))
 		),
 
-		/**
-		 * Gets an array entry with an unpacked type at an index.
-		 *
-		 * **Warning:** `.get()` no longer takes the boolean `isSigned` argument, and assumes an unpacked type.
-		 * For packed types, use `.get_s()` for signed and `.get_u()` for unsigned.
-		 */
-		get: function (ref: ExpressionRef, index: ExpressionRef, type: Type, deprecated_isSigned?: boolean): ExpressionRef {
-			return deprecated_isSigned === undefined
-				? BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type)
-				: deprecated_isSigned
-					? this.get_s(ref, index, type)
-					: this.get_u(ref, index, type);
-		},
+		/** Gets an array entry with an unpacked type at an index. */
+		get: (ref: ExpressionRef, index: ExpressionRef, type: Type): ExpressionRef => (
+			BinaryenObj["_BinaryenArrayGet"](mod[PTR], ref, index, type)
+		),
 
 		/** Gets an array entry with a signed packed type at an index. */
 		get_s: (ref: ExpressionRef, index: ExpressionRef, type: Type): ExpressionRef => (

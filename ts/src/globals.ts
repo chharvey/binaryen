@@ -26,6 +26,7 @@ import {
 	ExpressionId,
 	type ExpressionRef,
 	type HeapType,
+	type ModuleRef,
 	type Type,
 } from "./constants.ts";
 
@@ -49,7 +50,9 @@ const EXPRESSION_TYPE_REGISTRY: ReadonlyMap<ExpressionId, new (expr: ExpressionR
 	[ExpressionId.Return, expressions.Return],
 	[ExpressionId.Throw, expressions.Throw],
 	[ExpressionId.Rethrow, expressions.Rethrow],
+	[ExpressionId.ThrowRef, expressions.ThrowRef],
 	[ExpressionId.Try, expressions.Try],
+	[ExpressionId.TryTable, expressions.TryTable],
 
 	// Variable Instructions
 	[ExpressionId.LocalGet, expressions.LocalGet],
@@ -92,6 +95,10 @@ const EXPRESSION_TYPE_REGISTRY: ReadonlyMap<ExpressionId, new (expr: ExpressionR
 	[ExpressionId.StructNew, expressions.StructNew],
 	[ExpressionId.StructGet, expressions.StructGet],
 	[ExpressionId.StructSet, expressions.StructSet],
+	[ExpressionId.StructWait, expressions.StructWait],
+	[ExpressionId.WaitqueueNew, expressions.WaitqueueNew],
+	[ExpressionId.WaitqueueNotify, expressions.WaitqueueNotify],
+	[ExpressionId.Publish, expressions.Publish],
 	[ExpressionId.ArrayNew, expressions.ArrayNew],
 	[ExpressionId.ArrayNewFixed, expressions.ArrayNewFixed],
 	[ExpressionId.ArrayNewData, expressions.ArrayNewData],
@@ -140,7 +147,7 @@ const EXPRESSION_TYPE_REGISTRY: ReadonlyMap<ExpressionId, new (expr: ExpressionR
  * Private utility to create a Module from a given pointer.
  * Users don’t have access to this.
  */
-function wrapModule(ptr: number): Module {
+function wrapModule(ptr: ModuleRef): Module {
 	const returned = new Module();
 	// @ts-expect-error -- warning: reassigning a readonly field
 	returned[PTR] = ptr;
@@ -196,37 +203,24 @@ export function emitText(expr: ExpressionRef): string {
 	}
 }
 
-/** Creates a module from binary data. */
-export function readBinary(data: Uint8Array): Module {
+/** Parses a binary to a module with the given feature set enabled. `features` defaults to MVP. */
+export function readBinary(data: Uint8Array, features?: Feature): Module {
 	const buffer = _malloc(data.length);
 	BinaryenObj.HEAP8.set(data, buffer);
-	const ptr = handleFatalError(() => BinaryenObj["_BinaryenModuleRead"](buffer, data.length));
+	const ptr: ModuleRef = features === undefined
+		? handleFatalError(() => BinaryenObj["_BinaryenModuleRead"](buffer, data.length))
+		: handleFatalError(() => BinaryenObj["_BinaryenModuleReadWithFeatures"](buffer, data.length, features));
 	_free(buffer);
 	return wrapModule(ptr);
 }
 
-export function readBinaryWithFeatures(data: Uint8Array, features: Feature): Module {
-	const buffer = _malloc(data.length);
-	BinaryenObj.HEAP8.set(data, buffer);
-	const ptr = handleFatalError(() => BinaryenObj["_BinaryenModuleReadWithFeatures"](buffer, data.length, features));
-	_free(buffer);
-	return wrapModule(ptr);
-}
-
-/** Creates a module from Binaryen’s s-expression text format (not official stack-style text format). */
-export function parseText(text: string): Module {
+/** Parses text format to a module with the given feature set enabled. `features` defaults to MVP. */
+export function parseText(text: string, features?: Feature): Module {
 	const buffer = _malloc(text.length + 1);
 	stringToAscii(text, buffer);
-	const ptr = handleFatalError(() => BinaryenObj["_BinaryenModuleParse"](buffer));
-	_free(buffer);
-	return wrapModule(ptr);
-}
-
-/** Parses text format to a module with the given feature set enabled. */
-export function parseTextWithFeatures(text: string, features: Feature): Module {
-	const buffer = _malloc(text.length + 1);
-	stringToAscii(text, buffer);
-	const ptr = handleFatalError(() => BinaryenObj["_BinaryenModuleParseWithFeatures"](buffer, features));
+	const ptr: ModuleRef = features === undefined
+		? handleFatalError(() => BinaryenObj["_BinaryenModuleParse"](buffer))
+		: handleFatalError(() => BinaryenObj["_BinaryenModuleParseWithFeatures"](buffer, features));
 	_free(buffer);
 	return wrapModule(ptr);
 }

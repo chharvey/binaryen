@@ -2,21 +2,14 @@
 # https://launchpad.net/ubuntu/focal/+source/cmake
 cmake_minimum_required(VERSION 3.16.3)
 
-# Needed for C++17 (std::path)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum OS X deployment version")
 
-project(binaryen LANGUAGES C CXX VERSION 130)
+project(binaryen LANGUAGES C CXX VERSION 133)
 include(GNUInstallDirs)
 
 # The C++ standard whose features are required to build Binaryen.
 # Keep in sync with scripts/test/shared.py cxx_standard
-# The if condition allows embedding in a project with a higher default C++ standard set
-set(REQUIRED_CXX_STANDARD 20)
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD ${REQUIRED_CXX_STANDARD})
-elseif(CMAKE_CXX_STANDARD LESS ${REQUIRED_CXX_STANDARD})
-  message(SEND_ERROR "Building with C++ standards older than C++${REQUIRED_CXX_STANDARD} is not supported, change CMAKE_CXX_STANDARD to ${REQUIRED_CXX_STANDARD} or later")
-endif()
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -93,24 +86,62 @@ option(EMSCRIPTEN_ENABLE_SINGLE_FILE "Enable SINGLE_FILE mode in emscripten buil
 
 option(ENABLE_WERROR "Enable -Werror" ON)
 
-# For git users, attempt to generate a more useful version string
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
-  find_package(Git QUIET REQUIRED)
-  execute_process(COMMAND
-               "${GIT_EXECUTABLE}" --git-dir=${CMAKE_CURRENT_SOURCE_DIR}/.git describe --tags --match version_*
-           RESULT_VARIABLE
-               GIT_VERSION_RESULT
-           OUTPUT_VARIABLE
-               GIT_VERSION
-           OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(${GIT_VERSION_RESULT})
-    message(WARNING "Error running git describe to determine version")
-  else()
-    set(PROJECT_VERSION "${PROJECT_VERSION} (${GIT_VERSION})")
+# Generate config.h with PROJECT_VERSION (including git describe output when
+# building from a git checkout). This uses a build-time custom command
+# depending on .git/logs/HEAD so switching commits updates the version string
+# without needing to re-run CMake.
+set(VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/config.h")
+set(GEN_VERSION_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen-version.cmake")
+set(GEN_VERSION_DEPS "${GEN_VERSION_SCRIPT}" "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in")
+set(GENERATED_VERSION_FILES "${VERSION_HEADER}")
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND "${GIT_EXECUTABLE}" rev-parse --git-dir
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      RESULT_VARIABLE GIT_RESULT
+      OUTPUT_VARIABLE GIT_DIR
+      ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(GIT_RESULT EQUAL 0)
+      get_filename_component(GIT_DIR "${GIT_DIR}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+      if(EXISTS "${GIT_DIR}/logs/HEAD")
+        list(APPEND GEN_VERSION_DEPS "${GIT_DIR}/logs/HEAD")
+      else()
+        # Some checkouts (e.g. 'repo' or reflog-disabled) may not have
+        # .git/logs/HEAD; use a non-existent output to force checking git at
+        # build time.
+        list(APPEND GENERATED_VERSION_FILES "${CMAKE_CURRENT_BINARY_DIR}/__fake_config.h")
+      endif()
+    endif()
   endif()
 endif()
 
-configure_file(config.h.in config.h)
+set(GEN_VERSION_CMD
+  "${CMAKE_COMMAND}"
+  "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+  "-DOUTPUT_FILE=${VERSION_HEADER}"
+  "-DPROJECT_VERSION=${PROJECT_VERSION}"
+  "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+  -P "${GEN_VERSION_SCRIPT}")
+
+# Also generate config.h at configure time so tools like clang-tidy that run
+# before a build can find it.
+execute_process(COMMAND ${GEN_VERSION_CMD})
+
+add_custom_command(
+  OUTPUT ${GENERATED_VERSION_FILES}
+  DEPENDS ${GEN_VERSION_DEPS}
+  COMMAND ${GEN_VERSION_CMD}
+  COMMENT "Generating config.h")
+
+set_source_files_properties("${VERSION_HEADER}"
+  PROPERTIES GENERATED TRUE
+             HEADER_FILE_ONLY TRUE)
+
+add_custom_target(binaryen_version ALL DEPENDS ${GENERATED_VERSION_FILES})
 
 # Configure threads
 
@@ -256,9 +287,6 @@ if(MSVC)
 
   # workaround for https://github.com/WebAssembly/binaryen/issues/3661
   add_compile_flag("/D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING")
-  # Visual Studio 2018 15.8 implemented conformant support for std::aligned_storage, but the conformant support is only enabled when the following flag is passed, to avoid
-  # breaking backwards compatibility with code that relied on the non-conformant behavior (the old nonconformant behavior is not used with Binaryen)
-  add_compile_flag("/D_ENABLE_EXTENDED_ALIGNED_STORAGE")
   # Don't warn about using "strdup" as a reserved name.
   add_compile_flag("/D_CRT_NONSTDC_NO_DEPRECATE")
 
@@ -454,6 +482,7 @@ endif()
 # Declare libbinaryen
 # This will be either be STATIC or SHARED depending on BUILD_SHARED_LIBS
 add_library(binaryen)
+add_dependencies(binaryen binaryen_version)
 
 if(BUILD_SHARED_LIBS)
   add_definitions(-DBUILD_SHARED_LIBS)
@@ -465,6 +494,7 @@ if(BUILD_SHARED_LIBS)
 else()
   message(STATUS "Building libbinaryen as statically linked library.")
 endif()
+target_compile_features(binaryen PUBLIC cxx_std_20)
 target_link_libraries(binaryen PUBLIC Threads::Threads)
 binaryen_setup_rpath(binaryen)
 if(BUILD_LLVM_DWARF)

@@ -14,6 +14,46 @@
  * limitations under the License.
  */
 
+// IRBuilder constructs valid Binaryen IR expression trees from a flat stream of
+// WebAssembly instructions (e.g. from the binary or text parsers).
+//
+// Core Mechanism:
+//
+// - Maintain a stack of control scopes (`ScopeCtx`).
+//
+// - Track an expression stack (`exprStack`) within each scope.
+//
+// - Pop children from `exprStack` (via `ChildPopper`), set them as operands on
+//   the new Expression, and push the Expression back onto `exprStack`.
+//
+// - At scope end (`visitEnd`), the scope's expressions are inserted into the
+//   scope's control flow Expression, which is pushed to the parent scope.
+//
+// There are extra complications necessary to bridge the gap between WebAssembly
+// and Binaryen IR:
+//
+// - Unreachability: When the instructions before an unreachable-typed
+//   Expression would be popped but do not satisfy the parent Expression's type
+//   requirements, they are instead dropped and new `unreachable` instructions
+//   are synthesized instead (`popConstrainedChildren`).
+//
+// - Branch targets: Wasm allows branching to any control structure (if, try,
+//   try_table, loop, block), whereas Binaryen IR branches can target only
+//   `Block` or `Loop`. IRBuilder wraps other control flow structures in
+//   synthetic named `Block`s when targeted by branches (`maybeWrapForLabel`).
+//
+// - Branch values and block inputs: Wasm supports sending extra values with any
+//   branch instruction and also supports input parameters to any control flow
+//   structure. Binaryen IR only supports sending extra values on br and br_if
+//   and never supports input parameters to control flow structures. IRBuilder
+//   lowers away sent values and control flow parameters using scratch locals
+//   and trampoline blocks (`fixLoopWithInput`, `fixExtraOutput`).
+//
+// - Exception handling pops: Wasm EH `catch` blocks implicitly pop exception
+//   payloads from the value stack. `IRBuilder` generates synthetic `Pop`
+//   Expressions and performs fixups for pops within nested blocks
+//   (`handleBlockNestedPops`).
+
 #include <cassert>
 
 #include "ir/child-typer.h"
@@ -23,6 +63,7 @@
 #include "ir/properties.h"
 #include "ir/utils.h"
 #include "wasm-ir-builder.h"
+#include "wasm.h"
 
 #ifndef IR_BUILDER_DEBUG
 #define IR_BUILDER_DEBUG 0
@@ -51,6 +92,13 @@ Result<> validateTypeAnnotation(HeapType type, Expression* child) {
   return validateTypeAnnotation(Type(type, Nullable), child);
 }
 
+Result<> requireNaturalAtomicAlign(Address align, Address natural) {
+  if (align != natural) {
+    return Err{"atomic accesses must have natural alignment"};
+  }
+  return Ok{};
+}
+
 } // anonymous namespace
 
 Result<Index> IRBuilder::addScratchLocal(Type type) {
@@ -62,7 +110,8 @@ Result<Index> IRBuilder::addScratchLocal(Type type) {
 }
 
 MaybeResult<IRBuilder::HoistedVal> IRBuilder::hoistLastValue(bool greedy) {
-  auto& stack = getScope().exprStack;
+  auto& scope = getScope();
+  auto& stack = scope.exprStack;
   int valIndex = stack.size() - 1;
   for (; valIndex >= 0; --valIndex) {
     if (stack[valIndex]->type != Type::none) {
@@ -89,6 +138,17 @@ MaybeResult<IRBuilder::HoistedVal> IRBuilder::hoistLastValue(bool greedy) {
   if (expr->type == Type::unreachable) {
     // No need for a scratch local to hoist an unreachable.
     return HoistedVal{Index(hoistIndex), nullptr};
+  }
+  if (auto* get = expr->dynCast<LocalGet>();
+      get && scope.isInputLocal(get->index)) {
+    // Input scratch locals are never modified while their initial `local.get`s
+    // remain on the stack, so we can hoist them directly across subsequent
+    // none-typed expressions without allocating a new scratch local or
+    // packaging those expressions into a block.
+    assert(hoistIndex == valIndex && get->type.isSingle());
+    stack.erase(stack.begin() + valIndex);
+    stack.push_back(get);
+    return HoistedVal{Index(stack.size() - 1), nullptr};
   }
   // Hoist with a scratch local. Normally the scratch local is the same type as
   // the hoisted expression, but we may need to adjust it given the enabled
@@ -211,16 +271,16 @@ Result<Expression*> IRBuilder::build() {
   return expr;
 }
 
-void IRBuilder::setDebugLocation(
-  const std::optional<Function::DebugLocation>& loc) {
-  if (loc) {
-    DBG(std::cerr << "setting debugloc " << loc->fileIndex << ":"
-                  << loc->lineNumber << ":" << loc->columnNumber << "\n";);
+void IRBuilder::setDebugLocation(const Function::DebugLocations& loc) {
+  if (!loc.empty()) {
+    DBG(std::cerr << "setting debugloc " << loc.back().fileIndex << ":"
+                  << loc.back().lineNumber << ":" << loc.back().columnNumber
+                  << "\n";);
   } else {
     DBG(std::cerr << "setting debugloc to none\n";);
   }
-  if (loc) {
-    debugLoc = *loc;
+  if (!loc.empty()) {
+    debugLoc = loc;
   } else {
     debugLoc = NoDebug();
   }
@@ -229,16 +289,17 @@ void IRBuilder::setDebugLocation(
 void IRBuilder::applyDebugLoc(Expression* expr) {
   if (!std::get_if<CanReceiveDebug>(&debugLoc)) {
     if (func) {
-      if (auto* loc = std::get_if<Function::DebugLocation>(&debugLoc)) {
-        DBG(std::cerr << "applying debugloc " << loc->fileIndex << ":"
-                      << loc->lineNumber << ":" << loc->columnNumber
-                      << " to expression " << ShallowExpression{expr} << "\n");
+      if (auto* loc = std::get_if<Function::DebugLocations>(&debugLoc)) {
+        DBG(std::cerr << "applying debugloc " << loc->back().fileIndex << ":"
+                      << loc->back().lineNumber << ":"
+                      << loc->back().columnNumber << " to expression "
+                      << ShallowExpression{expr} << "\n");
         func->debugLocations[expr] = *loc;
       } else {
         assert(std::get_if<NoDebug>(&debugLoc));
         DBG(std::cerr << "applying debugloc to expression "
                       << ShallowExpression{expr} << "\n");
-        func->debugLocations[expr] = std::nullopt;
+        func->debugLocations[expr] = Function::DebugLocations{};
       }
     }
     debugLoc = CanReceiveDebug();
@@ -358,13 +419,13 @@ struct IRBuilder::ChildPopper
   ChildPopper(IRBuilder& builder) : builder(builder) {}
 
 private:
+  // The stack size at which we are about to pop an unreachable instruction
+  // that we must not pop past because the expressions underneath it do not
+  // have the types we need.
+  std::optional<size_t> unreachableFallbackSize;
+
   Result<> popConstrainedChildren(std::vector<Child>& children) {
     auto& scope = builder.getScope();
-
-    // The stack size at which we are about to pop an unreachable instruction
-    // that we must not pop past because the expressions underneath it do not
-    // have the types we need.
-    std::optional<size_t> unreachableFallbackSize;
 
     // We only need to check requirements if there is an unreachable.
     // Otherwise the validator will catch any problems.
@@ -374,20 +435,8 @@ private:
 
     // We have checked all the constraints, so we are ready to pop children.
     for (int i = children.size() - 1; i >= 0; --i) {
-      if (unreachableFallbackSize &&
-          scope.exprStack.size() == *unreachableFallbackSize && i > 0) {
-        // The next item on the stack is the unreachable instruction we must
-        // not pop past. We could pop it as child 0, but we are not ready to pop
-        // child 0 yet, so synthesize an unreachable instead of popping. The
-        // deeper instructions that would otherwise have been popped will remain
-        // on the stack to become prior children of future expressions or to be
-        // implicitly dropped at the end of the scope.
-        *children[i].childp = builder.builder.makeUnreachable();
-        continue;
-      }
-
-      // Pop a child normally. Pop greedily for children other than the first
-      // (i.e. the last to be popped).
+      // Pop a child. Pop greedily for children other than the first (i.e. the
+      // last to be popped).
       bool greedy = i > 0;
       auto val = pop(children[i].constraint.size(), greedy);
       CHECK_ERR(val);
@@ -498,6 +547,18 @@ private:
     assert(size >= 1);
     auto& scope = builder.getScope();
 
+    if (unreachableFallbackSize &&
+        scope.exprStack.size() == *unreachableFallbackSize && greedy) {
+      // The next item on the stack is the unreachable instruction we must not
+      // pop past. We could pop it as the first child or tuple element, but we
+      // are not ready to pop that yet (since we are popping greedily, we must
+      // not be at the first child), so synthesize an unreachable instead of
+      // popping. The deeper instructions that would otherwise have been popped
+      // will remain on the stack to become prior children of future expressions
+      // or to be implicitly dropped at the end of the scope.
+      return builder.builder.makeUnreachable();
+    }
+
     // Find the suffix of expressions that do not produce values.
     auto hoisted = builder.hoistLastValue(greedy);
     CHECK_ERR(hoisted);
@@ -578,14 +639,6 @@ public:
                            std::optional<HeapType> structType = std::nullopt) {
     std::vector<Child> children;
     ConstraintCollector{builder, children}.visitStructWait(curr, structType);
-    return popConstrainedChildren(children);
-  }
-
-  Result<>
-  visitStructNotify(StructNotify* curr,
-                    std::optional<HeapType> structType = std::nullopt) {
-    std::vector<Child> children;
-    ConstraintCollector{builder, children}.visitStructNotify(curr, structType);
     return popConstrainedChildren(children);
   }
 
@@ -682,6 +735,14 @@ public:
     return popConstrainedChildren(children);
   }
 
+  Result<> visitBrOn(BrOn* curr,
+                     std::optional<Type> in = std::nullopt,
+                     std::optional<Type> out = std::nullopt) {
+    std::vector<Child> children;
+    ConstraintCollector{builder, children}.visitBrOn(curr, in, out);
+    return popConstrainedChildren(children);
+  }
+
   Result<> visitSwitch(Switch* curr,
                        std::optional<Type> labelType = std::nullopt) {
     std::vector<Child> children;
@@ -729,6 +790,17 @@ public:
     std::vector<Child> children;
     ConstraintCollector{builder, children}.visitStackSwitch(curr, ct);
     return popConstrainedChildren(children);
+  }
+
+  Result<std::vector<Expression*>> popInputs(Type inputType) {
+    std::vector<Expression*> inputs(inputType.size());
+    std::vector<Child> children;
+    children.reserve(inputType.size());
+    for (size_t i = 0; i < inputType.size(); ++i) {
+      children.push_back({&inputs[i], {inputType[i]}});
+    }
+    CHECK_ERR(popConstrainedChildren(children));
+    return inputs;
   }
 };
 
@@ -788,12 +860,12 @@ Result<> IRBuilder::visitFunctionStart(Function* func) {
   if (!scopeStack.empty()) {
     return Err{"unexpected start of function"};
   }
-  if (auto* loc = std::get_if<Function::DebugLocation>(&debugLoc)) {
+  if (auto* loc = std::get_if<Function::DebugLocations>(&debugLoc)) {
     func->prologLocation = *loc;
   }
   debugLoc = CanReceiveDebug();
   scopeStack.push_back(ScopeCtx::makeFunc(func));
-  this->func = func;
+  setFunction(func);
 
   if (binaryPos) {
     lastBinaryPos = *binaryPos;
@@ -829,11 +901,64 @@ IRBuilder::visitTryTableStart(TryTable* trytable, Name label, Type inputType) {
   return pushScope(ScopeCtx::makeTryTable(trytable, label, inputType));
 }
 
+Result<> IRBuilder::pushScope(ScopeCtx&& scope) {
+  if (auto label = scope.getOriginalLabel()) {
+    // Assign a fresh label to the scope, if necessary.
+    if (!scope.label) {
+      scope.label = makeFresh(label);
+    }
+    // Record the original label to handle references to it correctly.
+    labelDepths[label].push_back(scopeStack.size() + 1);
+  }
+  if (binaryPos) {
+    scope.startPos = lastBinaryPos;
+    lastBinaryPos = *binaryPos;
+  }
+  bool hasInput = scope.inputType != Type::none;
+  if (hasInput && !scope.isDelimiter()) {
+    auto inputs = ChildPopper{*this}.popInputs(scope.inputType);
+    CHECK_ERR(inputs);
+    scope.inputLocals.reserve(inputs->size());
+    for (size_t i = 0; i < inputs->size(); ++i) {
+      // Reuse the enclosing scope's scratch local rather than allocating a new
+      // one when an input comes directly from an enclosing scope's input. This
+      // is safe even when other inputs for the new scope are copied into new
+      // scratch locals via `local.set`s emitted before the start of this scope
+      // (e.g. due to type widening or newly pushed expressions), because an
+      // enclosing scope's input scratch local is never modified while its
+      // initial `local.get` remains on the stack.
+      auto* input = (*inputs)[i];
+      auto* get = input->dynCast<LocalGet>();
+      bool isInputGet = get && get->type == scope.inputType[i] &&
+                        getScope().isInputLocal(get->index);
+      if (isInputGet) {
+        assert(!scope.isInputLocal(get->index));
+        scope.inputLocals.push_back(get->index);
+      } else {
+        auto scratch = addScratchLocal(scope.inputType[i]);
+        CHECK_ERR(scratch);
+        scope.inputLocals.push_back(*scratch);
+        pushSynthetic(builder.makeLocalSet(*scratch, input));
+      }
+    }
+  }
+  scopeStack.emplace_back(std::move(scope));
+  if (hasInput) {
+    auto& newScope = getScope();
+    for (size_t i = 0; i < newScope.inputLocals.size(); ++i) {
+      pushSynthetic(
+        builder.makeLocalGet(newScope.inputLocals[i], newScope.inputType[i]));
+    }
+  }
+  return Ok{};
+}
+
 Result<Expression*> IRBuilder::finishScope(Block* block) {
 #if IR_BUILDER_DEBUG
-  if (auto* loc = std::get_if<Function::DebugLocation>(&debugLoc)) {
-    std::cerr << "discarding debugloc " << loc->fileIndex << ":"
-              << loc->lineNumber << ":" << loc->columnNumber << "\n";
+  if (auto* loc = std::get_if<Function::DebugLocations>(&debugLoc)) {
+    std::cerr << "discarding debugloc " << loc->back().fileIndex << ":"
+              << loc->back().lineNumber << ":" << loc->back().columnNumber
+              << "\n";
   }
 #endif
   debugLoc = CanReceiveDebug();
@@ -1074,7 +1199,7 @@ Result<> IRBuilder::visitEnd() {
     return Err{"unexpected end"};
   }
   if (auto* func = scope.getFunction()) {
-    if (auto* loc = std::get_if<Function::DebugLocation>(&debugLoc)) {
+    if (auto* loc = std::get_if<Function::DebugLocations>(&debugLoc)) {
       func->epilogLocation = *loc;
     }
   }
@@ -1084,7 +1209,32 @@ Result<> IRBuilder::visitEnd() {
 
   bool isTry = scope.getTry() || scope.getCatch() || scope.getCatchAll();
   auto& label = isTry ? scope.branchLabel : scope.label;
+  // Whichever expression ends up carrying the scope's label, it is
+  // `scope.label` that it carries: the branch label of a try is always one we
+  // generated. Remember it if it was given to us, so that we write it out.
+  if (scope.labelExplicit) {
+    noteExplicitLabel(scope.label);
+  }
   auto blockType = scope.getResultType();
+
+  // When we wrap an expression then push the wrapper, we would end up with the
+  // binary start location attached to the original expression and the end
+  // location attached to the wrapper. Move the binary start location to the
+  // wrapper to avoid splitting the span information.
+  auto moveBinaryPosToWrapper = [&](Expression* original, Expression* wrapper) {
+    if (!func) {
+      return;
+    }
+    if (auto it = func->expressionLocations.find(original);
+        it != func->expressionLocations.end()) {
+      auto span = it->second;
+      assert(span.end == 0);
+      func->expressionLocations.erase(it);
+      [[maybe_unused]] auto [_, inserted] =
+        func->expressionLocations.insert({wrapper, span});
+      assert(inserted);
+    }
+  };
 
   // If the scope expression cannot be directly labeled, we may need to wrap it
   // in a block.
@@ -1092,18 +1242,20 @@ Result<> IRBuilder::visitEnd() {
     if (!label) {
       return curr;
     }
-    curr = fixExtraOutput(scope, label, curr);
-    // We can re-use unnamed blocks instead of wrapping them.
-    if (auto* block = curr->dynCast<Block>(); block && !block->name) {
+    auto* fixed = fixExtraOutput(scope, label, curr);
+    // We can reuse unnamed blocks instead of wrapping them.
+    if (auto* block = fixed->dynCast<Block>(); block && !block->name) {
       block->name = label;
       block->type = blockType;
+      moveBinaryPosToWrapper(curr, block);
       return block;
     }
     auto* block = builder.makeBlock();
     block->name = label;
-    block->list.push_back(curr);
+    block->list.push_back(fixed);
     block->finalize(blockType,
                     scope.labelUsed ? Block::HasBreak : Block::NoBreak);
+    moveBinaryPosToWrapper(curr, block);
     return block;
   };
 
@@ -1120,7 +1272,7 @@ Result<> IRBuilder::visitEnd() {
       EHUtils::handleBlockNestedPops(
         func, wasm, EHUtils::FeaturePolicy::RunIfNoEH);
     }
-    this->func = nullptr;
+    setFunction(nullptr);
     blockHint = 0;
     labelHint = 0;
   } else if (auto* block = scope.getBlock()) {
@@ -1137,8 +1289,8 @@ Result<> IRBuilder::visitEnd() {
     if (scope.inputType != Type::none && scope.labelUsed) {
       // Branches to this loop carry values, but Binaryen IR does not support
       // that. Fix this by trampolining the branches through new code that sets
-      // the branch value to the appropriate scratch local.
-      fixLoopWithInput(loop, scope.inputType, scope.inputLocal);
+      // the branch value to the appropriate scratch locals.
+      fixLoopWithInput(loop, scope.inputType, scope.inputLocals);
     }
     loop->finalize(loop->type);
     push(loop);
@@ -1147,8 +1299,19 @@ Result<> IRBuilder::visitEnd() {
     if (scope.inputType != Type::none) {
       // Normally an if without an else must have type none, but if there is an
       // input parameter, the empty else arm must propagate its value.
-      // Synthesize an else arm that loads the value from the scratch local.
-      iff->ifFalse = builder.makeLocalGet(scope.inputLocal, scope.inputType);
+      // Synthesize an else arm that loads the value from the scratch locals.
+      if (scope.inputType.isSingle()) {
+        iff->ifFalse =
+          builder.makeLocalGet(scope.inputLocals[0], scope.inputType);
+      } else {
+        std::vector<Expression*> gets;
+        gets.reserve(scope.inputLocals.size());
+        for (size_t i = 0; i < scope.inputLocals.size(); ++i) {
+          gets.push_back(
+            builder.makeLocalGet(scope.inputLocals[i], scope.inputType[i]));
+        }
+        iff->ifFalse = builder.makeTupleMake(gets);
+      }
     } else {
       iff->ifFalse = nullptr;
     }
@@ -1163,7 +1326,7 @@ Result<> IRBuilder::visitEnd() {
     tryy->name = scope.label;
     tryy->finalize(tryy->type);
     push(maybeWrapForLabel(tryy));
-  } else if (Try* tryy;
+  } else if (Try * tryy;
              (tryy = scope.getCatch()) || (tryy = scope.getCatchAll())) {
     auto index = scope.getIndex();
     setCatchBody(tryy, *expr, index);
@@ -1293,17 +1456,18 @@ IRBuilder::fixExtraOutput(ScopeCtx& scope, Name label, Expression* curr) {
   return curr;
 }
 
-// Branches to this loop need to be trampolined through code that sets the value
-// carried by the branch to the appropriate scratch local before branching to
-// the loop. Transform this:
+// Branches to this loop need to be trampolined through code that sets the
+// values carried by the branch to the appropriate scratch locals before
+// branching to the loop. Transform this:
 //
 //   (loop $l (param t1) (result t2) ...)
 //
-// to this:
+// to this (or, when t1 is a tuple, using a tuple scratch local to extract each
+// element into its corresponding input scratch local):
 //
 //  (loop $l0 (result t2)
 //    (block $l1 (result t2)
-//      (local.set $scratch ;; set the branch values to the scratch local
+//      (local.set $scratch ;; set the branch value to the scratch local
 //        (block $l (result t1)
 //          (br $l1 ;; exit the loop with the fallthrough value, if any.
 //            ...   ;; contains branches to $l
@@ -1313,7 +1477,9 @@ IRBuilder::fixExtraOutput(ScopeCtx& scope, Name label, Expression* curr) {
 //      (br $l0) ;; continue the loop
 //    )
 //  )
-void IRBuilder::fixLoopWithInput(Loop* loop, Type inputType, Index scratch) {
+void IRBuilder::fixLoopWithInput(Loop* loop,
+                                 Type inputType,
+                                 const std::vector<Index>& scratch) {
   auto l = loop->name;
   auto l0 = makeFresh(l, 0);
   auto l1 = makeFresh(l, 1);
@@ -1324,10 +1490,22 @@ void IRBuilder::fixLoopWithInput(Loop* loop, Type inputType, Index scratch) {
           loop->body, l, builder.makeBreak(l1), inputType)
       : builder.makeBlock(l, {builder.makeBreak(l1, loop->body)}, inputType);
 
-  Block* outer = builder.makeBlock(
-    l1,
-    {builder.makeLocalSet(scratch, inner), builder.makeBreak(l0)},
-    loop->type);
+  std::vector<Expression*> list;
+  if (inputType.isSingle()) {
+    list.push_back(builder.makeLocalSet(scratch[0], inner));
+  } else {
+    auto tupleScratch = addScratchLocal(inputType);
+    assertOk(tupleScratch);
+    list.push_back(builder.makeLocalSet(*tupleScratch, inner));
+    for (Index i = 0; i < scratch.size(); ++i) {
+      list.push_back(builder.makeLocalSet(
+        scratch[i],
+        builder.makeTupleExtract(builder.makeLocalGet(*tupleScratch, inputType),
+                                 i)));
+    }
+  }
+  list.push_back(builder.makeBreak(l0));
+  Block* outer = builder.makeBlock(l1, list, loop->type);
 
   loop->body = outer;
   loop->name = l0;
@@ -1376,8 +1554,12 @@ Result<Name> IRBuilder::getLabelName(Index label, bool forDelegate) {
     useTryBranchLabel ? (*scope)->branchLabel : (*scope)->label;
 
   if (!scopeLabel) {
-    // The scope does not already have a name, so we need to create one.
-    if ((*scope)->getBlock()) {
+    // The scope does not already have a name, so we need to create one. Use the
+    // name from the name section, if we have one.
+    if (auto hint = (*scope)->nameHint) {
+      scopeLabel = makeFresh(hint);
+      (*scope)->labelExplicit = true;
+    } else if ((*scope)->getBlock()) {
       scopeLabel = makeFresh("block", blockHint++);
     } else {
       scopeLabel = makeFresh("label", labelHint++);
@@ -1389,6 +1571,12 @@ Result<Name> IRBuilder::getLabelName(Index label, bool forDelegate) {
   return scopeLabel;
 }
 
+void IRBuilder::setScopeNameHint(Name name) {
+  if (!scopeStack.empty()) {
+    scopeStack.back().nameHint = name;
+  }
+}
+
 Result<> IRBuilder::makeNop() {
   push(builder.makeNop());
   return Ok{};
@@ -1398,7 +1586,7 @@ Result<> IRBuilder::makeBlock(Name label, Signature sig) {
   auto* block = wasm.allocator.alloc<Block>();
   block->name = label;
   block->type = sig.results;
-  return visitBlockStart(block, sig.params);
+  return markLabelExplicit(label, visitBlockStart(block, sig.params));
 }
 
 Result<> IRBuilder::makeIf(Name label,
@@ -1407,14 +1595,14 @@ Result<> IRBuilder::makeIf(Name label,
   auto* iff = wasm.allocator.alloc<If>();
   iff->type = sig.results;
   applyAnnotations(iff, annotations);
-  return visitIfStart(iff, label, sig.params);
+  return markLabelExplicit(label, visitIfStart(iff, label, sig.params));
 }
 
 Result<> IRBuilder::makeLoop(Name label, Signature sig) {
   auto* loop = wasm.allocator.alloc<Loop>();
   loop->name = label;
   loop->type = sig.results;
-  return visitLoopStart(loop, sig.params);
+  return markLabelExplicit(label, visitLoopStart(loop, sig.params));
 }
 
 Result<> IRBuilder::makeBreak(Index label,
@@ -1496,11 +1684,26 @@ Result<> IRBuilder::makeCallIndirect(Name table,
   return Ok{};
 }
 
+Result<> IRBuilder::makeScratchLocalGet(Index local) {
+  assert(func && local >= numDeclaredLocals && local < func->getNumLocals());
+  push(builder.makeLocalGet(local, func->getLocalType(local)));
+  return Ok{};
+}
+
+Result<> IRBuilder::makeScratchLocalSet(Index local) {
+  assert(func && local >= numDeclaredLocals && local < func->getNumLocals());
+  LocalSet curr;
+  curr.index = local;
+  CHECK_ERR(visitLocalSet(&curr));
+  push(builder.makeLocalSet(local, curr.value));
+  return Ok{};
+}
+
 Result<> IRBuilder::makeLocalGet(Index local) {
   if (!func) {
     return Err{"local.get is only valid in a function context"};
   }
-  if (local >= func->getNumLocals()) {
+  if (local >= numDeclaredLocals) {
     return Err{"invalid local.get index"};
   }
   push(builder.makeLocalGet(local, func->getLocalType(local)));
@@ -1511,7 +1714,7 @@ Result<> IRBuilder::makeLocalSet(Index local) {
   if (!func) {
     return Err{"local.set is only valid in a function context"};
   }
-  if (local >= func->getNumLocals()) {
+  if (local >= numDeclaredLocals) {
     return Err{"invalid local.set index"};
   }
   LocalSet curr;
@@ -1525,7 +1728,7 @@ Result<> IRBuilder::makeLocalTee(Index local) {
   if (!func) {
     return Err{"local.tee is only valid in a function context"};
   }
-  if (local >= func->getNumLocals()) {
+  if (local >= numDeclaredLocals) {
     return Err{"invalid local.tee index"};
   }
   LocalSet curr;
@@ -1572,8 +1775,13 @@ Result<> IRBuilder::makeStore(
   return Ok{};
 }
 
-Result<> IRBuilder::makeAtomicLoad(
-  unsigned bytes, Address offset, Type type, Name mem, MemoryOrder order) {
+Result<> IRBuilder::makeAtomicLoad(unsigned bytes,
+                                   Address offset,
+                                   Address align,
+                                   Type type,
+                                   Name mem,
+                                   MemoryOrder order) {
+  CHECK_ERR(requireNaturalAtomicAlign(align, bytes));
   Load curr;
   curr.memory = mem;
   CHECK_ERR(visitLoad(&curr));
@@ -1581,8 +1789,13 @@ Result<> IRBuilder::makeAtomicLoad(
   return Ok{};
 }
 
-Result<> IRBuilder::makeAtomicStore(
-  unsigned bytes, Address offset, Type type, Name mem, MemoryOrder order) {
+Result<> IRBuilder::makeAtomicStore(unsigned bytes,
+                                    Address offset,
+                                    Address align,
+                                    Type type,
+                                    Name mem,
+                                    MemoryOrder order) {
+  CHECK_ERR(requireNaturalAtomicAlign(align, bytes));
   Store curr;
   curr.memory = mem;
   curr.valueType = type;
@@ -1595,9 +1808,11 @@ Result<> IRBuilder::makeAtomicStore(
 Result<> IRBuilder::makeAtomicRMW(AtomicRMWOp op,
                                   unsigned bytes,
                                   Address offset,
+                                  Address align,
                                   Type type,
                                   Name mem,
                                   MemoryOrder order) {
+  CHECK_ERR(requireNaturalAtomicAlign(align, bytes));
   AtomicRMW curr;
   curr.memory = mem;
   curr.type = type;
@@ -1607,8 +1822,13 @@ Result<> IRBuilder::makeAtomicRMW(AtomicRMWOp op,
   return Ok{};
 }
 
-Result<> IRBuilder::makeAtomicCmpxchg(
-  unsigned bytes, Address offset, Type type, Name mem, MemoryOrder order) {
+Result<> IRBuilder::makeAtomicCmpxchg(unsigned bytes,
+                                      Address offset,
+                                      Address align,
+                                      Type type,
+                                      Name mem,
+                                      MemoryOrder order) {
+  CHECK_ERR(requireNaturalAtomicAlign(align, bytes));
   AtomicCmpxchg curr;
   curr.memory = mem;
   CHECK_ERR(ChildPopper{*this}.visitAtomicCmpxchg(&curr, type));
@@ -1623,7 +1843,9 @@ Result<> IRBuilder::makeAtomicCmpxchg(
   return Ok{};
 }
 
-Result<> IRBuilder::makeAtomicWait(Type type, Address offset, Name mem) {
+Result<>
+IRBuilder::makeAtomicWait(Type type, Address offset, Address align, Name mem) {
+  CHECK_ERR(requireNaturalAtomicAlign(align, type == Type::i32 ? 4 : 8));
   AtomicWait curr;
   curr.memory = mem;
   curr.expectedType = type;
@@ -1633,7 +1855,8 @@ Result<> IRBuilder::makeAtomicWait(Type type, Address offset, Name mem) {
   return Ok{};
 }
 
-Result<> IRBuilder::makeAtomicNotify(Address offset, Name mem) {
+Result<> IRBuilder::makeAtomicNotify(Address offset, Address align, Name mem) {
+  CHECK_ERR(requireNaturalAtomicAlign(align, 4));
   AtomicNotify curr;
   curr.memory = mem;
   CHECK_ERR(visitAtomicNotify(&curr));
@@ -1830,16 +2053,36 @@ Result<> IRBuilder::makePop(Type type) {
   // We don't actually want to create a new Pop expression here because we
   // already create them automatically when starting a legacy catch block that
   // needs one. Just verify that the Pop we are being asked to make is the same
-  // type as the Pop we have already made.
-  auto& scope = getScope();
-  if (!scope.getCatch() || scope.exprStack.size() != 1 ||
-      !scope.exprStack[0]->is<Pop>()) {
+  // type as the Pop we have already made, and move it into the current scope if
+  // we have entered unnamed blocks since the catch began. (Note that the block
+  // may receive a name later, if we encounter a break to it, if we process
+  // that after the pop. In that case, the fixups that run later will have work
+  // to do.)
+  ScopeCtx* catchScope = nullptr;
+  for (int i = int(scopeStack.size()) - 1; i >= 0; --i) {
+    auto& scope = scopeStack[i];
+    if (scope.getCatch()) {
+      catchScope = &scope;
+      break;
+    }
+    auto* block = scope.getBlock();
+    if (!block || block->name || !scope.exprStack.empty()) {
+      break;
+    }
+  }
+  if (!catchScope || catchScope->exprStack.size() != 1 ||
+      !catchScope->exprStack[0]->is<Pop>()) {
     return Err{
       "pop instructions may only appear at the beginning of catch blocks"};
   }
-  auto expectedType = scope.exprStack[0]->type;
+  auto* pop = catchScope->exprStack[0];
+  auto expectedType = pop->type;
   if (!Type::isSubType(expectedType, type)) {
     return Err{std::string("Expected pop of type ") + expectedType.toString()};
+  }
+  if (catchScope != &getScope()) {
+    catchScope->exprStack.pop_back();
+    pushSynthetic(pop);
   }
   return Ok{};
 }
@@ -1932,7 +2175,7 @@ Result<> IRBuilder::makeElemDrop(Name segment) {
 Result<> IRBuilder::makeTry(Name label, Signature sig) {
   auto* tryy = wasm.allocator.alloc<Try>();
   tryy->type = sig.results;
-  return visitTryStart(tryy, label, sig.params);
+  return markLabelExplicit(label, visitTryStart(tryy, label, sig.params));
 }
 
 Result<> IRBuilder::makeTryTable(Name label,
@@ -1950,7 +2193,8 @@ Result<> IRBuilder::makeTryTable(Name label,
     CHECK_ERR(name);
     trytable->catchDests.push_back(*name);
   }
-  return visitTryTableStart(trytable, label, sig.params);
+  return markLabelExplicit(label,
+                           visitTryTableStart(trytable, label, sig.params));
 }
 
 Result<> IRBuilder::makeThrow(Name tag) {
@@ -2095,13 +2339,16 @@ Result<> IRBuilder::makeRefGetDesc(HeapType type) {
 
 Result<> IRBuilder::makeBrOn(Index label,
                              BrOnOp op,
-                             Type in,
-                             Type out,
+                             std::optional<Type> in,
+                             std::optional<Type> out,
                              const CodeAnnotation& annotations) {
+  bool isCast = op != BrOnNull && op != BrOnNonNull;
+  bool isDescCast = op == BrOnCastDescEq || op == BrOnCastDescEqFail;
+  assert(bool(in) == bool(out) && bool(in) == isCast);
   std::optional<HeapType> descriptor;
-  if (op == BrOnCastDescEq || op == BrOnCastDescEqFail) {
-    assert(out.isRef());
-    descriptor = out.getHeapType().getDescriptorType();
+  if (isDescCast) {
+    assert(out && out->isRef());
+    descriptor = out->getHeapType().getDescriptorType();
     if (!descriptor) {
       return Err{"cast target must have descriptor"};
     }
@@ -2109,12 +2356,12 @@ Result<> IRBuilder::makeBrOn(Index label,
 
   BrOn curr;
   curr.op = op;
-  curr.castType = out;
+  curr.castType = isCast ? *out : Type::none;
   curr.desc = nullptr;
-  if (op != BrOnNull && op != BrOnNonNull && !out.isCastable()) {
+  if (isCast && !out->isCastable()) {
     return Err{"br_on cannot cast to invalid type"};
   }
-  CHECK_ERR(visitBrOn(&curr));
+  CHECK_ERR(ChildPopper{*this}.visitBrOn(&curr, in, out));
 
   // Validate things that would cause errors later.
   if (curr.ref->type != Type::unreachable && !curr.ref->type.isRef()) {
@@ -2132,14 +2379,14 @@ Result<> IRBuilder::makeBrOn(Index label,
       break;
     case BrOnCastDescEq:
     case BrOnCastDescEqFail: {
-      CHECK_ERR(validateTypeAnnotation(out.with(*descriptor).with(Nullable),
+      CHECK_ERR(validateTypeAnnotation(out->with(*descriptor).with(Nullable),
                                        curr.desc));
     }
       [[fallthrough]];
     case BrOnCast:
     case BrOnCastFail:
-      assert(in.isRef());
-      CHECK_ERR(validateTypeAnnotation(in, curr.ref));
+      assert(in->isRef());
+      CHECK_ERR(validateTypeAnnotation(*in, curr.ref));
   }
 
   // Extra values need to be sent in a scratch local.
@@ -2176,7 +2423,7 @@ Result<> IRBuilder::makeBrOn(Index label,
     case BrOnCastFail:
     case BrOnCastDescEq:
     case BrOnCastDescEqFail:
-      testType = in;
+      testType = *in;
       break;
   }
 
@@ -2189,7 +2436,7 @@ Result<> IRBuilder::makeBrOn(Index label,
     auto name = getLabelName(label);
     CHECK_ERR(name);
 
-    auto* br = builder.makeBrOn(op, *name, curr.ref, out, curr.desc);
+    auto* br = builder.makeBrOn(op, *name, curr.ref, curr.castType, curr.desc);
     applyAnnotations(br, annotations);
     push(br);
     return Ok{};
@@ -2200,20 +2447,21 @@ Result<> IRBuilder::makeBrOn(Index label,
 
   // Put the value under test back on the stack and stash it.
   getScope().exprStack.push_back(curr.ref);
-  CHECK_ERR(makeLocalSet(*testLocal));
+  CHECK_ERR(makeScratchLocalSet(*testLocal));
 
   // Now we can stash the extra values.
   auto info = getExtraOutputLocalAndLabel(label, extraArity);
   CHECK_ERR(info);
   auto [extraLocal, extraLabel] = *info;
-  CHECK_ERR(makeLocalSet(extraLocal));
+  CHECK_ERR(makeScratchLocalSet(extraLocal));
 
   // Restore the test value.
-  CHECK_ERR(makeLocalGet(*testLocal));
+  CHECK_ERR(makeScratchLocalGet(*testLocal));
 
   // Perform the branch.
   CHECK_ERR(visitBrOn(&curr));
-  auto* br = builder.makeBrOn(op, extraLabel, curr.ref, out, curr.desc);
+  auto* br =
+    builder.makeBrOn(op, extraLabel, curr.ref, curr.castType, curr.desc);
   applyAnnotations(br, annotations);
   push(br);
 
@@ -2222,7 +2470,7 @@ Result<> IRBuilder::makeBrOn(Index label,
   // to be under the result value. br_on_non_null does not have a result
   // value, so it is simpler.
   if (op == BrOnNonNull) {
-    CHECK_ERR(makeLocalGet(extraLocal));
+    CHECK_ERR(makeScratchLocalGet(extraLocal));
     return Ok{};
   }
 
@@ -2235,18 +2483,18 @@ Result<> IRBuilder::makeBrOn(Index label,
       WASM_UNREACHABLE("unexpected op");
     case BrOnCast:
     case BrOnCastDescEq:
-      if (out.isNullable()) {
-        resultType = Type(in.getHeapType(), NonNullable);
+      if (out->isNullableRef()) {
+        resultType = Type(in->getHeapType(), NonNullable);
       } else {
-        resultType = in;
+        resultType = *in;
       }
       break;
     case BrOnCastFail:
     case BrOnCastDescEqFail:
-      if (in.isNonNullable()) {
-        resultType = Type(out.getHeapType(), NonNullable);
+      if (in->isNonNullableRef()) {
+        resultType = Type(out->getHeapType(), NonNullable);
       } else {
-        resultType = out;
+        resultType = *out;
       }
       break;
   }
@@ -2254,9 +2502,9 @@ Result<> IRBuilder::makeBrOn(Index label,
   auto resultLocal = addScratchLocal(resultType);
   CHECK_ERR(resultLocal);
 
-  CHECK_ERR(makeLocalSet(*resultLocal));
-  CHECK_ERR(makeLocalGet(extraLocal));
-  CHECK_ERR(makeLocalGet(*resultLocal));
+  CHECK_ERR(makeScratchLocalSet(*resultLocal));
+  CHECK_ERR(makeScratchLocalGet(extraLocal));
+  CHECK_ERR(makeScratchLocalGet(*resultLocal));
   return Ok{};
 }
 
@@ -2359,36 +2607,32 @@ Result<> IRBuilder::makeStructWait(HeapType type, Index index) {
     return Err{"struct.wait field index out of bounds"};
   }
 
-  if (type.getStruct().fields.at(index).packedType !=
-      Field::PackedType::WaitQueue) {
-    return Err{"struct.wait field index must contain a `waitqueue`"};
-  }
-
   StructWait curr(wasm.allocator);
+  curr.index = index;
   CHECK_ERR(ChildPopper{*this}.visitStructWait(&curr, type));
   CHECK_ERR(validateTypeAnnotation(type, curr.ref));
-  push(builder.makeStructWait(index, curr.ref, curr.expected, curr.timeout));
+  push(builder.makeStructWait(
+    index, curr.ref, curr.waitqueue, curr.expected, curr.timeout));
   return Ok{};
 }
 
-Result<> IRBuilder::makeStructNotify(HeapType type, Index index) {
-  if (!type.isStruct()) {
-    return Err{"expected struct type annotation on struct.notify"};
-  }
-  // This is likely checked in the caller by the `fieldidx` parser.
-  if (index >= type.getStruct().fields.size()) {
-    return Err{"struct.notify field index out of bounds"};
-  }
+Result<> IRBuilder::makeWaitqueueNew() {
+  WaitqueueNew curr(wasm.allocator);
+  push(builder.makeWaitqueueNew());
+  return Ok{};
+}
 
-  if (type.getStruct().fields.at(index).packedType !=
-      Field::PackedType::WaitQueue) {
-    return Err{"struct.notify field index must contain a `waitqueue`"};
-  }
+Result<> IRBuilder::makeWaitqueueNotify() {
+  WaitqueueNotify curr(wasm.allocator);
+  CHECK_ERR(ChildPopper{*this}.visitWaitqueueNotify(&curr));
+  push(builder.makeWaitqueueNotify(curr.waitqueue, curr.count));
+  return Ok{};
+}
 
-  StructNotify curr(wasm.allocator);
-  CHECK_ERR(ChildPopper{*this}.visitStructNotify(&curr, type));
-  CHECK_ERR(validateTypeAnnotation(type, curr.ref));
-  push(builder.makeStructNotify(index, curr.ref, curr.count));
+Result<> IRBuilder::makePublish() {
+  Publish curr(wasm.allocator);
+  CHECK_ERR(ChildPopper{*this}.visitPublish(&curr));
+  push(builder.makePublish(curr.ref));
   return Ok{};
 }
 
@@ -2463,8 +2707,11 @@ Result<> IRBuilder::makeArraySet(HeapType type, MemoryOrder order) {
   return Ok{};
 }
 
-Result<>
-IRBuilder::makeArrayStore(HeapType arrayType, unsigned bytes, Type type) {
+Result<> IRBuilder::makeArrayStore(HeapType arrayType,
+                                   unsigned bytes,
+                                   Address offset,
+                                   Address align,
+                                   Type type) {
   if (!arrayType.isArray()) {
     return Err{"expected array type annotation on array store"};
   }
@@ -2473,13 +2720,16 @@ IRBuilder::makeArrayStore(HeapType arrayType, unsigned bytes, Type type) {
   CHECK_ERR(ChildPopper{*this}.visitArrayStore(&curr, arrayType, type));
 
   CHECK_ERR(validateTypeAnnotation(arrayType, curr.ref));
-  push(builder.makeArrayStore(bytes, curr.ref, curr.index, curr.value));
+  push(builder.makeArrayStore(
+    bytes, offset, align, curr.ref, curr.index, curr.value));
   return Ok{};
 }
 
 Result<> IRBuilder::makeArrayLoad(HeapType arrayType,
                                   unsigned bytes,
                                   bool signed_,
+                                  Address offset,
+                                  Address align,
                                   Type type) {
   if (!arrayType.isArray()) {
     return Err{"expected array type annotation on array load"};
@@ -2489,7 +2739,8 @@ Result<> IRBuilder::makeArrayLoad(HeapType arrayType,
   CHECK_ERR(ChildPopper{*this}.visitArrayLoad(&curr, arrayType));
 
   CHECK_ERR(validateTypeAnnotation(arrayType, curr.ref));
-  push(builder.makeArrayLoad(bytes, signed_, curr.ref, curr.index, type));
+  push(builder.makeArrayLoad(
+    bytes, signed_, offset, align, curr.ref, curr.index, type));
   return Ok{};
 }
 
@@ -2825,10 +3076,15 @@ Result<> IRBuilder::makeStackSwitch(HeapType ct, Name tag) {
   }
   StackSwitch curr(wasm.allocator);
   curr.tag = tag;
-  auto nparams = ct.getContinuation().type.getSignature().params.size();
+  auto params = ct.getContinuation().type.getSignature().params;
+  auto nparams = params.size();
   if (nparams < 1) {
     return Err{"arity mismatch: the continuation argument must have, at least, "
                "unary arity"};
+  }
+  if (!params[nparams - 1].isContinuation()) {
+    return Err{"expected continuation type for last parameter of switch "
+               "continuation"};
   }
 
   // The continuation argument of the continuation is synthetic,
@@ -2838,7 +3094,7 @@ Result<> IRBuilder::makeStackSwitch(HeapType ct, Name tag) {
   CHECK_ERR(ChildPopper{*this}.visitStackSwitch(&curr, ct));
   CHECK_ERR(validateTypeAnnotation(ct, curr.cont));
 
-  push(builder.makeStackSwitch(tag, std::move(curr.operands), curr.cont));
+  push(builder.makeStackSwitch(tag, std::move(curr.operands), curr.cont, ct));
   return Ok{};
 }
 
@@ -2873,6 +3129,11 @@ void IRBuilder::applyAnnotations(Expression* expr,
   if (annotation.toolchainInline) {
     assert(func);
     func->codeAnnotations[expr].toolchainInline = annotation.toolchainInline;
+  }
+
+  if (annotation.noReturn) {
+    assert(func);
+    func->codeAnnotations[expr].noReturn = true;
   }
 }
 

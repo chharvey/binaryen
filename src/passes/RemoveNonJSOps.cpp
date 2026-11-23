@@ -49,6 +49,22 @@
 
 namespace wasm {
 
+static const Name WASM_CTZ32("__wasm_ctz_i32");
+static const Name WASM_CTZ64("__wasm_ctz_i64");
+static const Name WASM_POPCNT32("__wasm_popcnt_i32");
+static const Name WASM_POPCNT64("__wasm_popcnt_i64");
+static const Name WASM_ROTL32("__wasm_rotl_i32");
+static const Name WASM_ROTL64("__wasm_rotl_i64");
+static const Name WASM_ROTR32("__wasm_rotr_i32");
+static const Name WASM_ROTR64("__wasm_rotr_i64");
+static const Name WASM_NEAREST_F32("__wasm_nearest_f32");
+static const Name WASM_NEAREST_F64("__wasm_nearest_f64");
+static const Name WASM_I64_MUL("__wasm_i64_mul");
+static const Name WASM_I64_SDIV("__wasm_i64_sdiv");
+static const Name WASM_I64_UDIV("__wasm_i64_udiv");
+static const Name WASM_I64_SREM("__wasm_i64_srem");
+static const Name WASM_I64_UREM("__wasm_i64_urem");
+
 struct RemoveNonJSOpsPass : public WalkerPass<PostWalker<RemoveNonJSOpsPass>> {
   std::unique_ptr<Builder> builder;
   std::unordered_set<Name> neededIntrinsics;
@@ -340,9 +356,20 @@ struct StubUnsupportedJSOpsPass
 
   void visitUnary(Unary* curr) {
     switch (curr->op) {
+      case ConvertSInt64ToFloat32:
       case ConvertUInt64ToFloat32:
-        // See detailed comment in lowerConvertIntToFloat in
-        // I64ToI32Lowering.cpp.
+      case TruncSatSFloat32ToInt32:
+      case TruncSatUFloat32ToInt32:
+      case TruncSatSFloat64ToInt32:
+      case TruncSatUFloat64ToInt32:
+      case TruncSatSFloat32ToInt64:
+      case TruncSatUFloat32ToInt64:
+      case TruncSatSFloat64ToInt64:
+      case TruncSatUFloat64ToInt64:
+        // f32.convert_i64_s and f32.convert_i64_u do not have perfect rounding
+        // in all cases (see lowerConvertIntToFloat in I64ToI32Lowering.cpp),
+        // and trunc_sat operations are lowered using non-saturating conversions
+        // in wasm2js and I64ToI32Lowering.
         stubOut(curr->value, curr->type);
         break;
       default: {

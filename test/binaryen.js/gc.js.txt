@@ -32,7 +32,17 @@
    (struct.new_default $1)
   )
   (drop
+   (struct.get_u $1 0
+    (global.get $struct-global)
+   )
+  )
+  (drop
    (struct.get_s $1 0
+    (global.get $struct-global)
+   )
+  )
+  (drop
+   (struct.get_u $1 0
     (global.get $struct-global)
    )
   )
@@ -71,7 +81,19 @@
    )
   )
   (drop
+   (array.get_u $0
+    (global.get $array-global)
+    (i32.const 0)
+   )
+  )
+  (drop
    (array.get_s $0
+    (global.get $array-global)
+    (i32.const 0)
+   )
+  )
+  (drop
+   (array.get_u $0
     (global.get $array-global)
     (i32.const 0)
    )
@@ -110,6 +132,9 @@
    (i32.const 0)
    (i32.const 1)
    (i32.const 2)
+  )
+  (drop
+   (string.const "hello \f0\9f\8c\8e")
   )
  )
 )

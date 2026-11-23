@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef wasm_ir_function_h
-#define wasm_ir_function_h
+#ifndef wasm_passes_call_utils_h
+#define wasm_passes_call_utils_h
 
+#include <functional>
 #include <variant>
+#include <vector>
 
 #include "ir/debuginfo.h"
-#include "ir/type-updating.h"
+#include "support/name.h"
+#include "wasm-builder.h"
+#include "wasm-type.h"
 #include "wasm.h"
 
 namespace wasm::CallUtils {
@@ -153,4 +157,4 @@ convertToDirectCalls(T* curr,
 
 } // namespace wasm::CallUtils
 
-#endif // wasm_ir_function_h
+#endif // wasm_passes_call_utils_h

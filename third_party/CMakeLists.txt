@@ -1,14 +1,28 @@
 if(BUILD_FUZZTEST)
+  # FuzzTest's CMakeLists.txt unconditionally sets CMAKE_CXX_STANDARD to 17,
+  # which would build Abseil with C++17 while Binaryen builds with C++20,
+  # causing an ABI mismatch on absl::SourceLocation. Restore Binaryen's C++
+  # standard when configuring Abseil (which then propagates it to FuzzTest via
+  # ABSL_PROPAGATE_CXX_STD).
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/absl-cxx-std.cmake"
+    "set(CMAKE_CXX_STANDARD ${CMAKE_CXX_STANDARD})\n")
+  set(CMAKE_PROJECT_absl_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/absl-cxx-std.cmake")
   add_subdirectory(fuzztest)
 elseif(BUILD_TESTS)
   # fuzztest includes gtest, but if we're not building fuzztest, build gtest ourselves.
   add_library(gtest STATIC googletest/googletest/src/gtest-all.cc)
   add_library(gtest_main STATIC googletest/googletest/src/gtest_main.cc)
+  add_library(gmock STATIC googletest/googlemock/src/gmock-all.cc)
+  add_library(gmock_main STATIC googletest/googlemock/src/gmock_main.cc)
   target_compile_options(gtest PRIVATE "-fno-rtti")
   target_compile_options(gtest_main PRIVATE "-fno-rtti")
+  target_compile_options(gmock PRIVATE "-fno-rtti")
+  target_compile_options(gmock_main PRIVATE "-fno-rtti")
   include_directories(
     googletest/googletest
     googletest/googletest/include
+    googletest/googlemock
+    googletest/googlemock/include
   )
 endif()
 

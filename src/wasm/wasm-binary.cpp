@@ -18,6 +18,7 @@
 #include <fstream>
 #include <optional>
 
+#include "ir/memory-utils.h"
 #include "ir/module-utils.h"
 #include "ir/names.h"
 #include "ir/table-utils.h"
@@ -26,6 +27,7 @@
 #include "support/bits.h"
 #include "support/stdckdint.h"
 #include "support/string.h"
+#include "support/utilities.h"
 #include "wasm-annotations.h"
 #include "wasm-binary.h"
 #include "wasm-debug.h"
@@ -36,10 +38,23 @@
 
 namespace wasm {
 
+WasmBinaryWriter::WasmBinaryWriter(Module* input,
+                                   BufferWithRandomAccess& o,
+                                   const PassOptions& options)
+  : wasm(input), o(o), options(options), indexes(*input) {
+  prepare();
+}
+
+WasmBinaryWriter::~WasmBinaryWriter() = default;
+
 void WasmBinaryWriter::prepare() {
+  if (options.generateStackIR) {
+    moduleStackIR = std::make_unique<ModuleStackIR>(*wasm, options);
+  }
   // Collect function types and their frequencies. Collect information in each
   // function in parallel, then merge.
-  indexedTypes = ModuleUtils::getOptimizedIndexedHeapTypes(*wasm);
+  indexedTypes =
+    ModuleUtils::getOptimizedIndexedHeapTypes(*wasm, moduleStackIR.get());
   for (Index i = 0, size = indexedTypes.types.size(); i < size; ++i) {
     if (indexedTypes.types[i].isSignature()) {
       signatureIndexes.insert({indexedTypes.types[i].getSignature(), i});
@@ -337,51 +352,160 @@ void WasmBinaryWriter::writeImports() {
     return;
   }
   auto start = startSection(BinaryConsts::Section::Import);
-  o << U32LEB(num);
-  auto writeImportHeader = [&](Importable* import) {
-    writeInlineString(import->module.view());
-    writeInlineString(import->base.view());
+
+  using ImportItem = std::variant<Function*, Global*, Tag*, Memory*, Table*>;
+  std::vector<ImportItem> imports;
+  imports.reserve(num);
+
+  ModuleUtils::iterImports(*wasm,
+                           [&](ImportItem item) { imports.push_back(item); });
+
+  auto getModule = [](const ImportItem& item) -> Name {
+    return std::visit([](auto* i) { return i->module; }, item);
   };
-  ModuleUtils::iterImportedFunctions(*wasm, [&](Function* func) {
-    writeImportHeader(func);
-    uint32_t kind = ExternalKind::Function;
-    if (func->type.isExact()) {
-      kind |= BinaryConsts::ExactImport;
+  auto getBase = [](const ImportItem& item) -> Name {
+    return std::visit([](auto* i) { return i->base; }, item);
+  };
+
+  auto shareImportType = [&](const ImportItem& a, const ImportItem& b) -> bool {
+    return std::visit(
+      overloaded{
+        [](Function* a, Function* b) { return a->type == b->type; },
+        [](Global* a, Global* b) {
+          return a->type == b->type && a->mutable_ == b->mutable_;
+        },
+        [](Tag* a, Tag* b) { return a->type == b->type; },
+        [](Memory* a, Memory* b) { return MemoryUtils::sameType(*a, *b); },
+        [](Table* a, Table* b) { return TableUtils::sameType(*a, *b); },
+        [](const auto& a, const auto& b) { return false; }},
+      a,
+      b);
+  };
+
+  struct ImportGroup {
+    enum Kind { Single, SharedAll, SharedModule } kind;
+    size_t start;
+    size_t count;
+  };
+
+  std::vector<ImportGroup> groups;
+  if (wasm->features.hasCompactImports()) {
+    size_t i = 0;
+    size_t numImports = imports.size();
+    while (i < numImports) {
+      // If the next import shares the module and type, then greedily collect
+      // the following imports as long as they share both the module and type.
+      size_t run = 1;
+      while (i + run < numImports &&
+             getModule(imports[i]) == getModule(imports[i + run]) &&
+             shareImportType(imports[i], imports[i + run])) {
+        ++run;
+      }
+      if (run > 1) {
+        groups.push_back({ImportGroup::SharedAll, i, run});
+        i += run;
+        continue;
+      }
+      // Otherwise, try greedily collecting imports that share just the module.
+      while (i + run < numImports &&
+             getModule(imports[i]) == getModule(imports[i + run])) {
+        ++run;
+      }
+      if (run > 1) {
+        groups.push_back({ImportGroup::SharedModule, i, run});
+        i += run;
+        continue;
+      }
+      // Otherwise, just use a normal import.
+      groups.push_back({ImportGroup::Single, i, 1});
+      ++i;
     }
-    o << U32LEB(kind) << U32LEB(getTypeIndex(func->type.getHeapType()));
-  });
-  ModuleUtils::iterImportedGlobals(*wasm, [&](Global* global) {
-    writeImportHeader(global);
-    o << U32LEB(int32_t(ExternalKind::Global));
-    writeType(global->type);
-    o << U32LEB(global->mutable_);
-  });
-  ModuleUtils::iterImportedTags(*wasm, [&](Tag* tag) {
-    writeImportHeader(tag);
-    o << U32LEB(int32_t(ExternalKind::Tag));
-    o << uint8_t(0); // Reserved 'attribute' field. Always 0.
-    o << U32LEB(getTypeIndex(tag->type));
-  });
-  ModuleUtils::iterImportedMemories(*wasm, [&](Memory* memory) {
-    writeImportHeader(memory);
-    o << U32LEB(int32_t(ExternalKind::Memory));
-    writeResizableLimits(memory->initial,
-                         memory->max,
-                         memory->hasMax(),
-                         memory->shared,
-                         memory->is64(),
-                         memory->pageSizeLog2);
-  });
-  ModuleUtils::iterImportedTables(*wasm, [&](Table* table) {
-    writeImportHeader(table);
-    o << U32LEB(int32_t(ExternalKind::Table));
-    writeType(table->type);
-    writeResizableLimits(table->initial,
-                         table->max,
-                         table->hasMax(),
-                         /*shared=*/false,
-                         table->is64());
-  });
+  } else {
+    for (size_t i = 0; i < imports.size(); ++i) {
+      groups.push_back({ImportGroup::Single, i, 1});
+    }
+  }
+
+  o << U32LEB(groups.size());
+
+  auto writeImportDesc = [&](const ImportItem& item) {
+    std::visit(overloaded{[&](Function* func) {
+                            uint32_t kind = ExternalKind::Function;
+                            if (func->type.isExact()) {
+                              kind |= BinaryConsts::ExactImport;
+                            }
+                            o << U32LEB(kind)
+                              << U32LEB(getTypeIndex(func->type.getHeapType()));
+                          },
+                          [&](Global* global) {
+                            o << U32LEB(int32_t(ExternalKind::Global));
+                            writeType(global->type);
+                            o << U32LEB(global->mutable_);
+                          },
+                          [&](Tag* tag) {
+                            o << U32LEB(int32_t(ExternalKind::Tag));
+                            // Reserved 'attribute' field. Always 0.
+                            o << uint8_t(0);
+                            o << U32LEB(getTypeIndex(tag->type));
+                          },
+                          [&](Memory* memory) {
+                            o << U32LEB(int32_t(ExternalKind::Memory));
+                            writeResizableLimits(memory->initial,
+                                                 memory->max,
+                                                 memory->hasMax(),
+                                                 memory->shared,
+                                                 memory->is64(),
+                                                 memory->pageSizeLog2);
+                          },
+                          [&](Table* table) {
+                            o << U32LEB(int32_t(ExternalKind::Table));
+                            writeType(table->type);
+                            writeResizableLimits(table->initial,
+                                                 table->max,
+                                                 table->hasMax(),
+                                                 /*shared=*/false,
+                                                 table->is64());
+                          }},
+               item);
+  };
+
+  for (const auto& group : groups) {
+    switch (group.kind) {
+      case ImportGroup::Single: {
+        const auto& item = imports[group.start];
+        writeInlineString(getModule(item).view());
+        writeInlineString(getBase(item).view());
+        writeImportDesc(item);
+        break;
+      }
+      case ImportGroup::SharedAll: {
+        const auto& first = imports[group.start];
+        writeInlineString(getModule(first).view());
+        writeInlineString("");
+        o << uint8_t(BinaryConsts::CompactImportsSharedAll);
+        writeImportDesc(first);
+        o << U32LEB(group.count);
+        for (size_t i = 0; i < group.count; ++i) {
+          writeInlineString(getBase(imports[group.start + i]).view());
+        }
+        break;
+      }
+      case ImportGroup::SharedModule: {
+        const auto& first = imports[group.start];
+        writeInlineString(getModule(first).view());
+        writeInlineString("");
+        o << uint8_t(BinaryConsts::CompactImportsSharedModule);
+        o << U32LEB(group.count);
+        for (size_t i = 0; i < group.count; ++i) {
+          const auto& item = imports[group.start + i];
+          writeInlineString(getBase(item).view());
+          writeImportDesc(item);
+        }
+        break;
+      }
+    }
+  }
+
   finishSection(start);
 }
 
@@ -401,14 +525,16 @@ void WasmBinaryWriter::writeExpression(Expression* curr) {
   BinaryenIRToBinaryWriter(*this, o).visit(curr);
 }
 
+void WasmBinaryWriter::noteLabelNames(
+  Function* func, std::vector<std::pair<Index, Name>>& labelNames) {
+  if (!labelNames.empty()) {
+    funcLabelNames[func->name] = std::move(labelNames);
+  }
+}
+
 void WasmBinaryWriter::writeFunctions() {
   if (importInfo->getNumDefinedFunctions() == 0) {
     return;
-  }
-
-  std::optional<ModuleStackIR> moduleStackIR;
-  if (options.generateStackIR) {
-    moduleStackIR.emplace(*wasm, options);
   }
 
   auto sectionStart = startSection(BinaryConsts::Section::Code);
@@ -431,12 +557,14 @@ void WasmBinaryWriter::writeFunctions() {
       writer.write();
       if (debugInfo) {
         funcMappedLocals[func->name] = std::move(writer.getMappedLocals());
+        noteLabelNames(func, writer.getLabelNames());
       }
     } else {
       BinaryenIRToBinaryWriter writer(*this, o, func, sourceMap, DWARF);
       writer.write();
       if (debugInfo) {
         funcMappedLocals[func->name] = std::move(writer.getMappedLocals());
+        noteLabelNames(func, writer.getLabelNames());
       }
     }
     size_t size = o.size() - start;
@@ -472,6 +600,9 @@ void WasmBinaryWriter::writeFunctions() {
         }
       }
     }
+    if (sourceMap) {
+      functionEndOffsets.push_back(o.size());
+    }
     // We need to track the function location if we are tracking the locations
     // of expressions inside it, or, if it has code annotations (the function
     // itself may be annotated, even if nothing inside it is).
@@ -495,7 +626,16 @@ void WasmBinaryWriter::writeFunctions() {
                 << "number of locals in function " << func->name << ".\n";
     }
   });
+  size_t sizeBeforeFinish = o.size();
   finishSection(sectionStart);
+  if (sourceMap) {
+    size_t sectionLEBShrink = sizeBeforeFinish - o.size();
+    if (sectionLEBShrink) {
+      for (auto& endOff : functionEndOffsets) {
+        endOff -= sectionLEBShrink;
+      }
+    }
+  }
 
   // Code annotations must come before the code section (see comment on
   // writeCodeAnnotations).
@@ -517,6 +657,9 @@ void WasmBinaryWriter::writeFunctions() {
     if (sourceMap) {
       for (auto& location : sourceMapLocations) {
         location.first += annotationsSectionSize;
+      }
+      for (auto& endOff : functionEndOffsets) {
+        endOff += annotationsSectionSize;
       }
     }
   }
@@ -1015,6 +1158,38 @@ void WasmBinaryWriter::writeNames() {
     }
   }
 
+  // label names
+  {
+    std::vector<std::pair<Index, Function*>> functionsWithLabelNames;
+    Index checked = 0;
+    auto check = [&](Function* curr) {
+      if (funcLabelNames.count(curr->name)) {
+        functionsWithLabelNames.push_back({checked, curr});
+      }
+      checked++;
+    };
+    ModuleUtils::iterImportedFunctions(*wasm, check);
+    ModuleUtils::iterDefinedFunctions(*wasm, check);
+    assert(checked == indexes.functionIndexes.size());
+    if (functionsWithLabelNames.size() > 0) {
+      auto substart =
+        startSubsection(BinaryConsts::CustomSections::Subsection::NameLabel);
+      o << U32LEB(functionsWithLabelNames.size());
+      for (auto& [index, func] : functionsWithLabelNames) {
+        // The labels were gathered in the order they were emitted, which is the
+        // order of the label index space.
+        auto& labels = funcLabelNames[func->name];
+        o << U32LEB(index);
+        o << U32LEB(labels.size());
+        for (auto& [labelIndex, name] : labels) {
+          o << U32LEB(labelIndex);
+          writeInlineString(name.view());
+        }
+      }
+      finishSubsection(substart);
+    }
+  }
+
   // type names
   {
     std::vector<HeapType> namedTypes;
@@ -1240,9 +1415,7 @@ void WasmBinaryWriter::writeSymbolMap() {
   file.close();
 }
 
-void WasmBinaryWriter::initializeDebugInfo() {
-  lastDebugLocation = {0, /* lineNumber = */ 1, 0, std::nullopt};
-}
+void WasmBinaryWriter::initializeDebugInfo() { lastDebugLocation.clear(); }
 
 void WasmBinaryWriter::writeSourceMapProlog() {
   *sourceMap << "{\"version\":3,";
@@ -1269,20 +1442,21 @@ void WasmBinaryWriter::writeSourceMapProlog() {
     }
   }
 
-  // Remove unused function names from 'names' field.
+  // Remove unused function/scope names from 'names' field.
   if (!wasm->debugInfoSymbolNames.empty()) {
     std::vector<std::string> newSymbolNames;
     std::map<Index, Index> oldToNewIndex;
 
-    // Collect all used symbol name indexes.
-    auto prepareIndexMap =
-      [&](const std::optional<Function::DebugLocation>& location) {
-        if (location && location->symbolNameIndex) {
-          uint32_t oldIndex = *location->symbolNameIndex;
+    // Collect all used symbol name indexes from debugLocations.
+    auto prepareIndexMap = [&](const Function::DebugLocations& locations) {
+      for (const auto& loc : locations) {
+        if (loc.symbolNameIndex) {
+          uint32_t oldIndex = *loc.symbolNameIndex;
           assert(oldIndex < wasm->debugInfoSymbolNames.size());
           oldToNewIndex[oldIndex] = 0; // placeholder
         }
-      };
+      }
+    };
     for (auto& func : wasm->functions) {
       for (auto& [_, location] : func->debugLocations) {
         prepareIndexMap(location);
@@ -1299,10 +1473,11 @@ void WasmBinaryWriter::writeSourceMapProlog() {
     }
 
     // Update all debug locations to point to the new indices.
-    auto updateIndex = [&](std::optional<Function::DebugLocation>& location) {
-      if (location && location->symbolNameIndex) {
-        uint32_t oldIndex = *location->symbolNameIndex;
-        location->symbolNameIndex = oldToNewIndex[oldIndex];
+    auto updateIndex = [&](Function::DebugLocations& locations) {
+      for (auto& loc : locations) {
+        if (loc.symbolNameIndex) {
+          loc.symbolNameIndex = oldToNewIndex[*loc.symbolNameIndex];
+        }
       }
     };
     for (auto& func : wasm->functions) {
@@ -1349,8 +1524,7 @@ void WasmBinaryWriter::writeSourceMapProlog() {
   *sourceMap << "\"mappings\":\"";
 }
 
-static void writeBase64VLQ(std::ostream& out, int32_t n) {
-  uint32_t value = n >= 0 ? n << 1 : ((-n) << 1) | 1;
+static void writeBase64VLQUnsigned(std::ostream& out, uint32_t value) {
   while (1) {
     uint32_t digit = value & 0x1F;
     value >>= 5;
@@ -1359,13 +1533,18 @@ static void writeBase64VLQ(std::ostream& out, int32_t n) {
       out << char(digit < 26 ? 'A' + digit : 'a' + digit - 26);
       break;
     }
-    // more VLG digit will follow -- add continuation bit (0x20),
+    // more VLQ digit will follow -- add continuation bit (0x20),
     // base64 codes 'g'..'z', '0'..'9', '+', '/'
     out << char(digit < 20    ? 'g' + digit
                 : digit < 30  ? '0' + digit - 20
                 : digit == 30 ? '+'
                               : '/');
   }
+}
+
+static void writeBase64VLQ(std::ostream& out, int32_t n) {
+  uint32_t value = n >= 0 ? uint32_t(n) << 1 : (uint32_t(-n) << 1) | 1;
+  writeBase64VLQUnsigned(out, value);
 }
 
 void WasmBinaryWriter::writeSourceMapEpilog() {
@@ -1375,13 +1554,22 @@ void WasmBinaryWriter::writeSourceMapEpilog() {
   BinaryLocation lastLineNumber = 1;
   BinaryLocation lastColumnNumber = 0;
   BinaryLocation lastSymbolNameIndex = 0;
-  for (const auto& [offset, loc] : sourceMapLocations) {
-    if (lastOffset > 0) {
-      *sourceMap << ",";
-    }
-    writeBase64VLQ(*sourceMap, int32_t(offset - lastOffset));
-    lastOffset = offset;
+  std::optional<Function::DebugLocation> activeMapping;
+  bool firstMapping = true;
+  for (const auto& [offset, locs] : sourceMapLocations) {
+    const Function::DebugLocation* loc =
+      (locs && !locs->empty()) ? &locs->back() : nullptr;
     if (loc) {
+      if (activeMapping && *loc == *activeMapping) {
+        continue;
+      }
+      if (!firstMapping) {
+        *sourceMap << ",";
+      }
+      firstMapping = false;
+      writeBase64VLQ(*sourceMap, int32_t(offset - lastOffset));
+      lastOffset = offset;
+
       writeBase64VLQ(*sourceMap, int32_t(loc->fileIndex - lastFileIndex));
       lastFileIndex = loc->fileIndex;
 
@@ -1396,9 +1584,288 @@ void WasmBinaryWriter::writeSourceMapEpilog() {
                        int32_t(*loc->symbolNameIndex - lastSymbolNameIndex));
         lastSymbolNameIndex = *loc->symbolNameIndex;
       }
+      activeMapping = *loc;
+    } else if (activeMapping) {
+      if (!firstMapping) {
+        *sourceMap << ",";
+      }
+      firstMapping = false;
+      writeBase64VLQ(*sourceMap, int32_t(offset - lastOffset));
+      lastOffset = offset;
+      activeMapping.reset();
     }
   }
-  *sourceMap << "\"}";
+  *sourceMap << "\"";
+
+  bool hasInlinedScopes = false;
+  for (const auto& [_, locs] : sourceMapLocations) {
+    if (locs && locs->size() > 1) {
+      hasInlinedScopes = true;
+      break;
+    }
+  }
+
+  if (hasInlinedScopes) {
+    // Synthesize OriginalScope entries per source file for all named frames,
+    // plus an unnamed OriginalScope (name=null, isStackFrame=true) per source
+    // file for unnamed inlined frames (j > 0) so every GeneratedRange with a
+    // CallSite has a non-null Definition as required by the Scopes spec.
+    struct SynthesizedScope {
+      BinaryLocation line = 1;
+      BinaryLocation col = 0;
+      std::optional<BinaryLocation> nameIndex;
+    };
+    using ScopeKey = std::pair<BinaryLocation, std::optional<BinaryLocation>>;
+    std::map<ScopeKey, std::pair<BinaryLocation, BinaryLocation>> minPos;
+    for (const auto& [_, locs] : sourceMapLocations) {
+      if (!locs) {
+        continue;
+      }
+      for (size_t j = 0; j < locs->size(); ++j) {
+        const auto& dl = (*locs)[j];
+        if ((dl.symbolNameIndex || j > 0) &&
+            dl.fileIndex < wasm->debugInfoFileNames.size()) {
+          ScopeKey key{dl.fileIndex, dl.symbolNameIndex};
+          std::pair<BinaryLocation, BinaryLocation> pos{dl.lineNumber,
+                                                        dl.columnNumber};
+          auto it = minPos.find(key);
+          if (it == minPos.end() || pos < it->second) {
+            minPos[key] = pos;
+          }
+        }
+      }
+    }
+
+    std::vector<std::vector<SynthesizedScope>> perFileScopes(
+      wasm->debugInfoFileNames.size());
+    for (const auto& [key, pos] : minPos) {
+      perFileScopes[key.first].push_back(
+        SynthesizedScope{pos.first, pos.second, key.second});
+    }
+
+    std::map<ScopeKey, BinaryLocation> scopeIndices;
+    for (size_t fileIdx = 0; fileIdx < perFileScopes.size(); ++fileIdx) {
+      auto& scopes = perFileScopes[fileIdx];
+      std::sort(scopes.begin(),
+                scopes.end(),
+                [](const SynthesizedScope& a, const SynthesizedScope& b) {
+                  uint32_t aLine0 = a.line > 0 ? a.line - 1 : 0;
+                  uint32_t bLine0 = b.line > 0 ? b.line - 1 : 0;
+                  return std::tie(aLine0, a.col, a.nameIndex) <
+                         std::tie(bLine0, b.col, b.nameIndex);
+                });
+      for (size_t i = 0; i < scopes.size(); ++i) {
+        scopeIndices[{BinaryLocation(fileIdx), scopes[i].nameIndex}] =
+          BinaryLocation(i);
+      }
+    }
+
+    *sourceMap << ",\"scopes\":[";
+    for (size_t i = 0; i < perFileScopes.size(); ++i) {
+      if (i > 0) {
+        *sourceMap << ",";
+      }
+      const auto& scopes = perFileScopes[i];
+      if (scopes.empty()) {
+        *sourceMap << "null";
+        continue;
+      }
+      *sourceMap << "\"";
+      uint32_t lastLine = 0;
+      uint32_t lastCol = 0;
+      int32_t lastNameIdx = 0;
+      for (size_t j = 0; j < scopes.size(); ++j) {
+        if (j > 0) {
+          *sourceMap << ",";
+        }
+        const auto& scope = scopes[j];
+        // 'B' (OriginalScopeStart) with flags = 0x4 (is stack frame) => 'E',
+        // or 0x1 (has name) | 0x4 (is stack frame) => 'F'.
+        *sourceMap << (scope.nameIndex ? "BF" : "BE");
+        uint32_t line0 = scope.line > 0 ? scope.line - 1 : 0;
+        uint32_t lineDiff = line0 - lastLine;
+        uint32_t colDiff = (lineDiff == 0) ? (scope.col - lastCol) : scope.col;
+        lastLine = line0;
+        lastCol = scope.col;
+        writeBase64VLQUnsigned(*sourceMap, lineDiff);
+        writeBase64VLQUnsigned(*sourceMap, colDiff);
+        if (scope.nameIndex) {
+          writeBase64VLQ(*sourceMap, int32_t(*scope.nameIndex) - lastNameIdx);
+          lastNameIdx = int32_t(*scope.nameIndex);
+        }
+        // 'C' (OriginalScopeEnd) at the same position (lineDiff=0, colDiff=0).
+        *sourceMap << ",CAA";
+      }
+      *sourceMap << "\"";
+    }
+    *sourceMap << "]";
+
+    // The caller source position for an inlined GeneratedRange.
+    struct CallSite {
+      BinaryLocation fileIndex = 0;
+      BinaryLocation lineNumber = 1;
+      BinaryLocation columnNumber = 0;
+      bool operator==(const CallSite& other) const = default;
+    };
+    struct ScopeDef {
+      BinaryLocation fileIndex = 0;
+      BinaryLocation scopeIndex = 0;
+      bool operator==(const ScopeDef& other) const = default;
+    };
+    struct TargetFrame {
+      std::optional<ScopeDef> def;
+      bool isStackFrame = false;
+      std::optional<CallSite> callSite;
+      bool operator==(const TargetFrame& other) const = default;
+    };
+    // A GeneratedRange node constructed from DebugLocations to be serialized to
+    // the source map's "ranges" field.
+    struct OutRange {
+      size_t startOffset = 0;
+      size_t endOffset = 0;
+      TargetFrame frame;
+      std::vector<OutRange> children;
+    };
+
+    std::vector<OutRange> rootRanges;
+    std::vector<OutRange> openStack;
+    auto closeTopRange = [&](size_t endOff) {
+      auto finished = std::move(openStack.back());
+      openStack.pop_back();
+      finished.endOffset = endOff;
+      if (finished.endOffset > finished.startOffset) {
+        if (openStack.empty()) {
+          rootRanges.push_back(std::move(finished));
+        } else {
+          openStack.back().children.push_back(std::move(finished));
+        }
+      }
+    };
+
+    size_t funcIdx = 0;
+    std::optional<size_t> gapOffset;
+    for (const auto& [offset, locs] : sourceMapLocations) {
+      // Close all open ranges when crossing a function boundary so ranges never
+      // merge or smear across distinct Wasm functions.
+      while (funcIdx < functionEndOffsets.size() &&
+             offset >= functionEndOffsets[funcIdx]) {
+        size_t closeOff = gapOffset ? *gapOffset : functionEndOffsets[funcIdx];
+        while (!openStack.empty()) {
+          closeTopRange(closeOff);
+        }
+        gapOffset.reset();
+        ++funcIdx;
+      }
+      if (!locs) {
+        // Defer closing open ranges across intra-function gaps so ranges that
+        // continue after the gap stay merged, while any range that does not
+        // continue closes at gapOffset without smearing into the gap.
+        if (!gapOffset && !openStack.empty()) {
+          gapOffset = offset;
+        }
+        continue;
+      }
+      SmallVector<TargetFrame, 4> targetFrames;
+      for (size_t j = 0; j < locs->size(); ++j) {
+        const auto& dl = (*locs)[j];
+        TargetFrame tf;
+        if (dl.symbolNameIndex || j > 0) {
+          auto it = scopeIndices.find({dl.fileIndex, dl.symbolNameIndex});
+          if (it != scopeIndices.end()) {
+            tf.def = ScopeDef{dl.fileIndex, it->second};
+          }
+        }
+        tf.isStackFrame = (j == 0);
+        if (j > 0 && tf.def &&
+            (*locs)[j - 1].fileIndex < wasm->debugInfoFileNames.size()) {
+          tf.callSite = CallSite{(*locs)[j - 1].fileIndex,
+                                 (*locs)[j - 1].lineNumber,
+                                 (*locs)[j - 1].columnNumber};
+        }
+        targetFrames.push_back(tf);
+      }
+      size_t common = 0;
+      while (common < openStack.size() && common < targetFrames.size() &&
+             openStack[common].frame == targetFrames[common]) {
+        ++common;
+      }
+      size_t closeOff = gapOffset ? *gapOffset : offset;
+      while (openStack.size() > common) {
+        closeTopRange(closeOff);
+      }
+      gapOffset.reset();
+      for (size_t d = common; d < targetFrames.size(); ++d) {
+        OutRange r;
+        r.startOffset = offset;
+        r.endOffset = offset;
+        r.frame = targetFrames[d];
+        openStack.push_back(std::move(r));
+      }
+    }
+    size_t finalCloseOff =
+      gapOffset ? *gapOffset
+                : (functionEndOffsets.empty() ? 0 : functionEndOffsets.back());
+    while (!openStack.empty()) {
+      closeTopRange(finalCloseOff);
+    }
+
+    *sourceMap << ",\"ranges\":[\"";
+    size_t lastRangeCol = 0;
+    int32_t lastDefSource = 0;
+    int32_t lastDefScope = 0;
+    bool firstRangeItem = true;
+    auto emitRangeTree = [&](const OutRange& r, auto& self) -> void {
+      if (!firstRangeItem) {
+        *sourceMap << ",";
+      }
+      firstRangeItem = false;
+      *sourceMap << 'E';
+      uint32_t flags = 0;
+      if (r.frame.def) {
+        flags |= 0x2;
+      }
+      if (r.frame.isStackFrame) {
+        flags |= 0x4;
+      }
+      writeBase64VLQUnsigned(*sourceMap, flags);
+      writeBase64VLQUnsigned(*sourceMap,
+                             uint32_t(r.startOffset - lastRangeCol));
+      lastRangeCol = r.startOffset;
+      if (r.frame.def) {
+        int32_t srcDiff = int32_t(r.frame.def->fileIndex) - lastDefSource;
+        lastDefSource = int32_t(r.frame.def->fileIndex);
+        writeBase64VLQ(*sourceMap, srcDiff);
+        if (srcDiff == 0) {
+          int32_t scpDiff = int32_t(r.frame.def->scopeIndex) - lastDefScope;
+          writeBase64VLQ(*sourceMap, scpDiff);
+        } else {
+          writeBase64VLQUnsigned(*sourceMap, r.frame.def->scopeIndex);
+        }
+        lastDefScope = int32_t(r.frame.def->scopeIndex);
+      }
+      if (r.frame.callSite) {
+        *sourceMap << ",I";
+        writeBase64VLQUnsigned(*sourceMap, r.frame.callSite->fileIndex);
+        uint32_t csLine0 = r.frame.callSite->lineNumber > 0
+                             ? r.frame.callSite->lineNumber - 1
+                             : 0;
+        writeBase64VLQUnsigned(*sourceMap, csLine0);
+        writeBase64VLQUnsigned(*sourceMap, r.frame.callSite->columnNumber);
+      }
+      for (const auto& child : r.children) {
+        self(child, self);
+      }
+      *sourceMap << ",F";
+      writeBase64VLQUnsigned(*sourceMap, uint32_t(r.endOffset - lastRangeCol));
+      lastRangeCol = r.endOffset;
+    };
+    for (const auto& r : rootRanges) {
+      emitRangeTree(r, emitRangeTree);
+    }
+    *sourceMap << "\"]";
+  }
+
+  *sourceMap << "}";
 }
 
 void WasmBinaryWriter::writeLateCustomSections() {
@@ -1483,14 +1950,16 @@ void WasmBinaryWriter::writeFeaturesSection() {
         return BinaryConsts::CustomSections::CallIndirectOverlongFeature;
       case FeatureSet::CustomDescriptors:
         return BinaryConsts::CustomSections::CustomDescriptorsFeature;
-      case FeatureSet::RelaxedAtomics:
-        return BinaryConsts::CustomSections::RelaxedAtomicsFeature;
+      case FeatureSet::AcquireReleaseAtomics:
+        return BinaryConsts::CustomSections::AcquireReleaseAtomicsFeature;
       case FeatureSet::CustomPageSizes:
         return BinaryConsts::CustomSections::CustomPageSizesFeature;
       case FeatureSet::WideArithmetic:
         return BinaryConsts::CustomSections::WideArithmeticFeature;
       case FeatureSet::CompactImports:
         return BinaryConsts::CustomSections::CompactImportsFeature;
+      case FeatureSet::RelaxedAtomics:
+        return BinaryConsts::CustomSections::RelaxedAtomicsFeature;
       case FeatureSet::None:
       case FeatureSet::Default:
       case FeatureSet::All:
@@ -1566,8 +2035,8 @@ void WasmBinaryWriter::writeDylinkSection() {
   finishSection(start);
 }
 
-void WasmBinaryWriter::writeDebugLocation(const Function::DebugLocation& loc) {
-  if (loc == lastDebugLocation) {
+void WasmBinaryWriter::writeDebugLocation(const Function::DebugLocations& loc) {
+  if (loc.empty() || loc == lastDebugLocation) {
     return;
   }
   auto offset = o.size();
@@ -1589,7 +2058,7 @@ void WasmBinaryWriter::writeNoDebugLocation() {
     sourceMapLocations.emplace_back(o.size(), nullptr);
 
     // Initialize the state of debug info to indicate there is no current
-    // debug info relevant. This sets |lastDebugLocation| to a dummy value,
+    // debug info relevant. This sets |lastDebugLocation| to an empty vector,
     // so that later places with debug info can see that they differ from
     // it (without this, if we had some debug info, then a nullptr for none,
     // and then the same debug info, we could get confused).
@@ -1603,9 +2072,9 @@ void WasmBinaryWriter::writeSourceMapLocation(Expression* curr,
 
   auto& debugLocations = func->debugLocations;
   auto iter = debugLocations.find(curr);
-  if (iter != debugLocations.end() && iter->second) {
+  if (iter != debugLocations.end() && !iter->second.empty()) {
     // There is debug information here, write it out.
-    writeDebugLocation(*(iter->second));
+    writeDebugLocation(iter->second);
   } else {
     // This expression has no debug location.
     writeNoDebugLocation();
@@ -1665,6 +2134,7 @@ std::optional<BufferWithRandomAccess> WasmBinaryWriter::writeCodeAnnotations() {
   append(getJSCalledHintsBuffer());
   append(getIdempotentHintsBuffer());
   append(getToolchainInlineHintsBuffer());
+  append(getNoReturnHintsBuffer());
   return ret;
 }
 
@@ -1836,6 +2306,11 @@ WasmBinaryWriter::getToolchainInlineHintsBuffer() {
   WRITE_I7_HINT(Annotations::ToolchainInlineHint, toolchainInline);
 }
 
+std::optional<BufferWithRandomAccess>
+WasmBinaryWriter::getNoReturnHintsBuffer() {
+  WRITE_BOOLEAN_HINT(Annotations::NoReturnHint, noReturn);
+}
+
 void WasmBinaryWriter::writeData(const char* data, size_t size) {
   for (size_t i = 0; i < size; i++) {
     o << int8_t(data[i]);
@@ -1855,7 +2330,7 @@ void WasmBinaryWriter::writeType(Type type) {
   type = type.asWrittenGivenFeatures(wasm->features);
   if (type.isRef()) {
     auto heapType = type.getHeapType();
-    if (type.isNullable() && heapType.isBasic() && !heapType.isShared()) {
+    if (type.isNullableRef() && heapType.isBasic() && !heapType.isShared()) {
       switch (heapType.getBasic(Unshared)) {
         case HeapType::ext:
           o << S32LEB(BinaryConsts::EncodedType::externref);
@@ -1902,9 +2377,15 @@ void WasmBinaryWriter::writeType(Type type) {
         case HeapType::nocont:
           o << S32LEB(BinaryConsts::EncodedType::nullcontref);
           return;
+        case HeapType::waitqueue:
+          o << S32LEB(BinaryConsts::EncodedHeapType::waitqueue);
+          return;
+        case HeapType::nowaitqueue:
+          o << S32LEB(BinaryConsts::EncodedHeapType::nowaitqueue);
+          return;
       }
     }
-    if (type.isNullable()) {
+    if (type.isNullableRef()) {
       o << S32LEB(BinaryConsts::EncodedType::nullable);
     } else {
       o << S32LEB(BinaryConsts::EncodedType::nonnullable);
@@ -2004,6 +2485,12 @@ void WasmBinaryWriter::writeHeapType(HeapType type, Exactness exactness) {
     case HeapType::nocont:
       ret = BinaryConsts::EncodedHeapType::nocont;
       break;
+    case HeapType::waitqueue:
+      ret = BinaryConsts::EncodedHeapType::waitqueue;
+      break;
+    case HeapType::nowaitqueue:
+      ret = BinaryConsts::EncodedHeapType::nowaitqueue;
+      break;
   }
   o << S64LEB(ret); // TODO: Actually s33
 }
@@ -2018,8 +2505,6 @@ void WasmBinaryWriter::writeField(const Field& field) {
       o << S32LEB(BinaryConsts::EncodedType::i8);
     } else if (field.packedType == Field::i16) {
       o << S32LEB(BinaryConsts::EncodedType::i16);
-    } else if (field.packedType == Field::WaitQueue) {
-      o << S32LEB(BinaryConsts::EncodedType::waitQueue);
     } else {
       WASM_UNREACHABLE("invalid packed type");
     }
@@ -2040,6 +2525,9 @@ void WasmBinaryWriter::writeMemoryOrder(MemoryOrder order, bool isRMW) {
       break;
     case MemoryOrder::AcqRel:
       code = BinaryConsts::OrderAcqRel;
+      break;
+    case MemoryOrder::Relaxed:
+      code = BinaryConsts::OrderRelaxed;
       break;
   }
   if (isRMW) {
@@ -2082,7 +2570,8 @@ void WasmBinaryReader::preScan() {
           sectionName == Annotations::RemovableIfUnusedHint ||
           sectionName == Annotations::JSCalledHint ||
           sectionName == Annotations::IdempotentHint ||
-          sectionName == Annotations::ToolchainInlineHint) {
+          sectionName == Annotations::ToolchainInlineHint ||
+          sectionName == Annotations::NoReturnHint) {
         // Code annotations require code locations.
         // TODO: We could note which functions require code locations, as an
         //       optimization.
@@ -2255,6 +2744,9 @@ void WasmBinaryReader::readCustomSection(size_t payloadLen) {
       AnnotationSectionInfo{pos, [this, payloadLen]() {
                               this->readToolchainInlineHints(payloadLen);
                             }});
+  } else if (sectionName == Annotations::NoReturnHint) {
+    deferredAnnotationSections.push_back(AnnotationSectionInfo{
+      pos, [this, payloadLen]() { this->readNoReturnHints(payloadLen); }});
   } else {
     // an unfamiliar custom section
     if (sectionName.equals(BinaryConsts::CustomSections::Linking)) {
@@ -2477,6 +2969,12 @@ bool WasmBinaryReader::getBasicHeapType(int64_t code, HeapType& out) {
     case BinaryConsts::EncodedHeapType::nocont:
       out = HeapType::nocont;
       return true;
+    case BinaryConsts::EncodedHeapType::waitqueue:
+      out = HeapType::waitqueue;
+      return true;
+    case BinaryConsts::EncodedHeapType::nowaitqueue:
+      out = HeapType::nowaitqueue;
+      return true;
     default:
       return false;
   }
@@ -2486,7 +2984,7 @@ Signature WasmBinaryReader::getBlockType() {
   // Single value types are negative; signature indices are non-negative.
   auto code = getS32LEB();
   if (code >= 0) {
-    return getSignatureByTypeIndex(code);
+    return getSignatureTypeByIndex(code).getSignature();
   }
   if (code == BinaryConsts::EncodedType::Empty) {
     return Signature();
@@ -2762,10 +3260,6 @@ void WasmBinaryReader::readTypes() {
     if (typeCode == BinaryConsts::EncodedType::i16) {
       auto mutable_ = readMutability();
       return Field(Field::i16, mutable_);
-    }
-    if (typeCode == BinaryConsts::EncodedType::waitQueue) {
-      auto mutable_ = readMutability();
-      return Field(Field::WaitQueue, mutable_);
     }
     // It's a regular wasm value.
     auto type = makeType(typeCode);
@@ -3121,7 +3615,7 @@ std::unique_ptr<Tag> WasmBinaryReader::readTagImport(Name module, Name base) {
   Builder builder(wasm);
   getInt8(); // Reserved 'attribute' field
   auto index = getU32LEB();
-  auto curr = builder.makeTag("", getSignatureByTypeIndex(index));
+  auto curr = builder.makeTag("", getSignatureTypeByIndex(index));
   curr->module = module;
   curr->base = base;
   return curr;
@@ -3230,6 +3724,25 @@ void WasmBinaryReader::setLocalNames(Function& func, Index i) {
   }
 }
 
+void WasmBinaryReader::setLabelNames(Index i) {
+  if (auto it = labelNames.find(i); it != labelNames.end()) {
+    currLabelNames = &it->second;
+  } else {
+    currLabelNames = nullptr;
+  }
+  nextLabelIndex = 0;
+}
+
+Name WasmBinaryReader::getNextLabelName() {
+  auto index = nextLabelIndex++;
+  if (currLabelNames) {
+    if (auto it = currLabelNames->find(index); it != currLabelNames->end()) {
+      return it->second;
+    }
+  }
+  return Name();
+}
+
 void WasmBinaryReader::readFunctionSignatures() {
   size_t num = getU32LEB();
   auto numImports = wasm.functions.size();
@@ -3248,14 +3761,20 @@ void WasmBinaryReader::readFunctionSignatures() {
                 << index << '\n';
     }
   }
+  // Likewise for the label names subsection.
+  for (auto& [index, labels] : labelNames) {
+    if (index >= num + numImports) {
+      std::cerr << "warning: function index out of bounds in name section: "
+                   "labels at index "
+                << index << '\n';
+    }
+  }
   for (size_t i = 0; i < num; i++) {
     auto [name, isExplicit] = getOrMakeName(
       functionNames, numImports + i, makeName("", i), usedFunctionNames);
     auto index = getU32LEB();
-    HeapType type = getTypeByIndex(index);
+    HeapType type = getSignatureTypeByIndex(index);
     functionTypes.push_back(type);
-    // Check that the type is a signature.
-    getSignatureByTypeIndex(index);
     auto func = Builder(wasm).makeFunction(
       name, Type(type, NonNullable, Exact), {}, nullptr);
     func->hasExplicitName = isExplicit;
@@ -3278,12 +3797,12 @@ HeapType WasmBinaryReader::getTypeByFunctionIndex(Index index) {
   return functionTypes[index];
 }
 
-Signature WasmBinaryReader::getSignatureByTypeIndex(Index index) {
+HeapType WasmBinaryReader::getSignatureTypeByIndex(Index index) {
   auto heapType = getTypeByIndex(index);
   if (!heapType.isSignature()) {
     throwError("invalid signature type " + heapType.toString());
   }
-  return heapType.getSignature();
+  return heapType;
 }
 
 Signature WasmBinaryReader::getSignatureByFunctionIndex(Index index) {
@@ -3324,6 +3843,7 @@ void WasmBinaryReader::readFunctions() {
 
     readVars();
     setLocalNames(*func, numFuncImports + i);
+    setLabelNames(numFuncImports + i);
     {
       // Process the function body. Even if we are skipping function bodies we
       // need to not skip the start function. That contains important code for
@@ -3357,12 +3877,25 @@ void WasmBinaryReader::readFunctions() {
         if (!builder.empty()) {
           throwError("expected function end");
         }
+        if (currLabelNames) {
+          // Check that the labels named in the name section actually exist.
+          Index maxIndex = 0;
+          for (auto& [index, name] : *currLabelNames) {
+            maxIndex = std::max(maxIndex, index);
+          }
+          if (maxIndex >= nextLabelIndex) {
+            std::cerr << "warning: label index out of bounds in name section: "
+                      << maxIndex << " in function " << (numFuncImports + i)
+                      << '\n';
+          }
+        }
       }
     }
 
     sourceMapReader.finishFunction();
     TypeUpdating::handleNonDefaultableLocals(func.get(), wasm);
     currFunction = nullptr;
+    currLabelNames = nullptr;
   }
 }
 
@@ -3391,35 +3924,44 @@ void WasmBinaryReader::readVars() {
 }
 
 Result<> WasmBinaryReader::readLoad(unsigned bytes, bool signed_, Type type) {
-  auto [mem, align, offset, backing] = getMemarg();
-  if (backing == BackingType::Array) {
-    HeapType arrayType = getIndexedHeapType();
-    return builder.makeArrayLoad(arrayType, bytes, signed_, type);
+  auto [mem, align, offset, arrayType] = getMemarg();
+  if (arrayType) {
+    return builder.makeArrayLoad(
+      *arrayType, bytes, signed_, offset, align, type);
   }
   return builder.makeLoad(bytes, signed_, offset, align, type, mem);
 }
 
 Result<> WasmBinaryReader::readStore(unsigned bytes, Type type) {
-  auto [mem, align, offset, backing] = getMemarg();
-  if (backing == BackingType::Array) {
-    HeapType arrayType = getIndexedHeapType();
-    return builder.makeArrayStore(arrayType, bytes, type);
+  auto [mem, align, offset, arrayType] = getMemarg();
+  if (arrayType) {
+    return builder.makeArrayStore(*arrayType, bytes, offset, align, type);
   }
   return builder.makeStore(bytes, offset, align, type, mem);
 }
 
 Result<> WasmBinaryReader::readInst() {
-  if (auto loc = sourceMapReader.readDebugLocationAt(pos)) {
+  if (auto loc = sourceMapReader.readDebugLocationAt(pos); !loc.empty()) {
     builder.setDebugLocation(loc);
   }
   uint8_t code = getInt8();
   switch (code) {
-    case BinaryConsts::Block:
-      return builder.makeBlock(Name(), getBlockType());
-    case BinaryConsts::If:
-      return builder.makeIf(Name(), getBlockType());
-    case BinaryConsts::Loop:
-      return builder.makeLoop(Name(), getBlockType());
+    case BinaryConsts::Block: {
+      auto name = getNextLabelName();
+      return builder.makeBlock(name, getBlockType());
+    }
+    case BinaryConsts::If: {
+      // An `if` cannot hold a name in Binaryen IR, so only use the name if we
+      // end up needing a label anyhow.
+      auto name = getNextLabelName();
+      auto result = builder.makeIf(Name(), getBlockType());
+      builder.setScopeNameHint(name);
+      return result;
+    }
+    case BinaryConsts::Loop: {
+      auto name = getNextLabelName();
+      return builder.makeLoop(name, getBlockType());
+    }
     case BinaryConsts::Br:
       return builder.makeBreak(getU32LEB(), false);
     case BinaryConsts::BrIf:
@@ -3507,9 +4049,14 @@ Result<> WasmBinaryReader::readInst() {
       return builder.makeTableGet(getTableName(getU32LEB()));
     case BinaryConsts::TableSet:
       return builder.makeTableSet(getTableName(getU32LEB()));
-    case BinaryConsts::Try:
-      return builder.makeTry(Name(), getBlockType());
+    case BinaryConsts::Try: {
+      // A `try` can hold a name in the IR, like a block or a loop.
+      auto name = getNextLabelName();
+      return builder.makeTry(name, getBlockType());
+    }
     case BinaryConsts::TryTable: {
+      // As with `if`, only use the name if we end up needing a label.
+      auto name = getNextLabelName();
       auto type = getBlockType();
       std::vector<Name> tags;
       std::vector<Index> labels;
@@ -3526,7 +4073,9 @@ Result<> WasmBinaryReader::readInst() {
         isRefs.push_back(code == BinaryConsts::CatchRef ||
                          code == BinaryConsts::CatchAllRef);
       }
-      return builder.makeTryTable(Name(), type, tags, labels, isRefs);
+      auto result = builder.makeTryTable(Name(), type, tags, labels, isRefs);
+      builder.setScopeNameHint(name);
+      return result;
     }
     case BinaryConsts::Throw:
       return builder.makeThrow(getTagName(getU32LEB()));
@@ -3805,105 +4354,111 @@ Result<> WasmBinaryReader::readInst() {
       auto op = getU32LEB();
       switch (op) {
         case BinaryConsts::I32AtomicLoad8U: {
-          // TODO: pass align through for validation.
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicLoad(1, offset, Type::i32, mem, memoryOrder);
+          return builder.makeAtomicLoad(
+            1, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicLoad16U: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicLoad(2, offset, Type::i32, mem, memoryOrder);
+          return builder.makeAtomicLoad(
+            2, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicLoad: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicLoad(4, offset, Type::i32, mem, memoryOrder);
+          return builder.makeAtomicLoad(
+            4, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicLoad8U: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicLoad(1, offset, Type::i64, mem, memoryOrder);
+          return builder.makeAtomicLoad(
+            1, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicLoad16U: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicLoad(2, offset, Type::i64, mem, memoryOrder);
+          return builder.makeAtomicLoad(
+            2, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicLoad32U: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicLoad(4, offset, Type::i64, mem, memoryOrder);
+          return builder.makeAtomicLoad(
+            4, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicLoad: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicLoad(8, offset, Type::i64, mem, memoryOrder);
+          return builder.makeAtomicLoad(
+            8, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicStore8: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
           return builder.makeAtomicStore(
-            1, offset, Type::i32, mem, memoryOrder);
+            1, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicStore16: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
           return builder.makeAtomicStore(
-            2, offset, Type::i32, mem, memoryOrder);
+            2, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicStore: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
           return builder.makeAtomicStore(
-            4, offset, Type::i32, mem, memoryOrder);
+            4, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicStore8: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
           return builder.makeAtomicStore(
-            1, offset, Type::i64, mem, memoryOrder);
+            1, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicStore16: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
           return builder.makeAtomicStore(
-            2, offset, Type::i64, mem, memoryOrder);
+            2, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicStore32: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
           return builder.makeAtomicStore(
-            4, offset, Type::i64, mem, memoryOrder);
+            4, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicStore: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
           return builder.makeAtomicStore(
-            8, offset, Type::i64, mem, memoryOrder);
+            8, offset, align, Type::i64, mem, memoryOrder);
         }
 
 #define RMW(op)                                                                \
   case BinaryConsts::I32AtomicRMW##op: {                                       \
     auto [mem, align, offset, memoryOrder] = getRMWMemarg();                   \
     return builder.makeAtomicRMW(                                              \
-      RMW##op, 4, offset, Type::i32, mem, memoryOrder);                        \
+      RMW##op, 4, offset, align, Type::i32, mem, memoryOrder);                 \
   }                                                                            \
   case BinaryConsts::I32AtomicRMW##op##8U: {                                   \
     auto [mem, align, offset, memoryOrder] = getRMWMemarg();                   \
     return builder.makeAtomicRMW(                                              \
-      RMW##op, 1, offset, Type::i32, mem, memoryOrder);                        \
+      RMW##op, 1, offset, align, Type::i32, mem, memoryOrder);                 \
   }                                                                            \
   case BinaryConsts::I32AtomicRMW##op##16U: {                                  \
     auto [mem, align, offset, memoryOrder] = getRMWMemarg();                   \
     return builder.makeAtomicRMW(                                              \
-      RMW##op, 2, offset, Type::i32, mem, memoryOrder);                        \
+      RMW##op, 2, offset, align, Type::i32, mem, memoryOrder);                 \
   }                                                                            \
   case BinaryConsts::I64AtomicRMW##op: {                                       \
     auto [mem, align, offset, memoryOrder] = getRMWMemarg();                   \
     return builder.makeAtomicRMW(                                              \
-      RMW##op, 8, offset, Type::i64, mem, memoryOrder);                        \
+      RMW##op, 8, offset, align, Type::i64, mem, memoryOrder);                 \
   }                                                                            \
   case BinaryConsts::I64AtomicRMW##op##8U: {                                   \
     auto [mem, align, offset, memoryOrder] = getRMWMemarg();                   \
     return builder.makeAtomicRMW(                                              \
-      RMW##op, 1, offset, Type::i64, mem, memoryOrder);                        \
+      RMW##op, 1, offset, align, Type::i64, mem, memoryOrder);                 \
   }                                                                            \
   case BinaryConsts::I64AtomicRMW##op##16U: {                                  \
     auto [mem, align, offset, memoryOrder] = getRMWMemarg();                   \
     return builder.makeAtomicRMW(                                              \
-      RMW##op, 2, offset, Type::i64, mem, memoryOrder);                        \
+      RMW##op, 2, offset, align, Type::i64, mem, memoryOrder);                 \
   }                                                                            \
   case BinaryConsts::I64AtomicRMW##op##32U: {                                  \
     auto [mem, align, offset, memoryOrder] = getRMWMemarg();                   \
     return builder.makeAtomicRMW(                                              \
-      RMW##op, 4, offset, Type::i64, mem, memoryOrder);                        \
+      RMW##op, 4, offset, align, Type::i64, mem, memoryOrder);                 \
   }
 
           RMW(Add);
@@ -3916,49 +4471,49 @@ Result<> WasmBinaryReader::readInst() {
         case BinaryConsts::I32AtomicCmpxchg: {
           auto [mem, align, offset, memoryOrder] = getRMWMemarg();
           return builder.makeAtomicCmpxchg(
-            4, offset, Type::i32, mem, memoryOrder);
+            4, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicCmpxchg8U: {
           auto [mem, align, offset, memoryOrder] = getRMWMemarg();
           return builder.makeAtomicCmpxchg(
-            1, offset, Type::i32, mem, memoryOrder);
+            1, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicCmpxchg16U: {
           auto [mem, align, offset, memoryOrder] = getRMWMemarg();
           return builder.makeAtomicCmpxchg(
-            2, offset, Type::i32, mem, memoryOrder);
+            2, offset, align, Type::i32, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicCmpxchg: {
           auto [mem, align, offset, memoryOrder] = getRMWMemarg();
           return builder.makeAtomicCmpxchg(
-            8, offset, Type::i64, mem, memoryOrder);
+            8, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicCmpxchg8U: {
           auto [mem, align, offset, memoryOrder] = getRMWMemarg();
           return builder.makeAtomicCmpxchg(
-            1, offset, Type::i64, mem, memoryOrder);
+            1, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicCmpxchg16U: {
           auto [mem, align, offset, memoryOrder] = getRMWMemarg();
           return builder.makeAtomicCmpxchg(
-            2, offset, Type::i64, mem, memoryOrder);
+            2, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I64AtomicCmpxchg32U: {
           auto [mem, align, offset, memoryOrder] = getRMWMemarg();
           return builder.makeAtomicCmpxchg(
-            4, offset, Type::i64, mem, memoryOrder);
+            4, offset, align, Type::i64, mem, memoryOrder);
         }
         case BinaryConsts::I32AtomicWait: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicWait(Type::i32, offset, mem);
+          return builder.makeAtomicWait(Type::i32, offset, align, mem);
         }
         case BinaryConsts::I64AtomicWait: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicWait(Type::i64, offset, mem);
+          return builder.makeAtomicWait(Type::i64, offset, align, mem);
         }
         case BinaryConsts::AtomicNotify: {
           auto [mem, align, offset, memoryOrder] = getAtomicMemarg();
-          return builder.makeAtomicNotify(offset, mem);
+          return builder.makeAtomicNotify(offset, align, mem);
         }
         case BinaryConsts::AtomicFence: {
           MemoryOrder order = getMemoryOrder(/*isRMW=*/false);
@@ -4041,10 +4596,14 @@ Result<> WasmBinaryReader::readInst() {
           auto index = getU32LEB();
           return builder.makeStructWait(structType, index);
         }
-        case BinaryConsts::StructNotify: {
-          auto structType = getIndexedHeapType();
-          auto index = getU32LEB();
-          return builder.makeStructNotify(structType, index);
+        case BinaryConsts::WaitqueueNotify: {
+          return builder.makeWaitqueueNotify();
+        }
+        case BinaryConsts::WaitqueueNew: {
+          return builder.makeWaitqueueNew();
+        }
+        case BinaryConsts::Publish: {
+          return builder.makePublish();
         }
       }
       return Err{"unknown atomic operation " + std::to_string(op)};
@@ -4111,12 +4670,10 @@ Result<> WasmBinaryReader::readInst() {
           return builder.makeElemDrop(elem);
         }
         case BinaryConsts::F32_F16LoadMem: {
-          auto [mem, align, offset, backing] = getMemarg();
-          return builder.makeLoad(2, false, offset, align, Type::f32, mem);
+          return readLoad(2, false, Type::f32);
         }
         case BinaryConsts::F32_F16StoreMem: {
-          auto [mem, align, offset, backing] = getMemarg();
-          return builder.makeStore(2, offset, align, Type::f32, mem);
+          return readStore(2, Type::f32);
         }
       }
       return Err{"unknown misc operation: " + std::to_string(op)};
@@ -4666,12 +5223,10 @@ Result<> WasmBinaryReader::readInst() {
         case BinaryConsts::V128Const:
           return builder.makeConst(getVec128Literal());
         case BinaryConsts::V128Store: {
-          auto [mem, align, offset, backing] = getMemarg();
-          return builder.makeStore(16, offset, align, Type::v128, mem);
+          return readStore(16, Type::v128);
         }
         case BinaryConsts::V128Load: {
-          auto [mem, align, offset, backing] = getMemarg();
-          return builder.makeLoad(16, false, offset, align, Type::v128, mem);
+          return readLoad(16, false, Type::v128);
         }
         case BinaryConsts::V128Load8Splat: {
           auto [mem, align, offset, backing] = getMemarg();
@@ -5198,8 +5753,15 @@ void WasmBinaryReader::readElementSegments() {
 
     if (isDeclarative) {
       // Declared segments are needed in wasm text and binary, but not in
-      // Binaryen IR; skip over the segment
-      [[maybe_unused]] auto type = getU32LEB();
+      // Binaryen IR; skip over the segment.
+      if (usesExpressions) {
+        [[maybe_unused]] auto type = getType();
+      } else {
+        auto elemKind = getU32LEB();
+        if (elemKind != 0x0) {
+          throwError("unexpected passive segment elemkind, expected 0, got " + std::to_string(elemKind));
+        }
+      }
       auto num = getU32LEB();
       for (Index i = 0; i < num; i++) {
         if (usesExpressions) {
@@ -5234,7 +5796,7 @@ void WasmBinaryReader::readElementSegments() {
       } else {
         auto elemKind = getU32LEB();
         if (elemKind != 0x0) {
-          throwError("Invalid kind (!= funcref(0)) since !usesExpressions.");
+          throwError("unexpected passive segment elemkind, expected 0, got " + std::to_string(elemKind));
         }
       }
     }
@@ -5270,7 +5832,7 @@ void WasmBinaryReader::readTags() {
     auto [name, isExplicit] = getOrMakeName(
       tagNames, numImports + i, makeName("tag$", i), usedTagNames);
     auto typeIndex = getU32LEB();
-    auto tag = Builder::makeTag(name, getSignatureByTypeIndex(typeIndex));
+    auto tag = Builder::makeTag(name, getSignatureTypeByIndex(typeIndex));
     tag->hasExplicitName = isExplicit;
     wasm.addTag(std::move(tag));
   }
@@ -5332,6 +5894,19 @@ void WasmBinaryReader::readNames(size_t sectionPos, size_t payloadLen) {
           auto rawName = getInlineString();
           auto name = processor.process(rawName);
           localNames[funcIndex][localIndex] = name;
+        }
+      }
+    } else if (nameType == Subsection::NameLabel) {
+      auto numFuncs = getU32LEB();
+      for (size_t i = 0; i < numFuncs; i++) {
+        auto funcIndex = getU32LEB();
+        auto numLabels = getU32LEB();
+        NameProcessor processor;
+        for (size_t j = 0; j < numLabels; j++) {
+          auto labelIndex = getU32LEB();
+          auto rawName = getInlineString();
+          auto name = processor.process(rawName);
+          labelNames[funcIndex][labelIndex] = name;
         }
       }
     } else if (nameType == Subsection::NameType) {
@@ -5497,14 +6072,17 @@ void WasmBinaryReader::readFeatures(size_t sectionPos, size_t payloadLen) {
       feature = FeatureSet::FP16;
     } else if (name == BinaryConsts::CustomSections::CustomDescriptorsFeature) {
       feature = FeatureSet::CustomDescriptors;
-    } else if (name == BinaryConsts::CustomSections::RelaxedAtomicsFeature) {
-      feature = FeatureSet::RelaxedAtomics;
+    } else if (name ==
+               BinaryConsts::CustomSections::AcquireReleaseAtomicsFeature) {
+      feature = FeatureSet::AcquireReleaseAtomics;
     } else if (name == BinaryConsts::CustomSections::CustomPageSizesFeature) {
       feature = FeatureSet::CustomPageSizes;
     } else if (name == BinaryConsts::CustomSections::WideArithmeticFeature) {
       feature = FeatureSet::WideArithmetic;
     } else if (name == BinaryConsts::CustomSections::CompactImportsFeature) {
       feature = FeatureSet::CompactImports;
+    } else if (name == BinaryConsts::CustomSections::RelaxedAtomicsFeature) {
+      feature = FeatureSet::RelaxedAtomics;
     } else {
       // Silently ignore unknown features (this may be and old binaryen running
       // on a new wasm).
@@ -5705,12 +6283,16 @@ void WasmBinaryReader::readToolchainInlineHints(size_t payloadLen) {
   READ_I7_HINT(Annotations::ToolchainInlineHint, toolchainInline);
 }
 
-std::tuple<Address, Address, Index, MemoryOrder, BackingType>
+void WasmBinaryReader::readNoReturnHints(size_t payloadLen) {
+  READ_BOOLEAN_HINT(Annotations::NoReturnHint, noReturn);
+}
+
+std::tuple<Address, Address, Index, MemoryOrder, std::optional<HeapType>>
 WasmBinaryReader::readMemoryAccess(bool isAtomic, bool isRMW) {
   auto rawAlignment = getU32LEB();
-  BackingType backing = BackingType::Memory;
   Index memIdx = 0;
   Address offset = 0;
+  std::optional<HeapType> arrayType;
 
   bool hasMemoryOrder = rawAlignment & BinaryConsts::HasMemoryOrderMask;
   if (hasMemoryOrder && !isAtomic) {
@@ -5728,8 +6310,8 @@ WasmBinaryReader::readMemoryAccess(bool isAtomic, bool isRMW) {
     rawAlignment = rawAlignment & ~BinaryConsts::HasMemoryIndexMask;
   }
 
-  if (rawAlignment & BinaryConsts::HasBackingArrayMask) {
-    backing = BackingType::Array;
+  bool hasBackingArray = rawAlignment & BinaryConsts::HasBackingArrayMask;
+  if (hasBackingArray) {
     // Clear the bit before we parse alignment
     rawAlignment = rawAlignment & ~BinaryConsts::HasBackingArrayMask;
   }
@@ -5742,7 +6324,14 @@ WasmBinaryReader::readMemoryAccess(bool isAtomic, bool isRMW) {
   MemoryOrder memoryOrder =
     isAtomic ? MemoryOrder::SeqCst : MemoryOrder::Unordered;
 
-  if (backing == BackingType::Memory) {
+  if (hasBackingArray) {
+    if (hasMemIdx || hasMemoryOrder) {
+      throwError(
+        "Memory index and memory order are not allowed for array backing.");
+    }
+    arrayType = getIndexedHeapType();
+    offset = getU32LEB();
+  } else {
     if (hasMemIdx) {
       memIdx = getU32LEB();
     }
@@ -5754,39 +6343,33 @@ WasmBinaryReader::readMemoryAccess(bool isAtomic, bool isRMW) {
     }
     auto* memory = wasm.memories[memIdx].get();
     offset = memory->addressType == Type::i32 ? getU32LEB() : getU64LEB();
-  } else if (backing == BackingType::Array) {
-    if (hasMemIdx || hasMemoryOrder) {
-      throwError(
-        "Memory index and memory order are not allowed for array backing.");
-    }
-  } else {
-    WASM_UNREACHABLE("Invalid backing type");
   }
 
-  return {alignment, offset, memIdx, memoryOrder, backing};
+  return {alignment, offset, memIdx, memoryOrder, arrayType};
 }
 
 std::tuple<Name, Address, Address, MemoryOrder>
 WasmBinaryReader::getAtomicMemarg() {
-  auto [alignment, offset, memIdx, memoryOrder, backing] =
+  auto [alignment, offset, memIdx, memoryOrder, arrayType] =
     readMemoryAccess(/*isAtomic=*/true, /*isRMW=*/false);
   return {getMemoryName(memIdx), alignment, offset, memoryOrder};
 }
 
 std::tuple<Name, Address, Address, MemoryOrder>
 WasmBinaryReader::getRMWMemarg() {
-  auto [alignment, offset, memIdx, memoryOrder, backing] =
+  auto [alignment, offset, memIdx, memoryOrder, arrayType] =
     readMemoryAccess(/*isAtomic=*/true, /*isRMW=*/true);
   return {getMemoryName(memIdx), alignment, offset, memoryOrder};
 }
 
-std::tuple<Name, Address, Address, BackingType> WasmBinaryReader::getMemarg() {
-  auto [alignment, offset, memIdx, memoryOrder, backing] =
+std::tuple<Name, Address, Address, std::optional<HeapType>>
+WasmBinaryReader::getMemarg() {
+  auto [alignment, offset, memIdx, memoryOrder, arrayType] =
     readMemoryAccess(/*isAtomic=*/false, /*isRMW=*/false);
-  if (backing == BackingType::Array) {
-    return {Name(), alignment, offset, backing};
+  if (arrayType) {
+    return {Name(), alignment, offset, arrayType};
   }
-  return {getMemoryName(memIdx), alignment, offset, backing};
+  return {getMemoryName(memIdx), alignment, offset, std::nullopt};
 }
 
 MemoryOrder WasmBinaryReader::getMemoryOrder(bool isRMW) {
@@ -5803,6 +6386,16 @@ MemoryOrder WasmBinaryReader::getMemoryOrder(bool isRMW) {
     case ((BinaryConsts::OrderAcqRel << 4) | BinaryConsts::OrderAcqRel):
       if (isRMW) {
         return MemoryOrder::AcqRel;
+      }
+      break;
+    case BinaryConsts::OrderRelaxed:
+      if (!isRMW) {
+        return MemoryOrder::Relaxed;
+      }
+      throwError("RMW memory orders must match");
+    case ((BinaryConsts::OrderRelaxed << 4) | BinaryConsts::OrderRelaxed):
+      if (isRMW) {
+        return MemoryOrder::Relaxed;
       }
       break;
   }

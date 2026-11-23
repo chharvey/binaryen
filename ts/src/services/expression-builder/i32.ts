@@ -1,13 +1,13 @@
 import {
-	BinaryenObj,
-} from "../../-pre.ts";
+	replaceWith,
+} from "../../-utils.ts";
 import type {
 	Module,
 } from "../../classes/module/Module.ts";
 import {
 	type ExpressionRef,
 	Operation,
-	i32 as i32_t,
+	Type,
 } from "../../constants.ts";
 import {
 	atomicLoadFn,
@@ -24,17 +24,17 @@ import {
 
 function atomic(mod: Module) {
 	return {
-		load: atomicLoadFn(mod, i32_t, 4),
-		load8_u: atomicLoadFn(mod, i32_t, 1),
-		load16_u: atomicLoadFn(mod, i32_t, 2),
+		load: atomicLoadFn(mod, Type.i32, 4),
+		load8_u: atomicLoadFn(mod, Type.i32, 1),
+		load16_u: atomicLoadFn(mod, Type.i32, 2),
 
-		store: atomicStoreFn(mod, i32_t, 4),
-		store8: atomicStoreFn(mod, i32_t, 1),
-		store16: atomicStoreFn(mod, i32_t, 2),
+		store: atomicStoreFn(mod, Type.i32, 4),
+		store8: atomicStoreFn(mod, Type.i32, 1),
+		store16: atomicStoreFn(mod, Type.i32, 2),
 
-		rmw: atomicRmwOps(mod, i32_t, 4),
-		rmw8_u: atomicRmwOps(mod, i32_t, 1),
-		rmw16_u: atomicRmwOps(mod, i32_t, 2),
+		rmw: atomicRmwOps(mod, Type.i32, 4),
+		rmw8_u: atomicRmwOps(mod, Type.i32, 1),
+		rmw16_u: atomicRmwOps(mod, Type.i32, 2),
 	} as const;
 }
 
@@ -46,15 +46,15 @@ function atomic(mod: Module) {
  */
 export function i32(mod: Module) {
 	return {
-		load: loadFn(mod, i32_t, 4, true),
-		load8_s: loadFn(mod, i32_t, 1, true),
-		load8_u: loadFn(mod, i32_t, 1, false),
-		load16_s: loadFn(mod, i32_t, 2, true),
-		load16_u: loadFn(mod, i32_t, 2, false),
+		load: loadFn(mod, Type.i32, 4, true),
+		load8_s: loadFn(mod, Type.i32, 1, true),
+		load8_u: loadFn(mod, Type.i32, 1, false),
+		load16_s: loadFn(mod, Type.i32, 2, true),
+		load16_u: loadFn(mod, Type.i32, 2, false),
 
-		store: storeFn(mod, i32_t, 4),
-		store8: storeFn(mod, i32_t, 1),
-		store16: storeFn(mod, i32_t, 2),
+		store: storeFn(mod, Type.i32, 4),
+		store8: storeFn(mod, Type.i32, 1),
+		store16: storeFn(mod, Type.i32, 2),
 
 		/** Return a static constant i32. */
 		const: (value: number): ExpressionRef => (
@@ -112,43 +112,45 @@ export function i32(mod: Module) {
 		/** @experimental */
 		atomic: atomic(mod),
 
+		/* eslint-disable prefer-arrow-callback */
 		// @ts-expect-error
-		/** @deprecated Use `.wrap_i64()` instead. */ wrap(...args) { BinaryenObj.printWarn("`.wrap()` is deprecated; use `.wrap_i64()` instead."); return this.wrap_i64(...args); },
+		/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.wrap_i64} instead. */ wrap: replaceWith("wrap -> wrap_i64", function (...args) { return this.wrap_i64(...args); }),
 		/** @deprecated */
 		trunc_s: {
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_f32_s()` instead. */ f32: (...args) => { BinaryenObj.printWarn("`.trunc_s.f32()` is deprecated; use `.trunc_f32_s()` instead."); return i32(mod).trunc_f32_s(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_f32_s} instead. */ f32: replaceWith("trunc_s.f32 -> trunc_f32_s", (...args) => i32(mod).trunc_f32_s(...args)),
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_f64_s()` instead. */ f64: (...args) => { BinaryenObj.printWarn("`.trunc_s.f64()` is deprecated; use `.trunc_f64_s()` instead."); return i32(mod).trunc_f64_s(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_f64_s} instead. */ f64: replaceWith("trunc_s.f64 -> trunc_f64_s", (...args) => i32(mod).trunc_f64_s(...args)),
 		},
 		/** @deprecated */
 		trunc_u: {
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_f32_u()` instead. */ f32: (...args) => { BinaryenObj.printWarn("`.trunc_u.f32()` is deprecated; use `.trunc_f32_u()` instead."); return i32(mod).trunc_f32_u(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_f32_u} instead. */ f32: replaceWith("trunc_u.f32 -> trunc_f32_u", (...args) => i32(mod).trunc_f32_u(...args)),
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_f64_u()` instead. */ f64: (...args) => { BinaryenObj.printWarn("`.trunc_u.f64()` is deprecated; use `.trunc_f64_u()` instead."); return i32(mod).trunc_f64_u(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_f64_u} instead. */ f64: replaceWith("trunc_u.f64 -> trunc_f64_u", (...args) => i32(mod).trunc_f64_u(...args)),
 		},
 		/** @deprecated */
 		trunc_s_sat: {
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_sat_f32_s()` instead. */ f32: (...args) => { BinaryenObj.printWarn("`.trunc_s_sat.f32()` is deprecated; use `.trunc_sat_f32_s()` instead."); return i32(mod).trunc_sat_f32_s(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_sat_f32_s} instead. */ f32: replaceWith("trunc_s_sat.f32 -> trunc_sat_f32_s", (...args) => i32(mod).trunc_sat_f32_s(...args)),
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_sat_f64_s()` instead. */ f64: (...args) => { BinaryenObj.printWarn("`.trunc_s_sat.f64()` is deprecated; use `.trunc_sat_f64_s()` instead."); return i32(mod).trunc_sat_f64_s(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_sat_f64_s} instead. */ f64: replaceWith("trunc_s_sat.f64 -> trunc_sat_f64_s", (...args) => i32(mod).trunc_sat_f64_s(...args)),
 		},
 		/** @deprecated */
 		trunc_u_sat: {
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_sat_f32_u()` instead. */ f32: (...args) => { BinaryenObj.printWarn("`.trunc_u_sat.f32()` is deprecated; use `.trunc_sat_f32_u()` instead."); return i32(mod).trunc_sat_f32_u(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_sat_f32_u} instead. */ f32: replaceWith("trunc_u_sat.f32 -> trunc_sat_f32_u", (...args) => i32(mod).trunc_sat_f32_u(...args)),
 			// @ts-expect-error
-			/** @deprecated Use `.trunc_sat_f64_u()` instead. */ f64: (...args) => { BinaryenObj.printWarn("`.trunc_u_sat.f64()` is deprecated; use `.trunc_sat_f64_u()` instead."); return i32(mod).trunc_sat_f64_u(...args); },
+			/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.trunc_sat_f64_u} instead. */ f64: replaceWith("trunc_u_sat.f64 -> trunc_sat_f64_u", (...args) => i32(mod).trunc_sat_f64_u(...args)),
 		},
 		// @ts-expect-error
-		/** @deprecated Use `.reinterpret_f32()` instead. */ reinterpret(...args) { BinaryenObj.printWarn("`.reinterpret()` is deprecated; use `.reinterpret_f32()` instead."); return this.reinterpret_f32(...args); },
+		/** @deprecated Use {@link ExpressionBuilder#i32 | ExpressionBuilder#i32.reinterpret_f32} instead. */ reinterpret: replaceWith("reinterpret -> reinterpret_f32", function (...args) { return this.reinterpret_f32(...args); }),
 
 		/** @deprecated Use {@link Module#pop} instead. */
-		pop() {
-			BinaryenObj.printWarn("`.i32.pop()` is deprecated; use `.pop(i32)` instead.");
-			return mod.pop(i32_t);
-		},
+		pop: replaceWith(
+			"i32.pop -> pop(Type.i32)",
+			() => mod.pop(Type.i32),
+		),
+		/* eslint-enable prefer-arrow-callback */
 	} as const;
 }

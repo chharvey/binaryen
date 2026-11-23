@@ -4,8 +4,11 @@ import {
 import {
 	PTR,
 	i32sToStack,
+	i8sToStack,
 	preserveStack,
+	replaceWith,
 	strToStack,
+	type TryTableCatch,
 } from "../../-utils.ts";
 import type {
 	Module,
@@ -13,9 +16,7 @@ import type {
 import {
 	type ExpressionRef,
 	Operation,
-	type Type,
-	none,
-	unreachable,
+	Type,
 } from "../../constants.ts";
 
 
@@ -51,7 +52,7 @@ export function parametrics(mod: Module) {
 export function blocks(mod: Module) {
 	return {
 		/** Creates a `(block)`. */
-		block: (name: string | null, children: readonly ExpressionRef[], resultType: Type = none): ExpressionRef => (
+		block: (name: string | null, children: readonly ExpressionRef[], resultType: Type = Type.none): ExpressionRef => (
 			preserveStack(() => BinaryenObj["_BinaryenBlock"](
 				mod[PTR],
 				name ? strToStack(name) : 0,
@@ -106,12 +107,12 @@ export function breaks(mod: Module) {
 
 		/** Branches if the reference operand is null. */
 		br_on_null: (label: string, value: ExpressionRef): ExpressionRef => (
-			brOn(Operation.BrOnNull, label, value, unreachable)
+			brOn(Operation.BrOnNull, label, value, Type.unreachable)
 		),
 
 		/** Branches if the reference operand is not null. */
 		br_on_non_null: (label: string, value: ExpressionRef): ExpressionRef => (
-			brOn(Operation.BrOnNonNull, label, value, unreachable)
+			brOn(Operation.BrOnNonNull, label, value, Type.unreachable)
 		),
 
 		/** Branches if the reference operand is successfully downcast to the given type. */
@@ -124,10 +125,12 @@ export function breaks(mod: Module) {
 			brOn(Operation.BrOnCastFail, label, value, castType)
 		),
 
+		/* eslint-disable prefer-arrow-callback */
 		// @ts-expect-error
-		/** @deprecated Use {@link ExpressionBuilder#br} instead. */ break(...args) { BinaryenObj.printWarn("`.break()` is deprecated; use `.br()` instead."); return this.br(...args); },
+		/** @deprecated Use {@link ExpressionBuilder#br} instead. */ break: replaceWith("break -> br", function (...args) { return this.br(...args); }),
 		// @ts-expect-error
-		/** @deprecated Use {@link ExpressionBuilder#br_table} instead. */ switch(...args) { BinaryenObj.printWarn("`.switch()` is deprecated; use `.br_table()` instead."); return this.br_table(...args); },
+		/** @deprecated Use {@link ExpressionBuilder#br_table} instead. */ switch: replaceWith("switch -> br_table", function (...args) { return this.br_table(...args); }),
+		/* eslint-enable prefer-arrow-callback */
 	} as const;
 }
 
@@ -174,12 +177,14 @@ export function calls(mod: Module) {
 			preserveStack(() => BinaryenObj["_BinaryenReturnCallIndirect"](mod[PTR], strToStack(table), target, i32sToStack(operands), operands.length, paramsType, resultsType))
 		),
 
+		/* eslint-disable prefer-arrow-callback */
 		// @ts-expect-error
-		/** @deprecated Use {@link ExpressionBuilder#call_indirect} instead. */ callIndirect(...args) { BinaryenObj.printWarn("`.callIndirect()` is deprecated; use `.call_indirect()` instead."); return this.call_indirect(...args); },
+		/** @deprecated Use {@link ExpressionBuilder#call_indirect} instead. */ callIndirect: replaceWith("callIndirect -> call_indirect", function (...args) { return this.call_indirect(...args); }),
 		// @ts-expect-error
-		/** @deprecated Use {@link ExpressionBuilder#return_call} instead. */ returnCall(...args) { BinaryenObj.printWarn("`.returnCall()` is deprecated; use `.return_call()` instead."); return this.return_call(...args); },
+		/** @deprecated Use {@link ExpressionBuilder#return_call} instead. */ returnCall: replaceWith("returnCall -> return_call", function (...args) { return this.return_call(...args); }),
 		// @ts-expect-error
-		/** @deprecated Use {@link ExpressionBuilder#return_call_indirect} instead. */ returnCallIndirect(...args) { BinaryenObj.printWarn("`.returnCallIndirect()` is deprecated; use `.return_call_indirect()` instead."); return this.return_call_indirect(...args); },
+		/** @deprecated Use {@link ExpressionBuilder#return_call_indirect} instead. */ returnCallIndirect: replaceWith("returnCallIndirect -> return_call_indirect", function (...args) { return this.return_call_indirect(...args); }),
+		/* eslint-enable prefer-arrow-callback */
 	} as const;
 }
 
@@ -194,18 +199,41 @@ export function throws(mod: Module) {
 		),
 
 		/** Reraise an exception. */
-		throw_ref: (target: string): ExpressionRef => (
-			preserveStack(() => BinaryenObj["_BinaryenRethrow"](mod[PTR], strToStack(target)))
+		throw_ref: (exnref: ExpressionRef): ExpressionRef => (
+			BinaryenObj["_BinaryenThrowRef"](mod[PTR], exnref)
 		),
 
 		/** Installs an exception handler that handles exceptions as specified by its catch clauses. */
-		try_table: (
+		try_table: (body: ExpressionRef, catches: readonly TryTableCatch[]): ExpressionRef => (
+			preserveStack(() => BinaryenObj["_BinaryenTryTable"](
+				mod[PTR],
+				body,
+				i32sToStack(catches.map((c) => strToStack(c.tag))),
+				i32sToStack(catches.map((c) => strToStack(c.dest))),
+				i8sToStack(catches.map((c) => Number(c.ref))),
+				catches.length,
+			))
+		),
+
+		// TODO: catch
+		// TODO: catch_ref
+		// TODO: catch_all
+		// TODO: catch_all_ref
+
+		/** @deprecated Use {@link ExpressionBuilder#throw_ref} instead. */
+		rethrow: replaceWith(
+			"rethrow -> throw_ref",
+			(target: string): ExpressionRef => preserveStack(() => BinaryenObj["_BinaryenRethrow"](mod[PTR], strToStack(target))),
+		),
+
+		/** @deprecated Use {@link ExpressionBuilder#try_table} instead. */
+		try: replaceWith("try -> try_table", (
 			name: string,
 			body: ExpressionRef,
 			catchTags: readonly string[],
 			catchBodies: readonly ExpressionRef[],
 			delegateTarget: string,
-		): ExpressionRef => preserveStack(() => BinaryenObj["_BinaryenTry"](
+		): ExpressionRef => BinaryenObj["_BinaryenTry"](
 			mod[PTR],
 			strToStack(name),
 			body,
@@ -215,15 +243,5 @@ export function throws(mod: Module) {
 			catchBodies.length,
 			strToStack(delegateTarget),
 		)),
-
-		// TODO: catch
-		// TODO: catch_ref
-		// TODO: catch_all
-		// TODO: catch_all_ref
-
-		// @ts-expect-error
-		/** @deprecated Use {@link ExpressionBuilder#throw_ref} instead. */ rethrow(...args) { BinaryenObj.printWarn("`.rethrow()` is deprecated; use `.throw_ref()` instead."); return this.throw_ref(...args); },
-		// @ts-expect-error
-		/** @deprecated Use {@link ExpressionBuilder#try_table} instead. */ try(...args) { BinaryenObj.printWarn("`.try()` is deprecated; use `.try_table()` instead."); return this.try_table(...args); },
 	} as const;
 }

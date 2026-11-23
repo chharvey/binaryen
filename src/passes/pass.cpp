@@ -129,6 +129,10 @@ void PassRegistry::registerPasses() {
   registerPass("cfp-reftest",
                "propagate constant struct field values, using ref.test",
                createConstantFieldPropagationRefTestPass);
+  registerPass("constant-arrays-to-data",
+               "convert constant array.new_fixed to array.new_data when it is "
+               "smaller",
+               createConstantArraysToDataPass);
   registerPass("constraint-analysis",
                "finds and uses mathematical constraints on locals",
                createConstraintAnalysisPass);
@@ -228,6 +232,9 @@ void PassRegistry::registerPasses() {
                createTypeRefiningGUFAPass);
   registerPass(
     "heap2local", "replace GC allocations with locals", createHeap2LocalPass);
+  registerPass("heap2local2",
+               "experimental reimplementation of heap2local",
+               createHeap2Local2Pass);
   registerPass("heap-store-optimization",
                "optimize heap (GC) stores",
                createHeapStoreOptimizationPass);
@@ -280,9 +287,15 @@ void PassRegistry::registerPasses() {
   registerPass("limit-segments",
                "attempt to merge segments to fit within web limits",
                createLimitSegmentsPass);
+  registerPass("make-shared-objects",
+               "Make structs and arrays shared and functions unshared",
+               createMakeSharedObjectsPass);
   registerPass("mark-js-called",
                "mark js called functions (using configureAll) as doing so",
                createMarkJSCalledPass);
+  registerPass("mark-noreturn",
+               "mark functions that do not return, enabling later opts",
+               createMarkNoReturnPass);
   registerPass("memory64-lowering",
                "lower loads and stores to a 64-bit memory to instead use a "
                "32-bit one",
@@ -300,7 +313,7 @@ void PassRegistry::registerPasses() {
   registerPass(
     "merge-blocks", "merges blocks to their parents", createMergeBlocksPass);
   registerPass("merge-similar-functions",
-               "merges similar functions when benefical",
+               "merges similar functions when beneficial",
                createMergeSimilarFunctionsPass);
   registerPass(
     "merge-locals", "merges locals when beneficial", createMergeLocalsPass);
@@ -328,6 +341,9 @@ void PassRegistry::registerPasses() {
   registerPass("monomorphize-always",
                "creates specialized versions of functions (even if unhelpful)",
                createMonomorphizeAlwaysPass);
+  registerPass("multi-heap2local",
+               "cleanly separate multiple heap allocations to a single local",
+               createMultiHeap2LocalPass);
   registerPass("multi-memory-lowering",
                "combines multiple memories into a single memory",
                createMultiMemoryLoweringPass);
@@ -364,6 +380,9 @@ void PassRegistry::registerPasses() {
   registerPass("optimize-instructions",
                "optimizes instruction combinations",
                createOptimizeInstructionsPass);
+  registerPass("optimize-noreturn",
+               "optimizes calls to @binaryen.noreturn functions",
+               createOptimizeNoReturnPass);
 // Outlining currently relies on LLVM's SuffixTree, which we can't rely upon
 // when building Binaryen for Emscripten.
 #ifndef SKIP_OUTLINING
@@ -372,8 +391,6 @@ void PassRegistry::registerPasses() {
   registerPass("pick-load-signs",
                "pick load signs based on their uses",
                createPickLoadSignsPass);
-  registerPass(
-    "poppify", "Transform Binaryen IR into Poppy IR", createPoppifyPass);
   registerPass("post-emscripten",
                "miscellaneous optimizations for Emscripten-generated code",
                createPostEmscriptenPass);
@@ -417,9 +434,16 @@ void PassRegistry::registerPasses() {
   registerPass("remove-non-js-ops",
                "removes operations incompatible with js",
                createRemoveNonJSOpsPass);
+  registerPass("relax-nullability",
+               "make private function params, locals, struct fields, tags, and "
+               "globals nullable, inserting ref.as_non_null where demanded",
+               createRelaxNullabilityPass);
   registerPass("remove-relaxed-simd",
                "replaces relaxed SIMD instructions with unreachable",
                createRemoveRelaxedSIMDPass);
+  registerPass("remove-empty-function-exports",
+               "removes exports of empty functions",
+               createRemoveEmptyFunctionExportsPass);
   registerPass("remove-exports",
                "removes exports using a wildcard",
                createRemoveExportsPass);
@@ -552,10 +576,17 @@ void PassRegistry::registerPasses() {
   registerPass("stack-check",
                "enforce limits on llvm's __stack_pointer global",
                createStackCheckPass);
+  registerPass("tail-call",
+               "convert calls in tail position to return calls",
+               createTailCallPass);
   registerPass("strip-debug",
                "strip debug info (including the names section)",
                createStripDebugPass);
   registerPass("strip-dwarf", "strip dwarf debug info", createStripDWARFPass);
+  registerPass("strip-refining-casts",
+               "remove casts on values flowing into slots whose declared type "
+               "the uncast value already satisfies",
+               createStripRefiningCastsPass);
   registerPass("strip-producers",
                "strip the wasm producers section",
                createStripProducersPass);
@@ -572,18 +603,14 @@ void PassRegistry::registerPasses() {
   registerPass("translate-to-exnref",
                "translate old Phase 3 EH instructions to new ones with exnref",
                createTranslateToExnrefPass);
-  registerPass("trap-mode-clamp",
-               "replace trapping operations with clamping semantics",
-               createTrapModeClamp);
-  registerPass("trap-mode-js",
-               "replace trapping operations with js semantics",
-               createTrapModeJS);
   registerPass("tuple-optimization",
                "optimize trivial tuples away",
                createTupleOptimizationPass);
   registerPass("type-finalizing",
                "mark all leaf types as final",
                createTypeFinalizingPass);
+  registerPass(
+    "type-generalizing", "generalize types", createTypeGeneralizingPass);
   registerPass("type-merging",
                "merge types to their supertypes where possible",
                createTypeMergingPass);
@@ -613,9 +640,6 @@ void PassRegistry::registerPasses() {
   registerTestPass("delete-branch-hints",
                    "delete branch hints using a list of instrumented IDs",
                    createDeleteBranchHintsPass);
-  registerTestPass("experimental-type-generalizing",
-                   "generalize types (not yet sound)",
-                   createTypeGeneralizingPass);
   registerTestPass("randomize-branch-hints",
                    "randomize branch hints (for fuzzing)",
                    createRandomizeBranchHintsPass);
@@ -665,6 +689,8 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
     addIfNoDWARFIssues("local-cse");
     // TODO: add rereloop etc. here
   }
+  // Add unreachables on noreturn calls before DCE, so DCE cleans them up.
+  addIfNoDWARFIssues("optimize-noreturn");
   addIfNoDWARFIssues("dce");
   addIfNoDWARFIssues("remove-unused-names");
   addIfNoDWARFIssues("remove-unused-brs");
@@ -706,6 +732,7 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   // simplify-locals opens opportunities for optimizations
   addIfNoDWARFIssues("remove-unused-brs");
   if (options.optimizeLevel > 1 && wasm->features.hasGC()) {
+    addIfNoDWARFIssues("multi-heap2local");
     addIfNoDWARFIssues("heap2local");
   }
   // if we are willing to work hard, also optimize copies before coalescing
@@ -736,8 +763,11 @@ void PassRunner::addDefaultFunctionOptimizationPasses() {
   addIfNoDWARFIssues(
     "remove-unused-brs"); // coalesce-locals opens opportunities
   addIfNoDWARFIssues(
-    "remove-unused-names");           // remove-unused-brs opens opportunities
-  addIfNoDWARFIssues("merge-blocks"); // clean up remove-unused-brs new blocks
+    "remove-unused-names"); // remove-unused-brs opens opportunities
+  if (options.optimizeLevel >= 3 || options.shrinkLevel >= 1) {
+    addIfNoDWARFIssues("constraint-analysis");
+  }
+  addIfNoDWARFIssues("merge-blocks"); // clean up new blocks from last passes
   // late propagation
   if (options.optimizeLevel >= 3 || options.shrinkLevel >= 2) {
     addIfNoDWARFIssues("precompute-propagate");
@@ -835,6 +865,14 @@ void PassRunner::addDefaultGlobalOptimizationPostPasses() {
     addIfNoDWARFIssues("simplify-globals");
   }
   addIfNoDWARFIssues("remove-unused-module-elements");
+  if (options.lastOpts && wasm->features.hasGC() &&
+      wasm->features.hasBulkMemory() &&
+      (options.optimizeLevel >= 2 || options.shrinkLevel >= 1)) {
+    // Converting array.new_fixed to array.new_data inhibits optimizations that
+    // need constant expressions or know the contents of the array (and
+    // OptimizeInstructions may undo it), so only do it at the very end.
+    addIfNoDWARFIssues("constant-arrays-to-data");
+  }
   if (options.optimizeLevel >= 2 && wasm->features.hasStrings()) {
     // Gather strings to globals right before reorder-globals, which will then
     // sort them properly.
@@ -1035,6 +1073,10 @@ void PassRunner::runPassOnFunction(Pass* pass, Function* func) {
     return;
   }
 
+  if (!pass->runsOnFunction(func)) {
+    return;
+  }
+
   auto passDebug = getPassDebug();
 
   // Add extra validation logic in pass-debug mode 2. The main logic in
@@ -1082,6 +1124,11 @@ void PassRunner::handleAfterEffects(Pass* pass, Function* func) {
   // Binaryen IR is modified, so we may have work here.
 
   if (!func) {
+    if (pass->addsEffects()) {
+      // Indirect call effects are now under-approximating. Clear them to avoid
+      // incorrect optimizations.
+      wasm->indirectCallEffects.clear();
+    }
     // If no function is provided, then this is not a function-parallel pass,
     // and it may have operated on any of the functions in theory, so run on
     // them all.

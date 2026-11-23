@@ -118,7 +118,7 @@ struct MemoryPacking : public Pass {
                        const std::unique_ptr<DataSegment>& segment,
                        const Referrers& referrers,
                        std::vector<Range>& ranges);
-  void createSplitSegments(Builder& builder,
+  void createSplitSegments(Module* module,
                            const DataSegment* segment,
                            std::vector<Range>& ranges,
                            std::vector<std::unique_ptr<DataSegment>>& packed,
@@ -160,7 +160,6 @@ void MemoryPacking::run(Module* module) {
   std::vector<std::unique_ptr<DataSegment>> packed;
 
   Replacements replacements;
-  Builder builder(*module);
   for (size_t index = 0; index < segments.size(); ++index) {
     auto& segment = segments[index];
     auto& currReferrers = referrers[segment->name];
@@ -178,7 +177,7 @@ void MemoryPacking::run(Module* module) {
     size_t segmentsRemaining = segments.size() - index;
     size_t currSegmentsStart = packed.size();
     createSplitSegments(
-      builder, segment.get(), ranges, packed, segmentsRemaining);
+      module, segment.get(), ranges, packed, segmentsRemaining);
     std::vector<Name> currSegmentNames;
     for (size_t i = currSegmentsStart; i < packed.size(); ++i) {
       currSegmentNames.push_back(packed[i]->name);
@@ -193,6 +192,34 @@ void MemoryPacking::run(Module* module) {
   if (canHaveSegmentReferrers) {
     replaceSegmentOps(module, replacements);
   }
+}
+
+// Whether the byte range [offset, offset + size) provably fits in the
+// declared minimum size of the memory, so that writing the segment cannot
+// trap.
+static bool
+provablyInBounds(const Memory& memory, uint64_t offset, uint64_t size) {
+  uint64_t end;
+  if (std::ckd_add(&end, offset, size)) {
+    // The mathematical end is 2^64 + |end| (the wrapped value). That is in
+    // bounds only when it is exactly 2^64, that is, |end| is 0, and the
+    // memory's declared minimum size is the maximal 2^64 bytes. (With
+    // one-byte pages the largest declarable minimum is 2^64 - 1 bytes, so a
+    // segment ending at 2^64 is never in bounds there.)
+    if (end != 0 || memory.pageSizeLog2 == 0) {
+      return false;
+    }
+    return memory.initial == (uint64_t(1) << (64 - memory.pageSizeLog2));
+  }
+  // Compare page counts rather than byte counts: the byte size of a maximal
+  // memory64 (2^48 pages) does not fit in 64 bits. Compute the number of
+  // pages needed to hold |end| bytes, rounding up as a partial page needs a
+  // whole page.
+  uint64_t endPages = end >> memory.pageSizeLog2;
+  if (end % memory.pageSize() != 0) {
+    endPages++;
+  }
+  return endPages <= memory.initial;
 }
 
 bool MemoryPacking::canOptimize(
@@ -215,7 +242,6 @@ bool MemoryPacking::canOptimize(
     return true;
   }
   // Check if it is ok for us to optimize.
-  Address maxAddress = 0;
   for (auto& segment : dataSegments) {
     if (segment->isActive()) {
       auto* c = segment->offset->dynCast<Const>();
@@ -241,9 +267,6 @@ bool MemoryPacking::canOptimize(
       if (!c) {
         return false;
       }
-      // Note the maximum address so far.
-      maxAddress = std::max(
-        maxAddress, Address(c->value.getUnsigned() + segment->data.size()));
     }
   }
   // All active segments have constant offsets, known at this time, so we may be
@@ -257,26 +280,39 @@ bool MemoryPacking::canOptimize(
       DisjointSpans::Span span{start, start + segment->data.size()};
       if (space.addAndCheckOverlap(span)) {
         // Some segments overlap, that is, a later segment tramples the data of
-        // an earlier one. If the memory is imported then we cannot optimize
-        // here: if a later segment is out of bounds then instantiation traps
-        // partway, leaving the data written so far visible in the imported
-        // memory (which outlives the failed instantiation), so even trampled
-        // data matters.
-        // TODO: We could optimize anyway if we can check that all the segments
-        //       after the trampled segment, up to and including the trampling
-        //       segment, will be in-bounds for the imported memory, as then no
-        //       trap can occur between the trampled write and the trampling
-        //       one.
+        // an earlier one. If the memory is imported then a trap on a later
+        // out-of-bounds segment leaves the data written so far visible in the
+        // imported memory (which outlives the failed instantiation), so even
+        // trampled data matters. We can only optimize if we prove no active
+        // segment can trap, which is the case when each is in bounds of the
+        // memory's declared minimum size: then instantiation always applies
+        // every segment, and only the final memory contents are observable,
+        // exactly as for a memory defined in the module.
+        // TODO: This could be finer-grained: it is enough for the segments
+        //       after a trampled segment, up to and including its trampling
+        //       segment, to be provably in-bounds, as then no trap can occur
+        //       between the trampled write and the trampling one.
         if (memory->imported()) {
-          std::cerr << "warning: active memory segments have overlap, which "
-                    << "prevents some optimizations.\n";
-          return false;
+          for (auto& seg : dataSegments) {
+            if (seg->isActive() &&
+                !provablyInBounds(
+                  *memory,
+                  seg->offset->cast<Const>()->value.getUnsigned(),
+                  seg->data.size())) {
+              std::cerr
+                << "warning: active memory segments overlap, and some may "
+                << "be out of bounds of the imported memory's declared "
+                << "minimum size, which prevents some optimizations.\n";
+              return false;
+            }
+          }
         }
-        // The memory is defined in this module, so partially-applied segments
-        // can never be observed: either instantiation completes and all the
-        // segments are applied in order, or it traps and the memory is never
-        // exposed. We can therefore zero out the trampled data, which the
-        // normal optimization of zeros will then remove.
+        // Zero out the trampled data, which the normal optimization of zeros
+        // will then remove. For a memory defined in the module
+        // partially-applied segments can never be observed (either
+        // instantiation completes and all the segments are applied in order,
+        // or it traps and the memory is never exposed), and for an imported
+        // memory we just proved that no trap is possible.
         zeroOutTrampledData(dataSegments);
         break;
       }
@@ -388,12 +424,8 @@ void MemoryPacking::calculateRanges(Module* module,
     // Check if we can rule out a trap by it being in bounds.
     if (auto* c = segment->offset->dynCast<Const>()) {
       auto* memory = module->getMemory(segment->memory);
-      auto memorySize = memory->initial << memory->pageSizeLog2;
-      Index start = c->value.getUnsigned();
-      Index size = segment->data.size();
-      Index end;
-      if (!std::ckd_add(&end, start, size) && end <= memorySize) {
-        // This is in bounds.
+      if (provablyInBounds(
+            *memory, c->value.getUnsigned(), segment->data.size())) {
         preserveTrap = false;
       }
     }
@@ -683,11 +715,12 @@ Expression* addStartAndOffset(T start, T offset, Builder& builder) {
 }
 
 void MemoryPacking::createSplitSegments(
-  Builder& builder,
+  Module* module,
   const DataSegment* segment,
   std::vector<Range>& ranges,
   std::vector<std::unique_ptr<DataSegment>>& packed,
   size_t segmentsRemaining) {
+  Builder builder(*module);
   size_t segmentCount = 0;
   bool hasExplicitName = false;
   for (size_t i = 0; i < ranges.size(); ++i) {
@@ -730,7 +763,9 @@ void MemoryPacking::createSplitSegments(
         name = segment->name;
         hasExplicitName = segment->hasExplicitName;
       } else {
-        name = segment->name.toString() + "." + std::to_string(segmentCount);
+        name = Names::getValidDataSegmentName(*module,
+                                              segment->name.toString() + "." +
+                                                std::to_string(segmentCount));
       }
       segmentCount++;
     }

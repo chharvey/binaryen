@@ -304,6 +304,7 @@ inline BinaryOp getBinary(Type type, Op op) {
   WASM_UNREACHABLE("invalid type");
 }
 
+// Logical negation, e.g. !(x < 10)  == x >= 10
 inline Op negateRelational(Op op) {
   switch (op) {
     case Eq:
@@ -331,6 +332,35 @@ inline Op negateRelational(Op op) {
   }
 }
 
+// Side flipping, e.g.  x < 10 flips to 10 > x (while still saying the same
+// thing, not negated).
+inline Op flipRelational(Op op) {
+  switch (op) {
+    case Eq:
+      return Eq;
+    case Ne:
+      return Ne;
+    case LtS:
+      return GtS;
+    case LtU:
+      return GtU;
+    case LeS:
+      return GeS;
+    case LeU:
+      return GeU;
+    case GtS:
+      return LtS;
+    case GtU:
+      return LtU;
+    case GeS:
+      return LeS;
+    case GeU:
+      return LeU;
+    default:
+      WASM_UNREACHABLE("invalid relational");
+  }
+}
+
 inline bool isRelationalSymmetric(Op op) { return op == Eq || op == Ne; }
 
 inline bool isRelationalAntisymmetric(Op op) {
@@ -348,6 +378,8 @@ inline bool isRelationalAntisymmetric(Op op) {
       return false;
   }
 }
+
+std::ostream& operator<<(std::ostream& o, Op op);
 
 } // namespace wasm::Abstract
 
